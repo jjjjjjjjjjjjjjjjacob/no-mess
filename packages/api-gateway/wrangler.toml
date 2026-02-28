@@ -1,0 +1,19 @@
+name = "no-mess-api-gateway"
+main = "src/index.ts"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Custom domain — configure DNS to point api.no-mess.xyz to Cloudflare
+# routes = [
+#   { pattern = "api.no-mess.xyz", custom_domain = true }
+# ]
+
+[vars]
+UPSTREAM_URL = "https://your-project.convex.site"
+ENVIRONMENT = "development"
+
+# KV namespace for rate limiting state
+# Create with: wrangler kv namespace create RATE_LIMIT_KV
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT_KV"
+# id = "placeholder-replace-after-creation"

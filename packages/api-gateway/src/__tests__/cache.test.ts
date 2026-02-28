@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+import { buildCacheKey } from "../cache";
+
+describe("buildCacheKey", () => {
+  it("includes API key in cache key", () => {
+    const request = new Request("https://api.no-mess.xyz/api/content/blog");
+    const cacheKey = buildCacheKey(request, "nm_abc123");
+    const url = new URL(cacheKey.url);
+    expect(url.searchParams.get("_ck")).toBe("nm_abc123");
+  });
+
+  it("uses 'anon' for null API key", () => {
+    const request = new Request("https://api.no-mess.xyz/api/content/blog");
+    const cacheKey = buildCacheKey(request, null);
+    const url = new URL(cacheKey.url);
+    expect(url.searchParams.get("_ck")).toBe("anon");
+  });
+
+  it("different API keys produce different cache keys", () => {
+    const request = new Request("https://api.no-mess.xyz/api/content/blog");
+    const key1 = buildCacheKey(request, "nm_key1");
+    const key2 = buildCacheKey(request, "nm_key2");
+    expect(key1.url).not.toBe(key2.url);
+  });
+
+  it("preserves existing query params", () => {
+    const request = new Request(
+      "https://api.no-mess.xyz/api/content/blog?preview=true",
+    );
+    const cacheKey = buildCacheKey(request, "nm_test");
+    const url = new URL(cacheKey.url);
+    expect(url.searchParams.get("preview")).toBe("true");
+    expect(url.searchParams.get("_ck")).toBe("nm_test");
+  });
+});

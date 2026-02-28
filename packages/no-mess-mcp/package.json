@@ -1,0 +1,35 @@
+{
+  "name": "@no-mess/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for no-mess headless CMS — schema introspection and content tools for AI coding agents",
+  "type": "module",
+  "bin": {
+    "no-mess-mcp": "./dist/bin/no-mess-mcp.js"
+  },
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepare": "tsc"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@no-mess/client": "workspace:*",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jjjjjjjjjjjjjjjjacob/no-mess.git",
+    "directory": "packages/no-mess-mcp"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

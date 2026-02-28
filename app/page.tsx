@@ -1,5 +1,17 @@
-import { ComponentExample } from "@/components/component-example";
+import { Footer } from "@/components/marketing/footer";
+import { Navbar } from "@/components/marketing/navbar";
+import { ScrollSections } from "@/components/marketing/scroll-sections";
 
-export default function Page() {
-return <ComponentExample />;
+export default function LandingPage() {
+  return (
+    <div className="flex min-h-svh flex-col">
+      <Navbar />
+      <main className="flex-1">
+        <ScrollSections />
+      </main>
+      <div className="snap-start">
+        <Footer />
+      </div>
+    </div>
+  );
 }

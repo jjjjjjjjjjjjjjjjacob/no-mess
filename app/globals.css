@@ -7,8 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+  --font-display: var(--font-display);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -47,82 +48,966 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
+/* =============================================================================
+   BAUHAUS BRUTALIST THEME
+   Palette: Off-white / Black / Deep Teal (Oceanic) / Coral
+   ============================================================================= */
+
 :root {
   --radius: 0;
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.58 0.22 27);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+
+  /* Core */
+  --background: oklch(0.97 0.005 90);
+  --foreground: oklch(0.08 0 0);
+  --card: oklch(0.97 0.005 90);
+  --card-foreground: oklch(0.08 0 0);
+  --popover: oklch(0.97 0.005 90);
+  --popover-foreground: oklch(0.08 0 0);
+
+  /* Primary — Deep Teal (Oceanic) */
+  --primary: oklch(0.55 0.18 195);
+  --primary-foreground: oklch(0.98 0 0);
+
+  /* Secondary — Deep Black */
+  --secondary: oklch(0.08 0 0);
+  --secondary-foreground: oklch(0.97 0.005 90);
+
+  /* Accent — Coral */
+  --accent: oklch(0.65 0.2 30);
+  --accent-foreground: oklch(0.98 0 0);
+
+  /* Muted */
+  --muted: oklch(0.92 0.005 90);
+  --muted-foreground: oklch(0.42 0 0);
+
+  /* Destructive */
+  --destructive: oklch(0.55 0.22 27);
+
+  /* Borders & Inputs */
+  --border: oklch(0.08 0 0);
+  --input: oklch(0.08 0 0 / 8%);
+  --ring: oklch(0.55 0.18 195);
+
+  /* Charts */
+  --chart-1: oklch(0.55 0.18 195);
+  --chart-2: oklch(0.65 0.2 30);
+  --chart-3: oklch(0.08 0 0);
+  --chart-4: oklch(0.65 0 0);
+  --chart-5: oklch(0.45 0 0);
+
+  /* Sidebar */
+  --sidebar: oklch(0.08 0 0);
+  --sidebar-foreground: oklch(0.97 0.005 90);
+  --sidebar-primary: oklch(0.55 0.18 195);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.14 0 0);
+  --sidebar-accent-foreground: oklch(0.97 0.005 90);
+  --sidebar-border: oklch(0.55 0.18 195);
+  --sidebar-ring: oklch(0.55 0.18 195);
+
+  /* Layout */
+  --navbar-height: 6.25rem;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.87 0.00 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.371 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: oklch(0.06 0 0);
+  --foreground: oklch(0.97 0.005 90);
+  --card: oklch(0.1 0 0);
+  --card-foreground: oklch(0.97 0.005 90);
+  --popover: oklch(0.1 0 0);
+  --popover-foreground: oklch(0.97 0.005 90);
+
+  --primary: oklch(0.62 0.18 195);
+  --primary-foreground: oklch(0.98 0 0);
+
+  --secondary: oklch(0.14 0 0);
+  --secondary-foreground: oklch(0.97 0.005 90);
+
+  --accent: oklch(0.7 0.2 30);
+  --accent-foreground: oklch(0.98 0 0);
+
+  --muted: oklch(0.14 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+
+  --border: oklch(0.97 0 0 / 14%);
+  --input: oklch(0.97 0 0 / 8%);
+  --ring: oklch(0.62 0.18 195);
+
+  --sidebar: oklch(0.04 0 0);
+  --sidebar-foreground: oklch(0.97 0.005 90);
+  --sidebar-accent: oklch(0.14 0 0);
+  --sidebar-accent-foreground: oklch(0.97 0.005 90);
+  --sidebar-border: oklch(0.62 0.18 195);
 }
 
+/* =============================================================================
+   BASE STYLES
+   ============================================================================= */
+
 @layer base {
+  *,
+  *::before,
+  *::after {
+    transition-property:
+      color, background-color, border-color, fill, stroke, box-shadow;
+    transition-duration: 300ms;
+    transition-timing-function: ease;
+  }
+
   * {
     @apply border-border outline-ring/50;
-    @apply border-border outline-ring/50;
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
+    /* Font stacks — defined on body where Next.js --font-* variables live */
+    --font-display: var(--font-anton), "Anton", system-ui, sans-serif;
+    --font-body: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
+    --font-mono: var(--font-space-mono), "Space Mono", ui-monospace, monospace;
+
     @apply bg-background text-foreground;
-    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-stretch: condensed;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    line-height: 0.9;
+  }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+  }
+
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+}
+
+/* =============================================================================
+   VIEW TRANSITION — crossfade for theme/palette switching
+   ============================================================================= */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 300ms;
+  animation-timing-function: ease;
+}
+
+/* Suppress per-element transitions during view transition capture */
+.vt-transitioning *,
+.vt-transitioning *::before,
+.vt-transitioning *::after {
+  transition-duration: 0s;
+}
+
+/* =============================================================================
+   UTILITY CLASSES
+   ============================================================================= */
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-stretch: condensed;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+  }
+
+  .font-body {
+    font-family: var(--font-body);
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* Bauhaus geometric circle */
+  .bauhaus-circle {
+    border-radius: 50%;
+  }
+
+  /* Logo triangle — responsive via CSS since border-trick can't use Tailwind breakpoints */
+  .logo-triangle {
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 20px solid var(--foreground);
+  }
+
+  @media (min-width: 640px) {
+    .logo-triangle {
+      border-left-width: 14px;
+      border-right-width: 14px;
+      border-bottom-width: 28px;
+    }
+  }
+
+  .logo-triangle-sm {
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 20px solid var(--foreground);
+  }
+
+  @media (min-width: 640px) {
+    .logo-triangle-sm {
+      border-left-width: 12px;
+      border-right-width: 12px;
+      border-bottom-width: 24px;
+    }
+  }
+
+  /* =========================================================================
+     BEN-DAY DOT PATTERNS (Lichtenstein halftone textures)
+     ========================================================================= */
+
+  /* Diagonal halftone: two offset radial-gradient layers with non-square
+     sizing create a sloped dot pattern instead of a horizontal grid.
+     The dots live on an oversized ::before pseudo that is rotated inside
+     the element. overflow:hidden on the element keeps the frame clean. */
+  .benday-dots-primary,
+  .benday-dots-accent,
+  .benday-dots-foreground {
+    overflow: hidden;
+  }
+
+  .benday-dots-primary::before,
+  .benday-dots-accent::before,
+  .benday-dots-foreground::before {
+    content: "";
+    position: absolute;
+    inset: -50%;
+    transform: rotate(15deg);
+  }
+
+  .benday-dots-primary::before {
+    background-image:
+      radial-gradient(circle, var(--primary) 4px, transparent 4px),
+      radial-gradient(circle, var(--primary) 4px, transparent 4px);
+    background-size: 24px 14px;
+    background-position:
+      0 0,
+      12px 7px;
+  }
+
+  .benday-dots-accent::before {
+    background-image:
+      radial-gradient(circle, var(--accent) 3px, transparent 3px),
+      radial-gradient(circle, var(--accent) 3px, transparent 3px);
+    background-size: 18px 10px;
+    background-position:
+      0 0,
+      9px 5px;
+  }
+
+  .benday-dots-foreground::before {
+    background-image:
+      radial-gradient(circle, var(--foreground) 2.5px, transparent 2.5px),
+      radial-gradient(circle, var(--foreground) 2.5px, transparent 2.5px);
+    background-size: 15px 9px;
+    background-position:
+      0 0,
+      7.5px 4.5px;
+  }
+
+  /* Gradient masks for dot patterns — combine with benday-dots-* to get
+     classic Lichtenstein halftone-fade where dots concentrate at edges */
+  .benday-gradient-radial {
+    -webkit-mask-image: radial-gradient(
+      ellipse at center,
+      transparent 10%,
+      black 70%
+    );
+    mask-image: radial-gradient(ellipse at center, transparent 10%, black 70%);
+  }
+
+  .benday-gradient-top {
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 70%);
+    mask-image: linear-gradient(to bottom, black 0%, transparent 70%);
+  }
+
+  .benday-gradient-bottom {
+    -webkit-mask-image: linear-gradient(to top, black 0%, transparent 70%);
+    mask-image: linear-gradient(to top, black 0%, transparent 70%);
+  }
+
+  .benday-gradient-corner {
+    -webkit-mask-image: linear-gradient(135deg, black 0%, transparent 60%);
+    mask-image: linear-gradient(135deg, black 0%, transparent 60%);
+  }
+
+  /* =========================================================================
+     3D TRANSFORM INFRASTRUCTURE
+     ========================================================================= */
+
+  .perspective-container {
+    perspective: 1200px;
+  }
+
+  .perspective-container-close {
+    perspective: 800px;
+  }
+
+  /* =========================================================================
+     SCROLL-JACKING — Beat System
+     ========================================================================= */
+
+  .scroll-section {
+    min-height: 100svh;
+  }
+
+  .scroll-beat {
+    height: calc(100svh - var(--navbar-height, 6.25rem));
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    scroll-margin-top: var(--navbar-height, 6.25rem);
+  }
+
+  /* Subtle rotation on display headings for stylistic emphasis.
+     The condensed look comes from Bebas Neue, not scaleX. */
+  .slant-heading {
+    transform: rotate(-2deg);
+  }
+
+  /* Text stroke utility */
+  .text-stroke {
+    -webkit-text-stroke: 2px currentColor;
+    /* biome-ignore lint/correctness/noUnknownProperty: text-stroke is the unprefixed standard form */
+    text-stroke: 2px currentColor;
+  }
+
+  .text-stroke-thick {
+    -webkit-text-stroke: 4px currentColor;
+    /* biome-ignore lint/correctness/noUnknownProperty: text-stroke is the unprefixed standard form */
+    text-stroke: 4px currentColor;
+  }
+
+  /* Noise/grain texture overlay */
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.04;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Diagonal stripes */
+  .stripes-bauhaus {
+    background-image: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 8px,
+      color-mix(in oklch, var(--foreground) 5%, transparent) 8px,
+      color-mix(in oklch, var(--foreground) 5%, transparent) 16px
+    );
+  }
+
+  /* Hover lift */
+  .hover-lift {
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 0 var(--foreground);
+  }
+
+  /* Brutal borders */
+  .border-brutal {
+    border: 3px solid var(--foreground);
+  }
+
+  .border-brutal-thick {
+    border: 5px solid var(--foreground);
+  }
+
+  /* Brutal shadows — theme-aware */
+  .shadow-brutal {
+    box-shadow: 5px 5px 0 var(--foreground);
+  }
+
+  .shadow-brutal-lg {
+    box-shadow: 8px 8px 0 var(--foreground);
+  }
+
+  .shadow-brutal-hover:hover {
+    box-shadow: 10px 10px 0 var(--foreground);
+  }
+
+  /* Vertical stretch */
+  .stretch-y {
+    transform: scaleY(1.1);
+  }
+
+  .stretch-y-lg {
+    transform: scaleY(1.2);
+  }
+
+  /* =========================================================================
+     BRUTALIST CTA UTILITIES
+     ========================================================================= */
+
+  /* Skewed CTA — the signature slant */
+  .cta-skew {
+    transform: skewX(-4deg);
+    transition:
+      transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .cta-skew > * {
+    transform: skewX(4deg);
+  }
+
+  .cta-skew:hover {
+    transform: skewX(-4deg) translateY(-4px);
+    box-shadow: 6px 8px 0 var(--foreground);
+  }
+
+  .cta-skew:active {
+    transform: skewX(-4deg) translateY(0);
+    box-shadow: 2px 2px 0 var(--foreground);
+  }
+
+  /* Reverse skew for secondary CTAs */
+  .cta-skew-reverse {
+    transform: skewX(4deg);
+    transition:
+      transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .cta-skew-reverse > * {
+    transform: skewX(-4deg);
+  }
+
+  .cta-skew-reverse:hover {
+    transform: skewX(4deg) translateY(-4px);
+    box-shadow: -6px 8px 0 var(--foreground);
+  }
+
+  .cta-skew-reverse:active {
+    transform: skewX(4deg) translateY(0);
+    box-shadow: -2px 2px 0 var(--foreground);
+  }
+
+  /* Diagonal propaganda banner — actual rotation, not skew */
+  .cta-diagonal {
+    transform: perspective(250px) rotateY(-45deg) rotate(-4deg);
+    transform-origin: center center;
+    transition:
+      transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .cta-diagonal:hover {
+    transform: perspective(250px) rotateY(-14deg) rotate(-4deg) translateY(-6px);
+    box-shadow: 8px 10px 0 var(--foreground);
+  }
+
+  .cta-diagonal:active {
+    transform: perspective(250px) rotateY(-14deg) rotate(-4deg) translateY(0);
+    box-shadow: 3px 3px 0 var(--foreground);
+  }
+}
+
+/* =============================================================================
+   ANIMATIONS
+   ============================================================================= */
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes marquee-reverse {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(2deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px color-mix(in oklch, var(--primary) 50%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 40px color-mix(in oklch, var(--primary) 80%, transparent);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slam-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-30px) scaleY(1.3);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(3px) scaleY(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes stamp-in {
+  0% {
+    opacity: 0;
+    transform: rotate(-6deg) scale(1.6);
+  }
+  70% {
+    opacity: 1;
+    transform: rotate(-2deg) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-2deg) scale(1);
+  }
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 3D Reveal Keyframes */
+@keyframes flip-in-x {
+  0% {
+    opacity: 0;
+    transform: rotateX(-80deg) translateY(-20px);
+  }
+  60% {
+    opacity: 1;
+    transform: rotateX(8deg) translateY(0);
+  }
+  80% {
+    transform: rotateX(-4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: rotateX(0deg);
+  }
+}
+
+@keyframes tilt-in-left {
+  0% {
+    opacity: 0;
+    transform: rotateY(35deg) translateX(-60px);
+  }
+  60% {
+    opacity: 1;
+    transform: rotateY(-5deg) translateX(0);
+  }
+  100% {
+    opacity: 1;
+    transform: rotateY(0deg) translateX(0);
+  }
+}
+
+@keyframes tilt-in-right {
+  0% {
+    opacity: 0;
+    transform: rotateY(-35deg) translateX(60px);
+  }
+  60% {
+    opacity: 1;
+    transform: rotateY(5deg) translateX(0);
+  }
+  100% {
+    opacity: 1;
+    transform: rotateY(0deg) translateX(0);
+  }
+}
+
+@keyframes pop-forward {
+  0% {
+    opacity: 0;
+    transform: translateZ(-100px) scale(0.85);
+  }
+  70% {
+    opacity: 1;
+    transform: translateZ(10px) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translateZ(0) scale(1);
+  }
+}
+
+/* ---- Perpetual background-shape keyframes ---- */
+
+@keyframes shape-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+@keyframes shape-drift {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(12px, -8px) rotate(2deg);
+  }
+  50% {
+    transform: translate(-6px, 10px) rotate(-1deg);
+  }
+  75% {
+    transform: translate(8px, 4px) rotate(1.5deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+@keyframes shape-morph {
+  0%,
+  100% {
+    border-radius: 50%;
+  }
+  25% {
+    border-radius: 40% 60% 55% 45% / 55% 40% 60% 45%;
+  }
+  50% {
+    border-radius: 55% 45% 40% 60% / 45% 55% 45% 55%;
+  }
+  75% {
+    border-radius: 45% 55% 60% 40% / 60% 45% 55% 40%;
+  }
+}
+
+@keyframes shape-pulse-scale {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.25);
+  }
+}
+
+@keyframes shape-orbit {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(16px, -16px) rotate(90deg);
+  }
+  50% {
+    transform: translate(0, -24px) rotate(180deg);
+  }
+  75% {
+    transform: translate(-16px, -16px) rotate(270deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(360deg);
+  }
+}
+
+@layer utilities {
+  .animate-marquee {
+    animation: marquee 30s linear infinite;
+  }
+  .animate-marquee-slow {
+    animation: marquee 60s linear infinite;
+  }
+  .animate-marquee-reverse {
+    animation: marquee-reverse 30s linear infinite;
+  }
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  .animate-slide-in-left {
+    animation: slide-in-left 0.6s ease-out forwards;
+  }
+  .animate-slide-in-right {
+    animation: slide-in-right 0.6s ease-out forwards;
+  }
+  .animate-slide-in-up {
+    animation: slide-in-up 0.6s ease-out forwards;
+  }
+  .animate-scale-in {
+    animation: scale-in 0.5s ease-out forwards;
+  }
+  .animate-slam-in {
+    animation: slam-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .animate-stamp-in {
+    animation: stamp-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .animate-blink {
+    animation: blink 1s step-end infinite;
+  }
+  .animate-spin-slow {
+    animation: spin-slow 20s linear infinite;
+  }
+
+  /* 3D reveal animations */
+  .animate-flip-in-x {
+    animation: flip-in-x 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .animate-tilt-in-left {
+    animation: tilt-in-left 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .animate-tilt-in-right {
+    animation: tilt-in-right 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .animate-pop-forward {
+    animation: pop-forward 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  /* Animation delays */
+  .delay-100 {
+    animation-delay: 100ms;
+  }
+  .delay-200 {
+    animation-delay: 200ms;
+  }
+  .delay-300 {
+    animation-delay: 300ms;
+  }
+  .delay-400 {
+    animation-delay: 400ms;
+  }
+  .delay-500 {
+    animation-delay: 500ms;
+  }
+  .delay-600 {
+    animation-delay: 600ms;
+  }
+  .delay-700 {
+    animation-delay: 700ms;
+  }
+  .delay-800 {
+    animation-delay: 800ms;
+  }
+
+  /* Perpetual background-shape animations */
+  .animate-shape-breathe {
+    animation: shape-breathe 10s ease-in-out infinite;
+  }
+  .animate-shape-breathe-slow {
+    animation: shape-breathe 14s ease-in-out infinite;
+  }
+  .animate-shape-drift {
+    animation: shape-drift 20s ease-in-out infinite;
+  }
+  .animate-shape-drift-slow {
+    animation: shape-drift 28s ease-in-out infinite;
+  }
+  .animate-shape-morph {
+    animation: shape-morph 16s ease-in-out infinite;
+  }
+  .animate-shape-pulse-scale {
+    animation: shape-pulse-scale 4s ease-in-out infinite;
+  }
+  .animate-shape-orbit {
+    animation: shape-orbit 24s linear infinite;
+  }
+}
+
+/* =============================================================================
+   SCROLLBAR
+   ============================================================================= */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--muted);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--foreground);
+  border: 2px solid var(--muted);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--card);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border: 2px solid var(--card);
+}
+
+/* =============================================================================
+   SHIKI DUAL-THEME
+   Activate dark variables under .dark class
+   ============================================================================= */
+
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+  font-style: var(--shiki-dark-font-style);
+  font-weight: var(--shiki-dark-font-weight);
+  text-decoration: var(--shiki-dark-text-decoration);
+}
+
+/* =============================================================================
+   REDUCED MOTION & MOBILE FALLBACKS
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0s;
+  }
+
+  .animate-flip-in-x,
+  .animate-tilt-in-left,
+  .animate-tilt-in-right,
+  .animate-pop-forward {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .animate-shape-breathe,
+  .animate-shape-breathe-slow,
+  .animate-shape-drift,
+  .animate-shape-drift-slow,
+  .animate-shape-morph,
+  .animate-shape-pulse-scale,
+  .animate-shape-orbit {
+    animation: none;
+  }
+
+  .scroll-beat {
+    transition: none;
+  }
+
+  .slant-heading {
+    transform: none;
+  }
+}
+
+/* On small viewports, 3D tilt effects fall back to slide-in-up */
+@media (max-width: 639px) {
+  .animate-tilt-in-left,
+  .animate-tilt-in-right {
+    animation-name: slide-in-up;
   }
 }

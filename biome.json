@@ -7,7 +7,16 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!node_modules", "!.next", "!dist", "!build"]
+    "includes": [
+      "**",
+      "!node_modules",
+      "!.next",
+      "!dist",
+      "!build",
+      "!convex/_generated",
+      "!.claude",
+      "!packages"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -19,7 +28,24 @@
     "rules": {
       "recommended": true,
       "suspicious": {
-        "noUnknownAtRules": "off"
+        "noUnknownAtRules": "off",
+        "noDoubleEquals": "warn",
+        "noArrayIndexKey": "off",
+        "noDocumentCookie": "off"
+      },
+      "a11y": {
+        "useSemanticElements": "off",
+        "noLabelWithoutControl": "off",
+        "useKeyWithClickEvents": "off",
+        "noRedundantAlt": "off",
+        "useFocusableInteractive": "off",
+        "noStaticElementInteractions": "off"
+      },
+      "correctness": {
+        "noUnknownTypeSelector": "off"
+      },
+      "performance": {
+        "noImgElement": "off"
       }
     },
     "domains": {
@@ -33,5 +59,25 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "**/__tests__/**",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "__mocks__/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    }
+  ]
 }

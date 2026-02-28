@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SDK build output (CI builds from source)
+packages/no-mess-client/dist/

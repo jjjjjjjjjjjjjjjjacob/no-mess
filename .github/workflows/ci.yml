@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-checks:
+    name: Static Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run static-checks
+
+  test-root:
+    name: Test (root)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun test
+
+  test-sdk:
+    name: Test (SDK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+        working-directory: packages/no-mess-client
+      - run: bun test
+        working-directory: packages/no-mess-client
+
+  test-gateway:
+    name: Test (API Gateway)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+        working-directory: packages/api-gateway
+      - run: bun test
+        working-directory: packages/api-gateway
+
+  build-sdk:
+    name: Build SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+        working-directory: packages/no-mess-client
+      - run: bun run build
+        working-directory: packages/no-mess-client
+      - name: Verify dist outputs
+        run: |
+          test -f packages/no-mess-client/dist/index.js
+          test -f packages/no-mess-client/dist/index.d.ts
+          test -f packages/no-mess-client/dist/react/index.js
+          test -f packages/no-mess-client/dist/react/index.d.ts
