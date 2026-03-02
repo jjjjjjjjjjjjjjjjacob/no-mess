@@ -16,20 +16,15 @@ export async function computeProof(
   timestamp: string,
 ): Promise<string> {
   const secretBytes = hexToBytes(sessionSecret);
-  const keyBuffer = toArrayBuffer(secretBytes);
   const key = await crypto.subtle.importKey(
     "raw",
-    keyBuffer,
+    secretBytes,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
   );
   const message = new TextEncoder().encode(`${sessionId}.${timestamp}`);
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    toArrayBuffer(message),
-  );
+  const signature = await crypto.subtle.sign("HMAC", key, message);
   return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
 
@@ -65,10 +60,4 @@ function hexToBytes(hex: string): Uint8Array {
     return new Uint8Array(0);
   }
   return new Uint8Array(matches.map((byte) => parseInt(byte, 16)));
-}
-
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const buf = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(buf).set(bytes);
-  return buf;
 }
