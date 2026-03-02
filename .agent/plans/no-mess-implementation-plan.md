@@ -375,7 +375,7 @@ Phase 2 (API)    Phase 3 (Shopify)
 ```
 bun run lint          ✅ 0 errors, 23 warnings (pre-existing shadcn)
 bunx tsc --noEmit     ✅ 0 type errors
-bun test              ✅ 26/26 tests pass (10 backend + 8 SDK + 8 other)
+bun run test          ✅ 26/26 tests pass (10 backend + 8 SDK + 8 other)
 bun run build         ✅ Next.js build succeeds (15 routes)
 ```
 

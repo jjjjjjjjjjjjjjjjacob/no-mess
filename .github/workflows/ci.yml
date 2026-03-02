@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - run: bun test
+      - run: bun run test
 
   test-sdk:
     name: Test (SDK)
@@ -38,7 +38,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
         working-directory: packages/no-mess-client
-      - run: bun test
+      - run: bun run test
         working-directory: packages/no-mess-client
 
   test-gateway:
@@ -49,7 +49,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
         working-directory: packages/api-gateway
-      - run: bun test
+      - run: bun run test
         working-directory: packages/api-gateway
 
   build-sdk:

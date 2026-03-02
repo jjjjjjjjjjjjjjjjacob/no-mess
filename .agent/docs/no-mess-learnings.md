@@ -165,7 +165,7 @@ Contextually relevant advice from building the no-mess CMS. Reference when worki
 - **Root (Convex):** `vitest.config.ts` with jsdom + globals enabled. Tests in `convex/__tests__/`. Covers: utils, previewCrypto (HMAC compute/verify, session generators)
 - **SDK (`packages/no-mess-client`):** `vitest.config.ts` minimal. Tests in `src/__tests__/`. Covers: client methods (getEntries, getEntry, getProducts, etc.), exchangePreviewSession, createPreviewHandler
 - **API Gateway (`packages/api-gateway`):** `vitest.config.ts` with `globals: false`. Tests in `src/__tests__/`. Covers: extractApiKey, buildCacheKey, proxy, CORS, logger, pipeline integration
-- **Run all:** `bun test` (root), `cd packages/no-mess-client && bun test` (SDK), `cd packages/api-gateway && bun test` (gateway)
+- **Run all:** `bun run test` (root), `cd packages/no-mess-client && bun run test` (SDK), `cd packages/api-gateway && bun run test` (gateway)
 
 ### Gateway tests must import from "vitest"
 - **When:** Writing tests in `packages/api-gateway/`
