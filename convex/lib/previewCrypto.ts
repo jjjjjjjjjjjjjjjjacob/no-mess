@@ -54,7 +54,7 @@ export async function verifyProof(
   return expected === proof;
 }
 
-function hexToBytes(hex: string): Uint8Array {
+function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
   const matches = hex.match(/.{2}/g);
   if (!matches) {
     return new Uint8Array(0);
