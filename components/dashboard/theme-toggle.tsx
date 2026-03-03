@@ -44,19 +44,40 @@ export function ThemeToggle() {
       />
       <DropdownMenuContent align="end" side="top" sideOffset={8}>
         <DropdownMenuItem
-          onClick={() => switchThemeWithTransition("light", setTheme)}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const origin = {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2,
+            };
+            switchThemeWithTransition("light", setTheme, origin);
+          }}
         >
           <Sun className="h-4 w-4" />
           Light
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => switchThemeWithTransition("dark", setTheme)}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const origin = {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2,
+            };
+            switchThemeWithTransition("dark", setTheme, origin);
+          }}
         >
           <Moon className="h-4 w-4" />
           Dark
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => switchThemeWithTransition("system", setTheme)}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const origin = {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2,
+            };
+            switchThemeWithTransition("system", setTheme, origin);
+          }}
         >
           <Monitor className="h-4 w-4" />
           System

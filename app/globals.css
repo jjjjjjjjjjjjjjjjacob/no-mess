@@ -141,6 +141,178 @@
 }
 
 /* =============================================================================
+   PALETTE OVERRIDES — class-driven, auto-resolved via .dark composition
+   ============================================================================= */
+
+.palette-electric-blue {
+  --primary: oklch(0.55 0.24 260);
+  --primary-foreground: oklch(0.98 0 0);
+  --accent: oklch(0.57 0.24 25);
+  --accent-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.55 0.24 260);
+  --sidebar-primary: oklch(0.55 0.24 260);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.55 0.24 260);
+  --sidebar-ring: oklch(0.55 0.24 260);
+  --chart-1: oklch(0.55 0.24 260);
+  --chart-2: oklch(0.57 0.24 25);
+}
+.dark.palette-electric-blue {
+  --primary: oklch(0.6 0.24 260);
+  --accent: oklch(0.6 0.24 25);
+  --ring: oklch(0.6 0.24 260);
+  --sidebar-primary: oklch(0.6 0.24 260);
+  --sidebar-border: oklch(0.6 0.24 260);
+  --sidebar-ring: oklch(0.6 0.24 260);
+  --chart-1: oklch(0.6 0.24 260);
+  --chart-2: oklch(0.6 0.24 25);
+}
+
+.palette-neon-watermelon {
+  --primary: oklch(0.72 0.25 145);
+  --primary-foreground: oklch(0.08 0 0);
+  --accent: oklch(0.62 0.27 340);
+  --accent-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.72 0.25 145);
+  --sidebar-primary: oklch(0.72 0.25 145);
+  --sidebar-primary-foreground: oklch(0.08 0 0);
+  --sidebar-border: oklch(0.72 0.25 145);
+  --sidebar-ring: oklch(0.72 0.25 145);
+  --chart-1: oklch(0.72 0.25 145);
+  --chart-2: oklch(0.62 0.27 340);
+}
+.dark.palette-neon-watermelon {
+  --primary: oklch(0.75 0.25 145);
+  --accent: oklch(0.67 0.27 340);
+  --ring: oklch(0.75 0.25 145);
+  --sidebar-primary: oklch(0.75 0.25 145);
+  --sidebar-border: oklch(0.75 0.25 145);
+  --sidebar-ring: oklch(0.75 0.25 145);
+  --chart-1: oklch(0.75 0.25 145);
+  --chart-2: oklch(0.67 0.27 340);
+}
+
+.palette-sunset {
+  --primary: oklch(0.62 0.22 50);
+  --primary-foreground: oklch(0.98 0 0);
+  --accent: oklch(0.8 0.18 85);
+  --accent-foreground: oklch(0.08 0 0);
+  --ring: oklch(0.62 0.22 50);
+  --sidebar-primary: oklch(0.62 0.22 50);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.62 0.22 50);
+  --sidebar-ring: oklch(0.62 0.22 50);
+  --chart-1: oklch(0.62 0.22 50);
+  --chart-2: oklch(0.8 0.18 85);
+}
+.dark.palette-sunset {
+  --primary: oklch(0.67 0.22 50);
+  --accent: oklch(0.82 0.18 85);
+  --ring: oklch(0.67 0.22 50);
+  --sidebar-primary: oklch(0.67 0.22 50);
+  --sidebar-border: oklch(0.67 0.22 50);
+  --sidebar-ring: oklch(0.67 0.22 50);
+  --chart-1: oklch(0.67 0.22 50);
+  --chart-2: oklch(0.82 0.18 85);
+}
+
+.palette-cyber-mint {
+  --primary: oklch(0.68 0.15 170);
+  --primary-foreground: oklch(0.08 0 0);
+  --accent: oklch(0.5 0.08 260);
+  --accent-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.68 0.15 170);
+  --sidebar-primary: oklch(0.68 0.15 170);
+  --sidebar-primary-foreground: oklch(0.08 0 0);
+  --sidebar-border: oklch(0.68 0.15 170);
+  --sidebar-ring: oklch(0.68 0.15 170);
+  --chart-1: oklch(0.68 0.15 170);
+  --chart-2: oklch(0.5 0.08 260);
+}
+.dark.palette-cyber-mint {
+  --primary: oklch(0.72 0.15 170);
+  --accent: oklch(0.55 0.08 260);
+  --ring: oklch(0.72 0.15 170);
+  --sidebar-primary: oklch(0.72 0.15 170);
+  --sidebar-border: oklch(0.72 0.15 170);
+  --sidebar-ring: oklch(0.72 0.15 170);
+  --chart-1: oklch(0.72 0.15 170);
+  --chart-2: oklch(0.55 0.08 260);
+}
+
+.palette-midnight-amber {
+  --primary: oklch(0.4 0.12 260);
+  --primary-foreground: oklch(0.98 0 0);
+  --accent: oklch(0.72 0.14 70);
+  --accent-foreground: oklch(0.08 0 0);
+  --ring: oklch(0.4 0.12 260);
+  --sidebar-primary: oklch(0.4 0.12 260);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.4 0.12 260);
+  --sidebar-ring: oklch(0.4 0.12 260);
+  --chart-1: oklch(0.4 0.12 260);
+  --chart-2: oklch(0.72 0.14 70);
+}
+.dark.palette-midnight-amber {
+  --primary: oklch(0.48 0.12 260);
+  --accent: oklch(0.76 0.14 70);
+  --ring: oklch(0.48 0.12 260);
+  --sidebar-primary: oklch(0.48 0.12 260);
+  --sidebar-border: oklch(0.48 0.12 260);
+  --sidebar-ring: oklch(0.48 0.12 260);
+  --chart-1: oklch(0.48 0.12 260);
+  --chart-2: oklch(0.76 0.14 70);
+}
+
+.palette-phosphor {
+  --primary: oklch(0.65 0.18 150);
+  --primary-foreground: oklch(0.08 0 0);
+  --accent: oklch(0.72 0.14 80);
+  --accent-foreground: oklch(0.08 0 0);
+  --ring: oklch(0.65 0.18 150);
+  --sidebar-primary: oklch(0.65 0.18 150);
+  --sidebar-primary-foreground: oklch(0.08 0 0);
+  --sidebar-border: oklch(0.65 0.18 150);
+  --sidebar-ring: oklch(0.65 0.18 150);
+  --chart-1: oklch(0.65 0.18 150);
+  --chart-2: oklch(0.72 0.14 80);
+}
+.dark.palette-phosphor {
+  --primary: oklch(0.7 0.18 150);
+  --accent: oklch(0.76 0.14 80);
+  --ring: oklch(0.7 0.18 150);
+  --sidebar-primary: oklch(0.7 0.18 150);
+  --sidebar-border: oklch(0.7 0.18 150);
+  --sidebar-ring: oklch(0.7 0.18 150);
+  --chart-1: oklch(0.7 0.18 150);
+  --chart-2: oklch(0.76 0.14 80);
+}
+
+.palette-blood-bone {
+  --primary: oklch(0.5 0.18 20);
+  --primary-foreground: oklch(0.98 0 0);
+  --accent: oklch(0.85 0.06 90);
+  --accent-foreground: oklch(0.08 0 0);
+  --ring: oklch(0.5 0.18 20);
+  --sidebar-primary: oklch(0.5 0.18 20);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.5 0.18 20);
+  --sidebar-ring: oklch(0.5 0.18 20);
+  --chart-1: oklch(0.5 0.18 20);
+  --chart-2: oklch(0.85 0.06 90);
+}
+.dark.palette-blood-bone {
+  --primary: oklch(0.55 0.18 20);
+  --accent: oklch(0.87 0.06 90);
+  --ring: oklch(0.55 0.18 20);
+  --sidebar-primary: oklch(0.55 0.18 20);
+  --sidebar-border: oklch(0.55 0.18 20);
+  --sidebar-ring: oklch(0.55 0.18 20);
+  --chart-1: oklch(0.55 0.18 20);
+  --chart-2: oklch(0.87 0.06 90);
+}
+
+/* =============================================================================
    BASE STYLES
    ============================================================================= */
 
@@ -213,10 +385,26 @@
 }
 
 /* Suppress per-element transitions during view transition capture */
+.vt-transitioning,
 .vt-transitioning *,
 .vt-transitioning *::before,
 .vt-transitioning *::after {
-  transition-duration: 0s;
+  transition: none;
+}
+
+/* Circle reveal variant — expands from click origin */
+html.vt-circle::view-transition-image-pair(root) {
+  isolation: isolate;
+}
+html.vt-circle::view-transition-old(root) {
+  animation: none;
+  z-index: 1;
+  mix-blend-mode: normal;
+}
+html.vt-circle::view-transition-new(root) {
+  animation: vt-expand-circle 500ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  z-index: 2;
+  mix-blend-mode: normal;
 }
 
 /* =============================================================================
@@ -976,6 +1164,10 @@
     animation-duration: 0s;
   }
 
+  html.vt-circle::view-transition-new(root) {
+    animation: none;
+  }
+
   .animate-flip-in-x,
   .animate-tilt-in-left,
   .animate-tilt-in-right,
@@ -1010,4 +1202,110 @@
   .animate-tilt-in-right {
     animation-name: slide-in-up;
   }
+}
+
+/* =============================================================================
+   VIEW TRANSITION DEBUG PANEL — test CSS
+   ============================================================================= */
+
+/* Panel exclusion — panel itself stays static during VT */
+.vt-debug-panel {
+  view-transition-name: vt-debug-panel;
+}
+::view-transition-old(vt-debug-panel),
+::view-transition-new(vt-debug-panel) {
+  animation: none;
+}
+
+/* Test 1 — Slow crossfade (800ms) */
+html.vt-test-crossfade::view-transition-old(root),
+html.vt-test-crossfade::view-transition-new(root) {
+  animation-duration: 800ms;
+}
+
+/* Shared base for tests 2-6 */
+html.vt-test-split-v::view-transition-image-pair(root),
+html.vt-test-split-h::view-transition-image-pair(root),
+html.vt-test-wipe-r::view-transition-image-pair(root),
+html.vt-test-wipe-d::view-transition-image-pair(root),
+html.vt-test-circle::view-transition-image-pair(root) {
+  isolation: isolate;
+}
+html.vt-test-split-v::view-transition-old(root),
+html.vt-test-split-h::view-transition-old(root),
+html.vt-test-wipe-r::view-transition-old(root),
+html.vt-test-wipe-d::view-transition-old(root),
+html.vt-test-circle::view-transition-old(root) {
+  animation: none;
+  z-index: 1;
+  mix-blend-mode: normal;
+}
+html.vt-test-split-v::view-transition-new(root),
+html.vt-test-split-h::view-transition-new(root),
+html.vt-test-wipe-r::view-transition-new(root),
+html.vt-test-wipe-d::view-transition-new(root),
+html.vt-test-circle::view-transition-new(root) {
+  z-index: 2;
+  mix-blend-mode: normal;
+}
+
+/* Hold animation — keeps pseudo-elements alive without interpolation */
+@keyframes vt-test-hold {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Test 2 — Static vertical split (left half) */
+html.vt-test-split-v::view-transition-new(root) {
+  clip-path: inset(0 50% 0 0);
+  animation: vt-test-hold 3000ms step-end forwards;
+}
+
+/* Test 3 — Static horizontal split (top half) */
+html.vt-test-split-h::view-transition-new(root) {
+  clip-path: inset(0 0 50% 0);
+  animation: vt-test-hold 3000ms step-end forwards;
+}
+
+/* Test 4 — Wipe right */
+@keyframes vt-test-wipe-right {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+html.vt-test-wipe-r::view-transition-new(root) {
+  animation: vt-test-wipe-right 800ms ease forwards;
+}
+
+/* Test 5 — Wipe down */
+@keyframes vt-test-wipe-down {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+html.vt-test-wipe-d::view-transition-new(root) {
+  animation: vt-test-wipe-down 800ms ease forwards;
+}
+
+/* Test 6 — Circle expand from center */
+@keyframes vt-test-circle-expand {
+  from {
+    clip-path: circle(0% at 50% 50%);
+  }
+  to {
+    clip-path: circle(150vmax at 50% 50%);
+  }
+}
+html.vt-test-circle::view-transition-new(root) {
+  animation: vt-test-circle-expand 800ms ease forwards;
 }

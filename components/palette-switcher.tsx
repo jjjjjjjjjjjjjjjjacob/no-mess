@@ -3,36 +3,21 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFavicon } from "@/hooks/use-favicon";
 import {
   switchThemeWithTransition,
   withViewTransition,
 } from "@/lib/view-transition";
 
 // ---------------------------------------------------------------------------
-// Palette definitions — light + dark values for each
+// Palette definitions — CSS class-driven
 // ---------------------------------------------------------------------------
-
-type PaletteVars = {
-  "--primary": string;
-  "--primary-foreground": string;
-  "--accent": string;
-  "--accent-foreground": string;
-  "--ring": string;
-  "--sidebar-primary": string;
-  "--sidebar-primary-foreground": string;
-  "--sidebar-border": string;
-  "--sidebar-ring": string;
-  "--chart-1": string;
-  "--chart-2": string;
-};
 
 type Palette = {
   id: string;
   name: string;
   primary: string; // display swatch color
   accent: string; // display swatch color
-  light: PaletteVars;
-  dark: PaletteVars;
 };
 
 const PALETTES: Palette[] = [
@@ -41,260 +26,54 @@ const PALETTES: Palette[] = [
     name: "Oceanic",
     primary: "oklch(0.55 0.18 195)",
     accent: "oklch(0.65 0.2 30)",
-    light: {
-      "--primary": "oklch(0.55 0.18 195)",
-      "--primary-foreground": "oklch(0.98 0 0)",
-      "--accent": "oklch(0.65 0.2 30)",
-      "--accent-foreground": "oklch(0.98 0 0)",
-      "--ring": "oklch(0.55 0.18 195)",
-      "--sidebar-primary": "oklch(0.55 0.18 195)",
-      "--sidebar-primary-foreground": "oklch(0.98 0 0)",
-      "--sidebar-border": "oklch(0.55 0.18 195)",
-      "--sidebar-ring": "oklch(0.55 0.18 195)",
-      "--chart-1": "oklch(0.55 0.18 195)",
-      "--chart-2": "oklch(0.65 0.2 30)",
-    },
-    dark: {
-      "--primary": "oklch(0.62 0.18 195)",
-      "--primary-foreground": "oklch(0.98 0 0)",
-      "--accent": "oklch(0.7 0.2 30)",
-      "--accent-foreground": "oklch(0.98 0 0)",
-      "--ring": "oklch(0.62 0.18 195)",
-      "--sidebar-primary": "oklch(0.62 0.18 195)",
-      "--sidebar-primary-foreground": "oklch(0.98 0 0)",
-      "--sidebar-border": "oklch(0.62 0.18 195)",
-      "--sidebar-ring": "oklch(0.62 0.18 195)",
-      "--chart-1": "oklch(0.62 0.18 195)",
-      "--chart-2": "oklch(0.7 0.2 30)",
-    },
   },
   {
     id: "electric-blue",
     name: "Electric Blue + Signal Red",
     primary: "oklch(0.55 0.24 260)",
     accent: "oklch(0.57 0.24 25)",
-    light: {
-      "--primary": "oklch(0.55 0.24 260)",
-      "--primary-foreground": "oklch(0.98 0 0)",
-      "--accent": "oklch(0.57 0.24 25)",
-      "--accent-foreground": "oklch(0.98 0 0)",
-      "--ring": "oklch(0.55 0.24 260)",
-      "--sidebar-primary": "oklch(0.55 0.24 260)",
-      "--sidebar-primary-foreground": "oklch(0.98 0 0)",
-      "--sidebar-border": "oklch(0.55 0.24 260)",
-      "--sidebar-ring": "oklch(0.55 0.24 260)",
-      "--chart-1": "oklch(0.55 0.24 260)",
-      "--chart-2": "oklch(0.57 0.24 25)",
-    },
-    dark: {
-      "--primary": "oklch(0.6 0.24 260)",
-      "--primary-foreground": "oklch(0.98 0 0)",
-      "--accent": "oklch(0.6 0.24 25)",
-      "--accent-foreground": "oklch(0.98 0 0)",
-      "--ring": "oklch(0.6 0.24 260)",
-      "--sidebar-primary": "oklch(0.6 0.24 260)",
-      "--sidebar-primary-foreground": "oklch(0.98 0 0)",
-      "--sidebar-border": "oklch(0.6 0.24 260)",
-      "--sidebar-ring": "oklch(0.6 0.24 260)",
-      "--chart-1": "oklch(0.6 0.24 260)",
-      "--chart-2": "oklch(0.6 0.24 25)",
-    },
   },
   {
     id: "neon-watermelon",
     name: "Neon Watermelon",
     primary: "oklch(0.72 0.25 145)",
     accent: "oklch(0.62 0.27 340)",
-    light: {
-      "--primary": "oklch(0.72 0.25 145)",
-      "--primary-foreground": "oklch(0.08 0 0)",
-      "--accent": "oklch(0.62 0.27 340)",
-      "--accent-foreground": "oklch(0.98 0 0)",
-      "--ring": "oklch(0.72 0.25 145)",
-      "--sidebar-primary": "oklch(0.72 0.25 145)",
-      "--sidebar-primary-foreground": "oklch(0.08 0 0)",
-      "--sidebar-border": "oklch(0.72 0.25 145)",
-      "--sidebar-ring": "oklch(0.72 0.25 145)",
-      "--chart-1": "oklch(0.72 0.25 145)",
-      "--chart-2": "oklch(0.62 0.27 340)",
-    },
-    dark: {
-      "--primary": "oklch(0.75 0.25 145)",
-      "--primary-foreground": "oklch(0.08 0 0)",
-      "--accent": "oklch(0.67 0.27 340)",
-      "--accent-foreground": "oklch(0.98 0 0)",
-      "--ring": "oklch(0.75 0.25 145)",
-      "--sidebar-primary": "oklch(0.75 0.25 145)",
-      "--sidebar-primary-foreground": "oklch(0.08 0 0)",
-      "--sidebar-border": "oklch(0.75 0.25 145)",
-      "--sidebar-ring": "oklch(0.75 0.25 145)",
-      "--chart-1": "oklch(0.75 0.25 145)",
-      "--chart-2": "oklch(0.67 0.27 340)",
-    },
   },
   {
     id: "sunset",
     name: "Sunset Brutalist",
     primary: "oklch(0.62 0.22 50)",
     accent: "oklch(0.8 0.18 85)",
-    light: {
-      "--primary": "oklch(0.62 0.22 50)",
-      "--primary-foreground": "oklch(0.98 0 0)",
-      "--accent": "oklch(0.8 0.18 85)",
-      "--accent-foreground": "oklch(0.08 0 0)",
-      "--ring": "oklch(0.62 0.22 50)",
-      "--sidebar-primary": "oklch(0.62 0.22 50)",
-      "--sidebar-primary-foreground": "oklch(0.98 0 0)",
-      "--sidebar-border": "oklch(0.62 0.22 50)",
-      "--sidebar-ring": "oklch(0.62 0.22 50)",
-      "--chart-1": "oklch(0.62 0.22 50)",
-      "--chart-2": "oklch(0.8 0.18 85)",
-    },
-    dark: {
-      "--primary": "oklch(0.67 0.22 50)",
-      "--primary-foreground": "oklch(0.98 0 0)",
-      "--accent": "oklch(0.82 0.18 85)",
-      "--accent-foreground": "oklch(0.08 0 0)",
-      "--ring": "oklch(0.67 0.22 50)",
-      "--sidebar-primary": "oklch(0.67 0.22 50)",
-      "--sidebar-primary-foreground": "oklch(0.98 0 0)",
-      "--sidebar-border": "oklch(0.67 0.22 50)",
-      "--sidebar-ring": "oklch(0.67 0.22 50)",
-      "--chart-1": "oklch(0.67 0.22 50)",
-      "--chart-2": "oklch(0.82 0.18 85)",
-    },
   },
   {
     id: "cyber-mint",
     name: "Cyber Mint",
     primary: "oklch(0.68 0.15 170)",
     accent: "oklch(0.50 0.08 260)",
-    light: {
-      "--primary": "oklch(0.68 0.15 170)",
-      "--primary-foreground": "oklch(0.08 0 0)",
-      "--accent": "oklch(0.50 0.08 260)",
-      "--accent-foreground": "oklch(0.98 0 0)",
-      "--ring": "oklch(0.68 0.15 170)",
-      "--sidebar-primary": "oklch(0.68 0.15 170)",
-      "--sidebar-primary-foreground": "oklch(0.08 0 0)",
-      "--sidebar-border": "oklch(0.68 0.15 170)",
-      "--sidebar-ring": "oklch(0.68 0.15 170)",
-      "--chart-1": "oklch(0.68 0.15 170)",
-      "--chart-2": "oklch(0.50 0.08 260)",
-    },
-    dark: {
-      "--primary": "oklch(0.72 0.15 170)",
-      "--primary-foreground": "oklch(0.08 0 0)",
-      "--accent": "oklch(0.55 0.08 260)",
-      "--accent-foreground": "oklch(0.98 0 0)",
-      "--ring": "oklch(0.72 0.15 170)",
-      "--sidebar-primary": "oklch(0.72 0.15 170)",
-      "--sidebar-primary-foreground": "oklch(0.08 0 0)",
-      "--sidebar-border": "oklch(0.72 0.15 170)",
-      "--sidebar-ring": "oklch(0.72 0.15 170)",
-      "--chart-1": "oklch(0.72 0.15 170)",
-      "--chart-2": "oklch(0.55 0.08 260)",
-    },
   },
   {
     id: "midnight-amber",
     name: "Midnight Amber",
     primary: "oklch(0.40 0.12 260)",
     accent: "oklch(0.72 0.14 70)",
-    light: {
-      "--primary": "oklch(0.40 0.12 260)",
-      "--primary-foreground": "oklch(0.98 0 0)",
-      "--accent": "oklch(0.72 0.14 70)",
-      "--accent-foreground": "oklch(0.08 0 0)",
-      "--ring": "oklch(0.40 0.12 260)",
-      "--sidebar-primary": "oklch(0.40 0.12 260)",
-      "--sidebar-primary-foreground": "oklch(0.98 0 0)",
-      "--sidebar-border": "oklch(0.40 0.12 260)",
-      "--sidebar-ring": "oklch(0.40 0.12 260)",
-      "--chart-1": "oklch(0.40 0.12 260)",
-      "--chart-2": "oklch(0.72 0.14 70)",
-    },
-    dark: {
-      "--primary": "oklch(0.48 0.12 260)",
-      "--primary-foreground": "oklch(0.98 0 0)",
-      "--accent": "oklch(0.76 0.14 70)",
-      "--accent-foreground": "oklch(0.08 0 0)",
-      "--ring": "oklch(0.48 0.12 260)",
-      "--sidebar-primary": "oklch(0.48 0.12 260)",
-      "--sidebar-primary-foreground": "oklch(0.98 0 0)",
-      "--sidebar-border": "oklch(0.48 0.12 260)",
-      "--sidebar-ring": "oklch(0.48 0.12 260)",
-      "--chart-1": "oklch(0.48 0.12 260)",
-      "--chart-2": "oklch(0.76 0.14 70)",
-    },
   },
   {
     id: "phosphor",
     name: "Phosphor Terminal",
     primary: "oklch(0.65 0.18 150)",
     accent: "oklch(0.72 0.14 80)",
-    light: {
-      "--primary": "oklch(0.65 0.18 150)",
-      "--primary-foreground": "oklch(0.08 0 0)",
-      "--accent": "oklch(0.72 0.14 80)",
-      "--accent-foreground": "oklch(0.08 0 0)",
-      "--ring": "oklch(0.65 0.18 150)",
-      "--sidebar-primary": "oklch(0.65 0.18 150)",
-      "--sidebar-primary-foreground": "oklch(0.08 0 0)",
-      "--sidebar-border": "oklch(0.65 0.18 150)",
-      "--sidebar-ring": "oklch(0.65 0.18 150)",
-      "--chart-1": "oklch(0.65 0.18 150)",
-      "--chart-2": "oklch(0.72 0.14 80)",
-    },
-    dark: {
-      "--primary": "oklch(0.70 0.18 150)",
-      "--primary-foreground": "oklch(0.08 0 0)",
-      "--accent": "oklch(0.76 0.14 80)",
-      "--accent-foreground": "oklch(0.08 0 0)",
-      "--ring": "oklch(0.70 0.18 150)",
-      "--sidebar-primary": "oklch(0.70 0.18 150)",
-      "--sidebar-primary-foreground": "oklch(0.08 0 0)",
-      "--sidebar-border": "oklch(0.70 0.18 150)",
-      "--sidebar-ring": "oklch(0.70 0.18 150)",
-      "--chart-1": "oklch(0.70 0.18 150)",
-      "--chart-2": "oklch(0.76 0.14 80)",
-    },
   },
   {
     id: "blood-bone",
     name: "Blood & Bone",
     primary: "oklch(0.50 0.18 20)",
     accent: "oklch(0.85 0.06 90)",
-    light: {
-      "--primary": "oklch(0.50 0.18 20)",
-      "--primary-foreground": "oklch(0.98 0 0)",
-      "--accent": "oklch(0.85 0.06 90)",
-      "--accent-foreground": "oklch(0.08 0 0)",
-      "--ring": "oklch(0.50 0.18 20)",
-      "--sidebar-primary": "oklch(0.50 0.18 20)",
-      "--sidebar-primary-foreground": "oklch(0.98 0 0)",
-      "--sidebar-border": "oklch(0.50 0.18 20)",
-      "--sidebar-ring": "oklch(0.50 0.18 20)",
-      "--chart-1": "oklch(0.50 0.18 20)",
-      "--chart-2": "oklch(0.85 0.06 90)",
-    },
-    dark: {
-      "--primary": "oklch(0.55 0.18 20)",
-      "--primary-foreground": "oklch(0.98 0 0)",
-      "--accent": "oklch(0.87 0.06 90)",
-      "--accent-foreground": "oklch(0.08 0 0)",
-      "--ring": "oklch(0.55 0.18 20)",
-      "--sidebar-primary": "oklch(0.55 0.18 20)",
-      "--sidebar-primary-foreground": "oklch(0.98 0 0)",
-      "--sidebar-border": "oklch(0.55 0.18 20)",
-      "--sidebar-ring": "oklch(0.55 0.18 20)",
-      "--chart-1": "oklch(0.55 0.18 20)",
-      "--chart-2": "oklch(0.87 0.06 90)",
-    },
   },
 ];
 
-const VAR_KEYS = Object.keys(PALETTES[0].light) as (keyof PaletteVars)[];
+const ALL_PALETTE_CLASSES = PALETTES.filter((p) => p.id !== "oceanic").map(
+  (p) => `palette-${p.id}`,
+);
 
 const DEFAULT_PALETTE_ID = "oceanic";
 
@@ -312,11 +91,23 @@ const LEGACY_ID_MAP: Record<string, string> = {
 
 function resolveId(raw: string | null): string {
   if (!raw) return DEFAULT_PALETTE_ID;
-  // Check legacy IDs first
   if (LEGACY_ID_MAP[raw]) return LEGACY_ID_MAP[raw];
-  // Check if it's a valid new ID
   if (PALETTES.some((p) => p.id === raw)) return raw;
   return DEFAULT_PALETTE_ID;
+}
+
+// ---------------------------------------------------------------------------
+// Apply palette via classList
+// ---------------------------------------------------------------------------
+
+function applyPalette(id: string): void {
+  const el = document.documentElement;
+  // Remove all palette classes
+  el.classList.remove(...ALL_PALETTE_CLASSES);
+  // Add the new one (oceanic = default, no class needed)
+  if (id !== DEFAULT_PALETTE_ID) {
+    el.classList.add(`palette-${id}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -354,6 +145,15 @@ function MoonIcon({ className }: { className?: string }) {
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
     </svg>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getButtonCenter(e: React.MouseEvent) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 }
 
 // ---------------------------------------------------------------------------
@@ -396,7 +196,6 @@ export function PaletteSwitcher() {
   const [activeId, setActiveId] = useState(() => {
     const fromUrl = resolveId(paramPalette);
     if (paramPalette) return fromUrl;
-    // Check localStorage
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("palette");
       if (stored) return resolveId(stored);
@@ -409,35 +208,14 @@ export function PaletteSwitcher() {
   // Clean up hover close timer on unmount
   useEffect(() => () => cancelClose(), [cancelClose]);
 
-  // Apply CSS variables whenever palette or theme changes
-  const applyPalette = useCallback(
-    (id: string) => {
-      const palette = PALETTES.find((p) => p.id === id);
-      if (!palette) return;
-
-      const isDark = resolvedTheme === "dark";
-      const vars = isDark ? palette.dark : palette.light;
-      const el = document.documentElement;
-
-      if (id === DEFAULT_PALETTE_ID) {
-        // Default palette — clear inline overrides so CSS defaults apply
-        for (const key of VAR_KEYS) {
-          el.style.removeProperty(key);
-        }
-      } else {
-        for (const key of VAR_KEYS) {
-          el.style.setProperty(key, vars[key]);
-        }
-      }
-    },
-    [resolvedTheme],
-  );
-
-  // Re-apply on theme or palette change
+  // Apply palette class whenever activeId changes
   useEffect(() => {
     if (!mounted) return;
     applyPalette(activeId);
-  }, [activeId, mounted, applyPalette]);
+  }, [activeId, mounted]);
+
+  // Dynamic favicon
+  useFavicon(activeId, resolvedTheme ?? "light");
 
   // Persist to localStorage
   useEffect(() => {
@@ -466,7 +244,6 @@ export function PaletteSwitcher() {
     if (!mounted || !paramPalette) return;
     const resolved = resolveId(paramPalette);
     if (resolved !== paramPalette) {
-      // Legacy ID detected — rewrite URL
       setActiveId(resolved);
       const params = new URLSearchParams(searchParams.toString());
       if (resolved === DEFAULT_PALETTE_ID) {
@@ -567,7 +344,10 @@ export function PaletteSwitcher() {
             <button
               key={t}
               type="button"
-              onClick={() => switchThemeWithTransition(t, setTheme)}
+              onClick={(e) => {
+                const origin = getButtonCenter(e);
+                switchThemeWithTransition(t, setTheme, origin);
+              }}
               className={`flex-1 px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
                 theme === t
                   ? "bg-foreground text-background"
@@ -589,10 +369,19 @@ export function PaletteSwitcher() {
           <button
             key={palette.id}
             type="button"
-            onClick={() => {
-              withViewTransition(() => applyPalette(palette.id));
-              selectPalette(palette.id);
-              setOpen(false);
+            onClick={(e) => {
+              const origin = getButtonCenter(e);
+              withViewTransition(
+                () => {
+                  applyPalette(palette.id);
+                  setActiveId(palette.id);
+                },
+                origin,
+                () => {
+                  selectPalette(palette.id);
+                  setOpen(false);
+                },
+              );
             }}
             className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted ${
               palette.id === activeId ? "bg-muted font-bold" : ""

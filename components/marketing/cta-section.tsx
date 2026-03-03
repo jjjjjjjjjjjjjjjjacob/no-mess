@@ -11,7 +11,7 @@ export const CtaSection = forwardRef<HTMLElement>(function CtaSection(_, ref) {
   return (
     <section
       ref={ref}
-      className="scroll-beat items-center justify-center overflow-hidden border-t-[5px] border-foreground bg-foreground text-background"
+      className="scroll-beat items-center justify-center overflow-hidden border-t-[5px] border-foreground bg-foreground text-background dark:border-background"
     >
       {/* Grain */}
       <div className="grain pointer-events-none absolute inset-0 opacity-[0.06]" />

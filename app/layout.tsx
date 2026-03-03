@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Anton, DM_Sans, Space_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { VtDebugPanel } from "@/components/dev/vt-debug-panel";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -46,6 +47,7 @@ export default function RootLayout({
       >
         <Providers>{children}</Providers>
         <Toaster />
+        {process.env.NODE_ENV === "development" && <VtDebugPanel />}
       </body>
     </html>
   );

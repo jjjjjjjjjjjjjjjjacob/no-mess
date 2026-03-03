@@ -33,7 +33,7 @@ export const HowItWorksBeatStep = forwardRef<
         "scroll-beat items-center justify-center border-t-[5px] border-foreground",
         isEven
           ? "bg-background text-foreground"
-          : "bg-secondary text-secondary-foreground",
+          : "bg-secondary text-secondary-foreground dark:bg-foreground dark:text-background dark:border-background",
       )}
     >
       {/* Animated background shapes */}
@@ -113,7 +113,9 @@ export const HowItWorksBeatStep = forwardRef<
           <p
             className={cn(
               "max-w-lg text-base sm:text-lg md:text-xl",
-              isEven ? "text-muted-foreground" : "text-secondary-foreground/50",
+              isEven
+                ? "text-muted-foreground"
+                : "text-secondary-foreground/50 dark:text-background/50",
               !isEven && "sm:ml-auto",
             )}
           >

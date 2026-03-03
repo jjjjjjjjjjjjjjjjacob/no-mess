@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@no-mess/client": "workspace:*",
+    "@no-mess/client": "*",
     "zod": "^3.24.0"
   },
   "devDependencies": {

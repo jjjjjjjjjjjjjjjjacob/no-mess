@@ -20,16 +20,14 @@ export function useScrollJacking(
   const touchStartY = useRef(0);
   const totalBeats = beatRefs.length;
 
-  // Enable/disable CSS scroll-snap on <html>
+  // CSS scroll-snap on <html> — always active (mobile gets native snap, desktop gets JS hijacking)
   useEffect(() => {
-    if (!enabled) return;
-
     document.documentElement.style.scrollSnapType = "y mandatory";
 
     return () => {
       document.documentElement.style.scrollSnapType = "";
     };
-  }, [enabled]);
+  }, []);
 
   const scrollToBeat = useCallback(
     (index: number) => {

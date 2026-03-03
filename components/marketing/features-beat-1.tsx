@@ -15,7 +15,7 @@ export const FeaturesBeat1 = forwardRef<HTMLElement>(
       <section
         ref={ref}
         className={cn(
-          "scroll-beat border-t-[5px] border-foreground bg-secondary text-secondary-foreground",
+          "scroll-beat border-t-[5px] border-foreground bg-secondary text-secondary-foreground dark:bg-foreground dark:text-background dark:border-background",
         )}
       >
         {/* Ben-day dot overlay */}
@@ -42,7 +42,7 @@ export const FeaturesBeat1 = forwardRef<HTMLElement>(
         </div>
 
         {/* Dark header bar */}
-        <div className="border-b-[5px] border-foreground bg-foreground px-4 py-3 sm:px-6">
+        <div className="border-b-[5px] border-foreground bg-foreground px-4 py-3 dark:bg-background dark:border-background sm:px-6">
           <div
             className={cn(
               "mx-auto max-w-7xl transition-all duration-500 ease-out",
@@ -51,7 +51,7 @@ export const FeaturesBeat1 = forwardRef<HTMLElement>(
                 : "-translate-x-12 opacity-0",
             )}
           >
-            <h2 className="slant-heading origin-top-left font-display text-2xl text-background sm:text-3xl md:text-4xl">
+            <h2 className="slant-heading origin-top-left font-display text-2xl text-background dark:text-foreground sm:text-3xl md:text-4xl">
               WHAT WE DON&apos;T DO
               <span className="text-primary">{" ///"}</span>
             </h2>
@@ -65,7 +65,7 @@ export const FeaturesBeat1 = forwardRef<HTMLElement>(
               <div
                 key={feature.number}
                 className={cn(
-                  "group relative border-[5px] border-foreground bg-secondary p-4 transition-all duration-600 ease-out hover:bg-primary hover:text-primary-foreground sm:p-5 md:p-6",
+                  "group relative border-[5px] border-foreground bg-secondary p-4 transition-all duration-600 ease-out hover:bg-primary hover:text-primary-foreground dark:bg-foreground dark:border-background sm:p-5 md:p-6",
                   isVisible
                     ? "translate-x-0 opacity-100"
                     : "-translate-x-16 opacity-0",
@@ -90,7 +90,7 @@ export const FeaturesBeat1 = forwardRef<HTMLElement>(
                   <h3 className="mb-2 font-display text-xl sm:text-2xl md:text-3xl">
                     {feature.title}
                   </h3>
-                  <p className="text-sm text-secondary-foreground/50 transition-colors duration-200 group-hover:text-primary-foreground/70">
+                  <p className="text-sm text-secondary-foreground/50 transition-colors duration-200 group-hover:text-primary-foreground/70 dark:text-background/50">
                     {feature.description}
                   </p>
                 </div>
