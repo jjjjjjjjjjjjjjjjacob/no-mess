@@ -33,6 +33,11 @@ export const metadata: Metadata = {
   title: "no-mess | Headless CMS for Developers",
   description:
     "A stupid-simple headless CMS for devs and their clients. Zero bloat. Zero config. Just ship.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "no-mess",
+  },
 };
 
 export default function RootLayout({
