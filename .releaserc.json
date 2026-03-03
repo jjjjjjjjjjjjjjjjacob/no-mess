@@ -16,7 +16,13 @@
     ],
     "@semantic-release/release-notes-generator",
     ["@semantic-release/changelog", { "changelogFile": "CHANGELOG.md" }],
-    "@semantic-release/npm",
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "node ../../scripts/bump-version.mjs ${nextRelease.version}",
+        "publishCmd": "npm publish --provenance --access public"
+      }
+    ],
     [
       "@semantic-release/github",
       { "successComment": false, "failTitle": false }

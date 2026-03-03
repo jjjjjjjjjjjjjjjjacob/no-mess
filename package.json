@@ -14,7 +14,7 @@
     "static-checks": "biome check && tsc --noEmit && bun run test",
     "test": "vitest run",
     "test:watch": "vitest",
-    "release": "multi-semantic-release",
+    "release": "multi-semantic-release --ignore-private-packages",
     "prepare": "husky"
   },
   "dependencies": {
@@ -46,6 +46,7 @@
     "@commitlint/config-conventional": "^20.4.2",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^12.0.6",
     "@semantic-release/npm": "^13.1.5",
