@@ -88,7 +88,7 @@
     },
     "packages/no-mess-client": {
       "name": "@no-mess/client",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "devDependencies": {
         "@testing-library/react": "^16.0.0",
         "@types/react": "^19",
@@ -108,13 +108,13 @@
     },
     "packages/no-mess-mcp": {
       "name": "@no-mess/mcp",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "bin": {
         "no-mess-mcp": "./dist/bin/no-mess-mcp.js",
       },
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.0.0",
-        "@no-mess/client": "*",
+        "@no-mess/client": "0.1.1",
         "zod": "^3.24.0",
       },
       "devDependencies": {
