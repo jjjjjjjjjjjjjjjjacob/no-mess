@@ -154,13 +154,13 @@ export function useScrollJacking(
   useEffect(() => {
     if (!enabled) return;
 
-    let rafId: number;
+    let rafId: number | null = null;
 
     const handleScroll = () => {
       // Skip during programmatic transitions (scrollIntoView)
       if (isTransitioning.current) return;
 
-      cancelAnimationFrame(rafId);
+      if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         let closestBeat = 0;
         let closestDistance = Infinity;
@@ -183,7 +183,7 @@ export function useScrollJacking(
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      cancelAnimationFrame(rafId);
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, [beatRefs, enabled, totalBeats]);
 
