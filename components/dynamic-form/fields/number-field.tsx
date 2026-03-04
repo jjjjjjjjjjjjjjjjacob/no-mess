@@ -10,6 +10,7 @@ export function NumberField({ value, onChange, disabled }: NumberFieldProps) {
   return (
     <Input
       type="number"
+      inputMode="numeric"
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
       disabled={disabled}

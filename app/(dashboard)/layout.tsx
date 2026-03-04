@@ -1,5 +1,4 @@
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
-import { DashboardBreadcrumb } from "@/components/dashboard/dashboard-breadcrumb";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
@@ -11,12 +10,9 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="flex h-screen flex-col overflow-hidden">
         <DashboardHeader />
-        <div className="px-6 pt-4">
-          <DashboardBreadcrumb />
-        </div>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );

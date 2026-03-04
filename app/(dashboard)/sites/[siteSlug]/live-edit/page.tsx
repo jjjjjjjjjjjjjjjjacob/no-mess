@@ -79,8 +79,8 @@ export default function LiveEditIndexPage() {
                 key={ct._id}
                 href={`/sites/${siteSlug}/live-edit/${ct.slug}`}
               >
-                <Card className="flex items-center gap-3 p-4 transition-colors hover:bg-accent">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
+                <Card className="h-full flex-row items-center gap-3 p-4 py-4 transition-colors hover:bg-accent">
+                  <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">{ct.name}</p>
                     {ct.description && (

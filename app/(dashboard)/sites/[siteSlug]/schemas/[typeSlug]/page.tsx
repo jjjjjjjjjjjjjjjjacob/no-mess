@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { Save, Trash2, Undo2, Upload } from "lucide-react";
+import { Code, Save, Trash2, Undo2, Upload } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +9,8 @@ import {
   ContentTypeForm,
   type ContentTypeFormData,
 } from "@/components/content-types/content-type-form";
+import { SchemaExportPanel } from "@/components/schemas/schema-export-panel";
+import { SchemaImportDialog } from "@/components/schemas/schema-import-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,11 +23,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { useSite } from "@/hooks/use-site";
 import { useBeforeUnload, useKeyboardSave } from "@/hooks/use-unsaved-changes";
+import { generateContentTypeSource } from "@/packages/no-mess-client/src/schema";
 
 function formatTimeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -51,8 +61,11 @@ export default function EditSchemaPage() {
   const publishMutation = useMutation(api.contentTypes.publish);
   const discardDraftMutation = useMutation(api.contentTypes.discardDraft);
 
+  const analytics = useAnalytics();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
 
@@ -87,6 +100,16 @@ export default function EditSchemaPage() {
     };
   }, [contentType]);
 
+  const exportCode = useMemo(() => {
+    if (!contentType) return "";
+    return generateContentTypeSource({
+      slug: contentType.slug,
+      name: contentType.name,
+      description: contentType.description,
+      fields: contentType.fields,
+    });
+  }, [contentType]);
+
   // Track form changes
   const handleFormChange = useCallback(
     (data: ContentTypeFormData) => {
@@ -115,13 +138,18 @@ export default function EditSchemaPage() {
         fields: formDataRef.current.fields,
       });
       setIsDirty(false);
+      analytics.trackSchemaDraftSaved({
+        site_id: site?._id,
+        field_count: formDataRef.current.fields.length,
+        is_new: false,
+      });
       toast.success("Draft saved");
     } catch {
       toast.error("Failed to save draft");
     } finally {
       setIsSavingDraft(false);
     }
-  }, [contentType, saveDraftMutation]);
+  }, [contentType, saveDraftMutation, analytics, site]);
 
   // Auto-save wiring
   const { lastSavedAt } = useAutoSave({
@@ -159,6 +187,11 @@ export default function EditSchemaPage() {
       });
       await publishMutation({ contentTypeId: contentType._id });
       setIsDirty(false);
+      analytics.trackSchemaPublished({
+        site_id: site?._id ?? "",
+        field_count: formDataRef.current.fields.length,
+        field_types: formDataRef.current.fields.map((f) => f.type),
+      });
       toast.success("Schema published");
       if (formDataRef.current.slug !== contentType.slug) {
         router.replace(
@@ -186,6 +219,7 @@ export default function EditSchemaPage() {
     try {
       await discardDraftMutation({ contentTypeId: contentType._id });
       setIsDirty(false);
+      analytics.trackSchemaDraftSaved({ action: "discarded" });
       toast.success("Draft discarded");
     } catch {
       toast.error("Failed to discard draft");
@@ -198,6 +232,7 @@ export default function EditSchemaPage() {
     if (!contentType) return;
     try {
       await removeContentType({ contentTypeId: contentType._id });
+      analytics.trackSchemaDeleted({ site_id: site?._id ?? "" });
       toast.success("Schema deleted");
       router.push(`/sites/${siteSlug}/schemas`);
     } catch {
@@ -257,6 +292,30 @@ export default function EditSchemaPage() {
           {statusBadge}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              analytics.trackSchemaExported({
+                export_type: "single",
+              });
+              setShowExportDialog(true);
+            }}
+          >
+            <Code className="mr-2 h-3 w-3" />
+            Export
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              analytics.trackSchemaImported({ step: "dialog_opened" });
+              setShowImportDialog(true);
+            }}
+          >
+            <Code className="mr-2 h-3 w-3" />
+            Import
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -347,6 +406,28 @@ export default function EditSchemaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Export dialog */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Export: {contentType.name}</DialogTitle>
+          </DialogHeader>
+          <SchemaExportPanel
+            code={exportCode}
+            filename={`${contentType.slug}.ts`}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Import dialog */}
+      {site && (
+        <SchemaImportDialog
+          open={showImportDialog}
+          onOpenChange={setShowImportDialog}
+          siteId={site._id}
+        />
+      )}
     </div>
   );
 }

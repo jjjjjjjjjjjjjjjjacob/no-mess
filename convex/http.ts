@@ -325,7 +325,104 @@ http.route({
 http.route({
   pathPrefix: "/api/schema/",
   method: "OPTIONS",
-  handler: httpAction(async () => corsPreflightResponse()),
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }),
+});
+
+// POST /api/schema/sync — Push schema definitions from CLI / dashboard import
+http.route({
+  path: "/api/schema/sync",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    // Require secret key (not publishable)
+    const auth = await authenticateRequest(ctx, request, "secret");
+    if ("error" in auth) return auth.error;
+    const { site } = auth;
+
+    let body: {
+      contentTypes?: {
+        slug: string;
+        name: string;
+        description?: string;
+        fields: {
+          name: string;
+          type: string;
+          required: boolean;
+          description?: string;
+          options?: { choices?: { label: string; value: string }[] };
+        }[];
+      }[];
+    };
+
+    try {
+      body = await request.json();
+    } catch {
+      return corsJsonError("Invalid JSON body", 400);
+    }
+
+    if (!body.contentTypes || !Array.isArray(body.contentTypes)) {
+      return corsJsonError(
+        "Missing or invalid contentTypes array in request body",
+        400,
+      );
+    }
+
+    if (body.contentTypes.length === 0) {
+      return corsJsonError("contentTypes array must not be empty", 400);
+    }
+
+    // Validate each content type has required fields
+    const validationErrors: string[] = [];
+    for (const ct of body.contentTypes) {
+      if (!ct.slug || typeof ct.slug !== "string") {
+        validationErrors.push("Each content type must have a slug");
+      }
+      if (!ct.name || typeof ct.name !== "string") {
+        validationErrors.push(
+          `Content type "${ct.slug ?? "unknown"}" must have a name`,
+        );
+      }
+      if (!Array.isArray(ct.fields)) {
+        validationErrors.push(
+          `Content type "${ct.slug ?? "unknown"}" must have a fields array`,
+        );
+      }
+    }
+
+    if (validationErrors.length > 0) {
+      return corsJsonError(validationErrors.join("; "), 400);
+    }
+
+    try {
+      const results = await ctx.runMutation(
+        internal.contentTypes.syncFromSchema,
+        {
+          // biome-ignore lint/suspicious/noExplicitAny: Convex ID type coercion
+          siteId: site._id as any,
+          // biome-ignore lint/suspicious/noExplicitAny: Convex field type coercion
+          contentTypes: body.contentTypes as any,
+        },
+      );
+
+      return corsJsonResponseNoCache({
+        synced: results,
+        errors: [],
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to sync schema";
+      return corsJsonError(message, 500);
+    }
+  }),
 });
 
 // Schema introspection handler (shared by exact and prefix routes)

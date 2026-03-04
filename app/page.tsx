@@ -1,4 +1,3 @@
-import { Footer } from "@/components/marketing/footer";
 import { Navbar } from "@/components/marketing/navbar";
 import { ScrollSections } from "@/components/marketing/scroll-sections";
 
@@ -9,9 +8,6 @@ export default function LandingPage() {
       <main className="flex-1">
         <ScrollSections />
       </main>
-      <div className="snap-start">
-        <Footer />
-      </div>
     </div>
   );
 }

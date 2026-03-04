@@ -20,6 +20,7 @@ export const docsNavigation: DocNavGroup[] = [
     title: "Reference",
     items: [
       { title: "Field Types", href: "/docs/field-types" },
+      { title: "CLI & Schema as Code", href: "/docs/cli" },
       { title: "SDK Usage", href: "/docs/sdk" },
       { title: "API Reference", href: "/docs/api" },
     ],

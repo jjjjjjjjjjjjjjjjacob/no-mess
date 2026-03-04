@@ -84,6 +84,17 @@ export default function GettingStartedPage() {
             (Date/Time)
           </li>
         </ul>
+        <DocsCallout type="tip" title="Prefer code?">
+          You can also define schemas in TypeScript using the{" "}
+          <a href="/docs/cli" className="font-medium text-primary underline">
+            CLI &amp; Schema as Code
+          </a>{" "}
+          workflow. Run{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            no-mess push
+          </code>{" "}
+          to sync your schema file to the dashboard.
+        </DocsCallout>
       </DocsStep>
 
       <DocsStep number={4} title="Create content entries">
@@ -175,6 +186,12 @@ export default async function BlogPage() {
             Field Types Reference
           </a>{" "}
           &mdash; learn about all 9 field types
+        </li>
+        <li>
+          <a href="/docs/cli" className="font-medium text-primary underline">
+            CLI &amp; Schema as Code
+          </a>{" "}
+          &mdash; define schemas in TypeScript and sync with the CLI
         </li>
         <li>
           <a href="/docs/sdk" className="font-medium text-primary underline">

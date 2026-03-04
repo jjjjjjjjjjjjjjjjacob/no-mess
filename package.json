@@ -32,13 +32,17 @@
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
+    "posthog-js": "^1.357.2",
+    "posthog-node": "^5.26.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-resizable-panels": "^4.6.5",
     "shadcn": "^3.7.0",
     "shiki": "^3.21.0",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "vaul": "^1.1.2",
+    "web-haptics": "^0.0.6"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",

@@ -74,6 +74,8 @@ export default function SignUpPage() {
               </Clerk.FieldState>
             </Clerk.Field>
 
+            <div id="clerk-captcha" />
+
             <SignUp.Action submit asChild>
               <AuthSubmitButton>SIGN UP</AuthSubmitButton>
             </SignUp.Action>

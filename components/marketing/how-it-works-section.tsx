@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { stepAnimations, steps } from "./how-it-works-data";
 
 function useScrollReveal(threshold = 0.1) {
   const ref = useRef<HTMLDivElement>(null);
@@ -27,34 +28,6 @@ function useScrollReveal(threshold = 0.1) {
 
   return { ref, isVisible };
 }
-
-const steps = [
-  {
-    number: "01",
-    title: "CREATE SITE",
-    description: "30 seconds. One form. API key generated instantly.",
-    color: "primary" as const,
-  },
-  {
-    number: "02",
-    title: "DEFINE SCHEMA",
-    description: "Drag fields. Hit save. Your content types are ready.",
-    color: "accent" as const,
-  },
-  {
-    number: "03",
-    title: "SHIP IT",
-    description: "Install SDK. Fetch content. Deploy. Touch grass.",
-    color: "primary" as const,
-    command: "bun add @no-mess/client",
-  },
-];
-
-const stepAnimations = [
-  "animate-tilt-in-left",
-  "animate-tilt-in-right",
-  "animate-flip-in-x",
-] as const;
 
 export const HowItWorksSection = forwardRef<HTMLElement>(
   function HowItWorksSection(_, forwardedRef) {
