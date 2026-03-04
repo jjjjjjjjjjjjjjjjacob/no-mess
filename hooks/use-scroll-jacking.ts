@@ -67,15 +67,16 @@ export function useScrollJacking(
       if (Math.abs(e.deltaY) < 5) return;
 
       const direction = e.deltaY > 0 ? "down" : "up";
-      const toBeat = direction === "down" ? currentBeat + 1 : currentBeat - 1;
-
+      const toBeat = Math.max(
+        0,
+        Math.min(
+          direction === "down" ? currentBeat + 1 : currentBeat - 1,
+          totalBeats - 1,
+        ),
+      );
+      if (toBeat === currentBeat) return;
       onNavigate?.("wheel", direction, currentBeat, toBeat);
-
-      if (direction === "down") {
-        scrollToBeat(currentBeat + 1);
-      } else {
-        scrollToBeat(currentBeat - 1);
-      }
+      scrollToBeat(toBeat);
     };
 
     window.addEventListener("wheel", handleWheel, { passive: false });
@@ -83,7 +84,7 @@ export function useScrollJacking(
     return () => {
       window.removeEventListener("wheel", handleWheel);
     };
-  }, [currentBeat, scrollToBeat, enabled, onNavigate]);
+  }, [currentBeat, scrollToBeat, enabled, onNavigate, totalBeats]);
 
   // Touch: prevent native touch scroll, trigger on swipe end
   useEffect(() => {
@@ -105,14 +106,16 @@ export function useScrollJacking(
       if (Math.abs(deltaY) < 50) return;
 
       const direction = deltaY > 0 ? "down" : "up";
-      const toBeat = direction === "down" ? currentBeat + 1 : currentBeat - 1;
-      onNavigate?.("touch", direction as "up" | "down", currentBeat, toBeat);
-
-      if (deltaY > 0) {
-        scrollToBeat(currentBeat + 1);
-      } else {
-        scrollToBeat(currentBeat - 1);
-      }
+      const toBeat = Math.max(
+        0,
+        Math.min(
+          direction === "down" ? currentBeat + 1 : currentBeat - 1,
+          totalBeats - 1,
+        ),
+      );
+      if (toBeat === currentBeat) return;
+      onNavigate?.("touch", direction, currentBeat, toBeat);
+      scrollToBeat(toBeat);
     };
 
     window.addEventListener("touchstart", handleTouchStart, { passive: true });
@@ -124,7 +127,7 @@ export function useScrollJacking(
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [currentBeat, scrollToBeat, enabled, onNavigate]);
+  }, [currentBeat, scrollToBeat, enabled, onNavigate, totalBeats]);
 
   // Keyboard navigation
   useEffect(() => {
