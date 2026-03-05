@@ -46,6 +46,7 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+  --breakpoint-xs: 460px;
 }
 
 /* =============================================================================
@@ -312,6 +313,126 @@
   --chart-2: oklch(0.87 0.06 90);
 }
 
+.palette-ultraviolet {
+  --primary: oklch(0.45 0.22 290);
+  --primary-foreground: oklch(0.98 0 0);
+  --accent: oklch(0.75 0.16 60);
+  --accent-foreground: oklch(0.08 0 0);
+  --ring: oklch(0.45 0.22 290);
+  --sidebar-primary: oklch(0.45 0.22 290);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.45 0.22 290);
+  --sidebar-ring: oklch(0.45 0.22 290);
+  --chart-1: oklch(0.45 0.22 290);
+  --chart-2: oklch(0.75 0.16 60);
+}
+.dark.palette-ultraviolet {
+  --primary: oklch(0.51 0.22 290);
+  --accent: oklch(0.79 0.16 60);
+  --ring: oklch(0.51 0.22 290);
+  --sidebar-primary: oklch(0.51 0.22 290);
+  --sidebar-border: oklch(0.51 0.22 290);
+  --sidebar-ring: oklch(0.51 0.22 290);
+  --chart-1: oklch(0.51 0.22 290);
+  --chart-2: oklch(0.79 0.16 60);
+}
+
+.palette-sakura {
+  --primary: oklch(0.68 0.18 350);
+  --primary-foreground: oklch(0.08 0 0);
+  --accent: oklch(0.55 0.12 230);
+  --accent-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.68 0.18 350);
+  --sidebar-primary: oklch(0.68 0.18 350);
+  --sidebar-primary-foreground: oklch(0.08 0 0);
+  --sidebar-border: oklch(0.68 0.18 350);
+  --sidebar-ring: oklch(0.68 0.18 350);
+  --chart-1: oklch(0.68 0.18 350);
+  --chart-2: oklch(0.55 0.12 230);
+}
+.dark.palette-sakura {
+  --primary: oklch(0.72 0.18 350);
+  --accent: oklch(0.6 0.12 230);
+  --ring: oklch(0.72 0.18 350);
+  --sidebar-primary: oklch(0.72 0.18 350);
+  --sidebar-border: oklch(0.72 0.18 350);
+  --sidebar-ring: oklch(0.72 0.18 350);
+  --chart-1: oklch(0.72 0.18 350);
+  --chart-2: oklch(0.6 0.12 230);
+}
+
+.palette-acid-rain {
+  --primary: oklch(0.78 0.22 110);
+  --primary-foreground: oklch(0.08 0 0);
+  --accent: oklch(0.55 0.2 300);
+  --accent-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.78 0.22 110);
+  --sidebar-primary: oklch(0.78 0.22 110);
+  --sidebar-primary-foreground: oklch(0.08 0 0);
+  --sidebar-border: oklch(0.78 0.22 110);
+  --sidebar-ring: oklch(0.78 0.22 110);
+  --chart-1: oklch(0.78 0.22 110);
+  --chart-2: oklch(0.55 0.2 300);
+}
+.dark.palette-acid-rain {
+  --primary: oklch(0.82 0.22 110);
+  --accent: oklch(0.6 0.2 300);
+  --ring: oklch(0.82 0.22 110);
+  --sidebar-primary: oklch(0.82 0.22 110);
+  --sidebar-border: oklch(0.82 0.22 110);
+  --sidebar-ring: oklch(0.82 0.22 110);
+  --chart-1: oklch(0.82 0.22 110);
+  --chart-2: oklch(0.6 0.2 300);
+}
+
+.palette-rust-steel {
+  --primary: oklch(0.55 0.14 40);
+  --primary-foreground: oklch(0.98 0 0);
+  --accent: oklch(0.58 0.04 240);
+  --accent-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.55 0.14 40);
+  --sidebar-primary: oklch(0.55 0.14 40);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.55 0.14 40);
+  --sidebar-ring: oklch(0.55 0.14 40);
+  --chart-1: oklch(0.55 0.14 40);
+  --chart-2: oklch(0.58 0.04 240);
+}
+.dark.palette-rust-steel {
+  --primary: oklch(0.6 0.14 40);
+  --accent: oklch(0.63 0.04 240);
+  --ring: oklch(0.6 0.14 40);
+  --sidebar-primary: oklch(0.6 0.14 40);
+  --sidebar-border: oklch(0.6 0.14 40);
+  --sidebar-ring: oklch(0.6 0.14 40);
+  --chart-1: oklch(0.6 0.14 40);
+  --chart-2: oklch(0.63 0.04 240);
+}
+
+.palette-tropical {
+  --primary: oklch(0.6 0.2 210);
+  --primary-foreground: oklch(0.98 0 0);
+  --accent: oklch(0.72 0.22 135);
+  --accent-foreground: oklch(0.08 0 0);
+  --ring: oklch(0.6 0.2 210);
+  --sidebar-primary: oklch(0.6 0.2 210);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.6 0.2 210);
+  --sidebar-ring: oklch(0.6 0.2 210);
+  --chart-1: oklch(0.6 0.2 210);
+  --chart-2: oklch(0.72 0.22 135);
+}
+.dark.palette-tropical {
+  --primary: oklch(0.65 0.2 210);
+  --accent: oklch(0.76 0.22 135);
+  --ring: oklch(0.65 0.2 210);
+  --sidebar-primary: oklch(0.65 0.2 210);
+  --sidebar-border: oklch(0.65 0.2 210);
+  --sidebar-ring: oklch(0.65 0.2 210);
+  --chart-1: oklch(0.65 0.2 210);
+  --chart-2: oklch(0.76 0.22 135);
+}
+
 /* =============================================================================
    BASE STYLES
    ============================================================================= */
@@ -330,8 +451,25 @@
     @apply border-border outline-ring/50;
   }
 
+  /* Feature cards own transition-all at 600ms — prevent the global 300ms
+     transition from fighting it on children and pseudo-elements */
+  .feature-card,
+  .feature-card *,
+  .feature-card *::before,
+  .feature-card *::after {
+    transition-property: none;
+    transition-duration: 0ms;
+  }
+  /* Re-enable only the card's own intentional transitions */
+  .feature-card {
+    transition-property: all;
+    transition-duration: 600ms;
+    transition-timing-function: ease-out;
+  }
+
   html {
     scroll-behavior: smooth;
+    overscroll-behavior-y: contain;
   }
 
   body {
@@ -476,13 +614,15 @@ html.vt-circle::view-transition-new(root) {
      the element. overflow:hidden on the element keeps the frame clean. */
   .benday-dots-primary,
   .benday-dots-accent,
-  .benday-dots-foreground {
+  .benday-dots-foreground,
+  .benday-dots-background {
     overflow: hidden;
   }
 
   .benday-dots-primary::before,
   .benday-dots-accent::before,
-  .benday-dots-foreground::before {
+  .benday-dots-foreground::before,
+  .benday-dots-background::before {
     content: "";
     position: absolute;
     inset: -50%;
@@ -513,6 +653,16 @@ html.vt-circle::view-transition-new(root) {
     background-image:
       radial-gradient(circle, var(--foreground) 2.5px, transparent 2.5px),
       radial-gradient(circle, var(--foreground) 2.5px, transparent 2.5px);
+    background-size: 15px 9px;
+    background-position:
+      0 0,
+      7.5px 4.5px;
+  }
+
+  .benday-dots-background::before {
+    background-image:
+      radial-gradient(circle, var(--background) 2.5px, transparent 2.5px),
+      radial-gradient(circle, var(--background) 2.5px, transparent 2.5px);
     background-size: 15px 9px;
     background-position:
       0 0,
@@ -574,6 +724,7 @@ html.vt-circle::view-transition-new(root) {
     scroll-snap-align: start;
     scroll-snap-stop: always;
     scroll-margin-top: var(--navbar-height, 6.25rem);
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Subtle rotation on display headings for stylistic emphasis.
@@ -936,7 +1087,7 @@ html.vt-circle::view-transition-new(root) {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.15);
+    transform: scale(1.25);
   }
 }
 
@@ -945,13 +1096,13 @@ html.vt-circle::view-transition-new(root) {
     transform: translate(0, 0) rotate(0deg);
   }
   25% {
-    transform: translate(12px, -8px) rotate(2deg);
+    transform: translate(18px, -12px) rotate(3deg);
   }
   50% {
-    transform: translate(-6px, 10px) rotate(-1deg);
+    transform: translate(-9px, 15px) rotate(-1.5deg);
   }
   75% {
-    transform: translate(8px, 4px) rotate(1.5deg);
+    transform: translate(12px, 6px) rotate(2deg);
   }
   100% {
     transform: translate(0, 0) rotate(0deg);
@@ -980,7 +1131,7 @@ html.vt-circle::view-transition-new(root) {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.25);
+    transform: scale(1.4);
   }
 }
 
@@ -989,13 +1140,13 @@ html.vt-circle::view-transition-new(root) {
     transform: translate(0, 0) rotate(0deg);
   }
   25% {
-    transform: translate(16px, -16px) rotate(90deg);
+    transform: translate(22px, -22px) rotate(90deg);
   }
   50% {
-    transform: translate(0, -24px) rotate(180deg);
+    transform: translate(0, -34px) rotate(180deg);
   }
   75% {
-    transform: translate(-16px, -16px) rotate(270deg);
+    transform: translate(-22px, -22px) rotate(270deg);
   }
   100% {
     transform: translate(0, 0) rotate(360deg);
@@ -1104,6 +1255,44 @@ html.vt-circle::view-transition-new(root) {
   }
   .animate-shape-orbit {
     animation: shape-orbit 24s linear infinite;
+  }
+}
+
+/* =============================================================================
+   SAFE AREA UTILITIES — for notched / dynamic-island devices
+   ============================================================================= */
+
+@utility safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility safe-x {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+@utility safe-y {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* =============================================================================
+   TOUCH TARGET EXPANSION — expand tap area without changing visual size
+   ============================================================================= */
+
+@utility touch-target-expand {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
   }
 }
 

@@ -1,7 +1,12 @@
 import { ConvexError, v } from "convex/values";
-import { internalQuery, mutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server";
 import { requireSiteAccess, requireSiteOwner } from "./lib/access";
-import { contentFieldsValidator } from "./lib/validators";
+import { contentFieldsValidator, fieldTypeValidator } from "./lib/validators";
 
 export const create = mutation({
   args: {
@@ -491,5 +496,124 @@ export const discardDraft = mutation({
       draftUpdatedAt: undefined,
       updatedAt: Date.now(),
     });
+  },
+});
+
+/**
+ * Internal mutation used by the schema sync HTTP endpoint and CLI.
+ * For each content type definition in the payload:
+ *   - If slug exists: update as draft (merge, never delete existing fields)
+ *   - If slug doesn't exist: create as draft
+ * Never deletes content types or fields not in the payload.
+ */
+export const syncFromSchema = internalMutation({
+  args: {
+    siteId: v.id("sites"),
+    contentTypes: v.array(
+      v.object({
+        slug: v.string(),
+        name: v.string(),
+        description: v.optional(v.string()),
+        fields: v.array(
+          v.object({
+            name: v.string(),
+            type: fieldTypeValidator,
+            required: v.boolean(),
+            description: v.optional(v.string()),
+            options: v.optional(
+              v.object({
+                choices: v.optional(
+                  v.array(
+                    v.object({
+                      label: v.string(),
+                      value: v.string(),
+                    }),
+                  ),
+                ),
+              }),
+            ),
+          }),
+        ),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const results: { slug: string; action: "created" | "updated" }[] = [];
+
+    for (const incoming of args.contentTypes) {
+      const existing = await ctx.db
+        .query("contentTypes")
+        .withIndex("by_slug", (q) =>
+          q.eq("siteId", args.siteId).eq("slug", incoming.slug),
+        )
+        .first();
+
+      if (existing) {
+        // Merge fields: keep existing fields not in the import, update matching ones
+        const existingFieldMap = new Map(
+          existing.fields.map((f) => [f.name, f]),
+        );
+        for (const incomingField of incoming.fields) {
+          existingFieldMap.set(incomingField.name, incomingField);
+        }
+        const mergedFields = Array.from(existingFieldMap.values());
+
+        const draftData = {
+          name: incoming.name,
+          slug: incoming.slug,
+          description: incoming.description,
+          fields: mergedFields,
+        };
+
+        const now = Date.now();
+        const status = existing.status ?? "published";
+
+        if (status === "draft") {
+          await ctx.db.patch(existing._id, {
+            name: draftData.name,
+            slug: draftData.slug,
+            description: draftData.description,
+            fields: draftData.fields,
+            draft: draftData,
+            draftUpdatedAt: now,
+            updatedAt: now,
+          });
+        } else {
+          await ctx.db.patch(existing._id, {
+            draft: draftData,
+            draftUpdatedAt: now,
+            updatedAt: now,
+          });
+        }
+
+        results.push({ slug: incoming.slug, action: "updated" });
+      } else {
+        // Create new draft content type
+        const now = Date.now();
+        const draftData = {
+          name: incoming.name,
+          slug: incoming.slug,
+          description: incoming.description,
+          fields: incoming.fields,
+        };
+
+        await ctx.db.insert("contentTypes", {
+          siteId: args.siteId,
+          name: incoming.name,
+          slug: incoming.slug,
+          description: incoming.description,
+          fields: incoming.fields,
+          status: "draft",
+          draft: draftData,
+          draftUpdatedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        results.push({ slug: incoming.slug, action: "created" });
+      }
+    }
+
+    return results;
   },
 });

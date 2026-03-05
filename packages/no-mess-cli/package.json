@@ -1,0 +1,33 @@
+{
+  "name": "no-mess",
+  "version": "0.1.0",
+  "description": "CLI for the no-mess headless CMS",
+  "type": "module",
+  "bin": {
+    "no-mess": "./dist/cli.js"
+  },
+  "main": "./dist/cli.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@no-mess/client": "workspace:*",
+    "chokidar": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jjjjjjjjjjjjjjjjacob/no-mess.git",
+    "directory": "packages/no-mess-cli"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -6,8 +6,9 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "no-mess",
     description:
       "A stupid-simple headless CMS for devs and their clients. Zero bloat. Zero config. Just ship.",
-    start_url: "/",
+    start_url: "/dashboard",
     display: "standalone",
+    orientation: "portrait",
     background_color: "#f6f5f1",
     theme_color: "#008e92",
     icons: [

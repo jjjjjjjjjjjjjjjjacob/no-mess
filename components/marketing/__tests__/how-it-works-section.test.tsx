@@ -41,7 +41,9 @@ describe("HowItWorksSection", () => {
 
   it("renders step 2 description", () => {
     render(<HowItWorksSection />);
-    expect(screen.getByText(/Drag fields\. Hit save/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Drag fields in the dashboard/),
+    ).toBeInTheDocument();
   });
 
   it("renders step 3 description", () => {

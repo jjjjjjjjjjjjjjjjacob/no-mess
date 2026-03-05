@@ -8,8 +8,10 @@ export const steps = [
   {
     number: "02",
     title: "DEFINE SCHEMA",
-    description: "Drag fields. Hit save. Your content types are ready.",
+    description:
+      "Drag fields in the dashboard, or define in TypeScript with the CLI. Your call.",
     color: "accent" as const,
+    command: "no-mess push",
   },
   {
     number: "03",

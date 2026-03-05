@@ -41,7 +41,7 @@ export const HowItWorksBeatStep = forwardRef<
         {/* Ring — opposite side of number */}
         <div
           className={cn(
-            "animate-shape-breathe absolute h-32 w-32 rounded-full border-[3px] opacity-[0.05] sm:h-40 sm:w-40 md:h-48 md:w-48 md:border-4",
+            "animate-shape-breathe absolute h-32 w-32 rounded-full border-[3px] opacity-[0.12] sm:h-40 sm:w-40 md:h-56 md:w-56 md:border-4",
             isEven ? "right-[5%] top-[15%]" : "left-[5%] top-[15%]",
             step.color === "primary" ? "border-primary" : "border-accent",
           )}
@@ -50,7 +50,7 @@ export const HowItWorksBeatStep = forwardRef<
         {/* Small rotated square — same side as number, lower */}
         <div
           className={cn(
-            "absolute bottom-[25%] rotate-[18deg] opacity-[0.04]",
+            "absolute bottom-[25%] rotate-[18deg] opacity-[0.12]",
             isEven ? "left-[8%]" : "right-[8%]",
           )}
         >
@@ -60,6 +60,42 @@ export const HowItWorksBeatStep = forwardRef<
               step.color === "primary" ? "bg-primary" : "bg-accent",
             )}
             style={{ animationDelay: `${index * 3}s` }}
+          />
+        </div>
+
+        {/* Morphing blob — same side as ring, lower half */}
+        <div
+          className={cn(
+            "animate-shape-morph absolute h-28 w-28 rounded-full opacity-[0.07] sm:h-36 sm:w-36 md:h-44 md:w-44",
+            isEven ? "right-[12%] bottom-[10%]" : "left-[12%] bottom-[10%]",
+            step.color === "primary" ? "bg-primary" : "bg-accent",
+          )}
+          style={{ animationDelay: `${index * 5}s` }}
+        />
+
+        {/* Pulsing dot — center-ish area */}
+        <div
+          className={cn(
+            "animate-shape-pulse-scale absolute h-5 w-5 rounded-full opacity-[0.14] sm:h-6 sm:w-6 md:h-8 md:w-8",
+            isEven ? "left-[35%] top-[12%]" : "right-[35%] top-[12%]",
+            step.color === "primary" ? "bg-accent" : "bg-primary",
+          )}
+          style={{ animationDelay: `${index * 2 + 1}s` }}
+        />
+
+        {/* Drifting rectangle — opposite edge, mid height */}
+        <div
+          className={cn(
+            "absolute top-[50%] -rotate-[12deg] opacity-[0.08]",
+            isEven ? "left-0" : "right-0",
+          )}
+        >
+          <div
+            className={cn(
+              "animate-shape-drift-slow h-8 w-20 sm:h-10 sm:w-24 md:h-12 md:w-28",
+              step.color === "primary" ? "bg-primary" : "bg-accent",
+            )}
+            style={{ animationDelay: `${index * 4 + 2}s` }}
           />
         </div>
       </div>
@@ -79,13 +115,18 @@ export const HowItWorksBeatStep = forwardRef<
         >
           {/* Ben-day dot texture behind number */}
           <div
-            className="benday-dots-foreground benday-gradient-radial pointer-events-none absolute inset-0"
+            className={cn(
+              "benday-gradient-radial pointer-events-none absolute inset-0",
+              isEven ? "benday-dots-foreground" : "benday-dots-background",
+              !isEven ? "-scale-x-100" : "",
+            )}
             style={{ opacity: 0.12 }}
           />
           <span
             className={cn(
               "relative block font-display text-[clamp(5rem,min(10vw,16svh),10rem)] leading-[0.85]",
               step.color === "primary" ? "text-primary" : "text-accent",
+              !isEven && "text-right sm:text-left",
             )}
           >
             {step.number}
@@ -95,18 +136,27 @@ export const HowItWorksBeatStep = forwardRef<
         {/* Content */}
         <div
           className={cn(
-            "flex-1 transition-all duration-600 ease-out",
+            "relative flex-1 transition-all duration-600 ease-out",
+            isEven ? "pl-4 sm:pl-0" : "pr-4 sm:pr-0",
             isVisible
               ? "translate-x-0 opacity-100"
               : isEven
                 ? "translate-x-20 opacity-0"
                 : "-translate-x-20 opacity-0",
-            !isEven && "sm:order-1 sm:text-right",
+            !isEven && "text-right sm:order-1",
           )}
           style={{
             transitionDelay: isVisible ? "150ms" : "0ms",
           }}
         >
+          {/* Vertical accent bar */}
+          <div
+            className={cn(
+              "absolute top-0 h-full w-1 sm:w-1.5",
+              isEven ? "left-0 sm:-left-4" : "right-0 sm:-right-4",
+              step.color === "primary" ? "bg-primary" : "bg-accent",
+            )}
+          />
           <h3 className="mb-3 font-display text-[clamp(1.75rem,min(4vw,6svh),3.75rem)] sm:mb-4">
             {step.title}
           </h3>
@@ -116,7 +166,7 @@ export const HowItWorksBeatStep = forwardRef<
               isEven
                 ? "text-muted-foreground"
                 : "text-secondary-foreground/50 dark:text-background/50",
-              !isEven && "sm:ml-auto",
+              !isEven && "ml-auto",
             )}
           >
             {step.description}
@@ -125,11 +175,18 @@ export const HowItWorksBeatStep = forwardRef<
           {step.command && (
             <div
               className={cn(
-                "mt-5 inline-block border-[4px] border-foreground bg-foreground px-4 py-2.5 shadow-brutal sm:mt-6 sm:border-[5px] sm:px-6 sm:py-3",
-                !isEven && "sm:ml-auto",
+                "mt-5 inline-block border-[4px] px-4 py-2.5 sm:mt-6 sm:border-[5px] sm:px-6 sm:py-3",
+                isEven
+                  ? "border-foreground bg-foreground shadow-brutal"
+                  : "border-background bg-background shadow-[5px_5px_0_var(--background)] sm:ml-auto",
               )}
             >
-              <code className="font-mono text-xs text-background sm:text-sm md:text-base">
+              <code
+                className={cn(
+                  "font-mono text-xs sm:text-sm md:text-base",
+                  isEven ? "text-background" : "text-foreground",
+                )}
+              >
                 <span className="text-primary">$</span> {step.command}
                 <span className="ml-1 inline-block h-4 w-2 animate-blink bg-primary" />
               </code>

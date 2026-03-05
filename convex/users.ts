@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 
+import type { Id } from "./_generated/dataModel";
 import { internalMutation, query } from "./_generated/server";
 
 /**
@@ -22,11 +23,24 @@ export const upsertFromClerk = internalMutation({
       .first();
 
     if (existing) {
-      await ctx.db.patch(existing._id, {
+      const patch: Record<string, unknown> = {
         email: args.email,
         name: args.name,
         avatarUrl: args.avatarUrl,
-      });
+      };
+
+      // Restore soft-deleted user: cancel scheduled deletion
+      if (existing.deletedAt) {
+        patch.deletedAt = undefined;
+        if (existing.scheduledDeletionId) {
+          await ctx.scheduler.cancel(
+            existing.scheduledDeletionId as Id<"_scheduled_functions">,
+          );
+        }
+        patch.scheduledDeletionId = undefined;
+      }
+
+      await ctx.db.patch(existing._id, patch);
       return existing._id;
     }
 

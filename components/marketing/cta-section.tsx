@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { forwardRef } from "react";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { useBeatReveal } from "@/hooks/use-beat-reveal";
+import { useHaptics } from "@/hooks/use-haptics";
 import { cn } from "@/lib/utils";
 
 export const CtaSection = forwardRef<HTMLElement>(function CtaSection(_, ref) {
   const isVisible = useBeatReveal(ref as React.RefObject<HTMLElement | null>);
+  const haptic = useHaptics();
+  const analytics = useAnalytics();
 
   return (
     <section
@@ -85,6 +89,10 @@ export const CtaSection = forwardRef<HTMLElement>(function CtaSection(_, ref) {
         >
           <Link
             href="/sign-up"
+            onClick={() => {
+              haptic("tap");
+              analytics.trackCtaClicked("GET_STARTED_FREE", "cta");
+            }}
             className="cta-diagonal group relative inline-flex max-w-[90vw] border-[4px] border-background bg-accent shadow-[6px_6px_0_var(--background)] transition-shadow hover:shadow-[8px_10px_0_var(--background)] sm:border-[6px] sm:shadow-[8px_8px_0_var(--background)] sm:hover:shadow-[10px_12px_0_var(--background)]"
             style={{
               padding:

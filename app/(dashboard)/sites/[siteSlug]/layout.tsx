@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { useSite } from "@/hooks/use-site";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,7 @@ export default function SiteLayout({
 }) {
   const { site, isLoading, siteSlug } = useSite();
   const pathname = usePathname();
+  const analytics = useAnalytics();
 
   if (isLoading) {
     return (
@@ -59,7 +61,7 @@ export default function SiteLayout({
         <h1 className="text-2xl font-bold tracking-tight">{site.name}</h1>
         <p className="text-sm text-muted-foreground">{site.slug}</p>
       </div>
-      <nav className="flex gap-1 border-b">
+      <nav className="flex gap-1 border-b overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
         {tabs.map((tab) => {
           const href = `${basePath}${tab.href}`;
           const isActive =
@@ -69,8 +71,14 @@ export default function SiteLayout({
             <Link
               key={tab.label}
               href={href}
+              onClick={() =>
+                analytics.trackTabNavigated({
+                  tab: tab.label.toLowerCase().replace(" ", "-"),
+                  site_id: site?._id,
+                })
+              }
               className={cn(
-                "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
+                "px-3 sm:px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap shrink-0",
                 isActive
                   ? "border-primary text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground",

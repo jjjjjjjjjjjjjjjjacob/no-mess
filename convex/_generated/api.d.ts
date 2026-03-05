@@ -28,6 +28,7 @@ import type * as shopify from "../shopify.js";
 import type * as shopifySync from "../shopifySync.js";
 import type * as siteAccess from "../siteAccess.js";
 import type * as sites from "../sites.js";
+import type * as userDeletion from "../userDeletion.js";
 import type * as users from "../users.js";
 
 import type {
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   shopifySync: typeof shopifySync;
   siteAccess: typeof siteAccess;
   sites: typeof sites;
+  userDeletion: typeof userDeletion;
   users: typeof users;
 }>;
 

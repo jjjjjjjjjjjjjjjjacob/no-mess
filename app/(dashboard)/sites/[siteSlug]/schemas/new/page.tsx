@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "convex/react";
-import { Save, Upload } from "lucide-react";
+import { Code, Save, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -9,8 +9,10 @@ import {
   ContentTypeForm,
   type ContentTypeFormData,
 } from "@/components/content-types/content-type-form";
+import { SchemaImportDialog } from "@/components/schemas/schema-import-dialog";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { useSite } from "@/hooks/use-site";
 
 export default function NewSchemaPage() {
@@ -18,9 +20,11 @@ export default function NewSchemaPage() {
   const { site, siteSlug } = useSite();
   const createDraft = useMutation(api.contentTypes.createDraft);
   const publishMutation = useMutation(api.contentTypes.publish);
+  const analytics = useAnalytics();
   const formDataRef = useRef<ContentTypeFormData | null>(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   if (!site) return null;
 
@@ -39,6 +43,11 @@ export default function NewSchemaPage() {
         slug: data.slug,
         description: data.description,
         fields: data.fields,
+      });
+      analytics.trackSchemaDraftSaved({
+        site_id: site._id,
+        field_count: data.fields.length,
+        is_new: true,
       });
       toast.success("Draft saved");
       // Redirect to the edit page where auto-save will take over
@@ -65,6 +74,11 @@ export default function NewSchemaPage() {
         fields: data.fields,
       });
       await publishMutation({ contentTypeId });
+      analytics.trackSchemaPublished({
+        site_id: site._id,
+        field_count: data.fields.length,
+        field_types: data.fields.map((f) => f.type),
+      });
       toast.success("Schema published");
       router.push(`/sites/${siteSlug}/schemas`);
     } catch (err) {
@@ -86,6 +100,17 @@ export default function NewSchemaPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              analytics.trackSchemaImported({ step: "dialog_opened" });
+              setShowImportDialog(true);
+            }}
+          >
+            <Code className="mr-2 h-3 w-3" />
+            Import from Code
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -112,6 +137,12 @@ export default function NewSchemaPage() {
         siteId={site._id}
         formId="schema-create-form"
         hideSubmit
+      />
+
+      <SchemaImportDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        siteId={site._id}
       />
     </div>
   );

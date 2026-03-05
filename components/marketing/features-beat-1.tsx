@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useRef } from "react";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { useBeatReveal } from "@/hooks/use-beat-reveal";
 import { cn } from "@/lib/utils";
 import { features } from "./features-data";
@@ -8,6 +9,8 @@ import { features } from "./features-data";
 export const FeaturesBeat1 = forwardRef<HTMLElement>(
   function FeaturesBeat1(_, ref) {
     const isVisible = useBeatReveal(ref as React.RefObject<HTMLElement | null>);
+    const analytics = useAnalytics();
+    const hoverStart = useRef<number>(0);
 
     const cards = features.slice(0, 3);
 
@@ -19,18 +22,15 @@ export const FeaturesBeat1 = forwardRef<HTMLElement>(
         )}
       >
         {/* Ben-day dot overlay */}
-        <div
-          className="benday-dots-primary benday-gradient-corner pointer-events-none absolute inset-0 z-0"
-          style={{ opacity: 0.12 }}
-        />
+        <div className="benday-dots-primary benday-gradient-corner pointer-events-none absolute inset-0 z-0 opacity-[0.12] dark:opacity-[0.2]" />
 
         {/* Animated background shapes */}
         <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
           {/* Large ring — bottom-right, overflows */}
-          <div className="animate-shape-breathe absolute -bottom-16 -right-16 h-48 w-48 rounded-full border-[4px] border-primary opacity-[0.08] sm:h-56 sm:w-56 md:h-64 md:w-64 md:border-[5px]" />
+          <div className="animate-shape-breathe absolute -bottom-16 -right-16 h-48 w-48 rounded-full border-[4px] border-primary opacity-[0.14] sm:h-56 sm:w-56 md:h-64 md:w-64 md:border-[5px]" />
 
           {/* Small square (rotated) — top-right */}
-          <div className="absolute right-[15%] top-[12%] rotate-[20deg] opacity-[0.06]">
+          <div className="absolute right-[15%] top-[12%] rotate-[20deg] opacity-[0.12]">
             <div
               className="animate-shape-drift h-10 w-10 bg-accent sm:h-12 sm:w-12 md:h-14 md:w-14"
               style={{ animationDelay: "5s" }}
@@ -38,7 +38,7 @@ export const FeaturesBeat1 = forwardRef<HTMLElement>(
           </div>
 
           {/* Rectangle — left edge, 45% */}
-          <div className="animate-shape-breathe-slow absolute left-0 top-[45%] h-12 w-24 bg-primary opacity-[0.05] sm:h-14 sm:w-28 md:h-16 md:w-32" />
+          <div className="animate-shape-breathe-slow absolute left-0 top-[45%] h-12 w-24 bg-primary opacity-[0.1] sm:h-14 sm:w-28 md:h-16 md:w-32" />
         </div>
 
         {/* Dark header bar */}
@@ -64,8 +64,17 @@ export const FeaturesBeat1 = forwardRef<HTMLElement>(
             {cards.map((feature, i) => (
               <div
                 key={feature.number}
+                onMouseEnter={() => {
+                  hoverStart.current = Date.now();
+                }}
+                onMouseLeave={() => {
+                  const duration = Date.now() - hoverStart.current;
+                  if (duration > 200) {
+                    analytics.trackFeatureCardHover(i, feature.title, duration);
+                  }
+                }}
                 className={cn(
-                  "group relative border-[5px] border-foreground bg-secondary p-4 transition-all duration-600 ease-out hover:bg-primary hover:text-primary-foreground dark:bg-foreground dark:border-background sm:p-5 md:p-6",
+                  "feature-card group relative border-[5px] border-foreground bg-secondary p-4 text-secondary-foreground transition-all duration-600 ease-out hover:bg-primary hover:text-primary-foreground sm:p-5 md:p-6",
                   isVisible
                     ? "translate-x-0 opacity-100"
                     : "-translate-x-16 opacity-0",
@@ -90,7 +99,7 @@ export const FeaturesBeat1 = forwardRef<HTMLElement>(
                   <h3 className="mb-2 font-display text-xl sm:text-2xl md:text-3xl">
                     {feature.title}
                   </h3>
-                  <p className="text-sm text-secondary-foreground/50 transition-colors duration-200 group-hover:text-primary-foreground/70 dark:text-background/50">
+                  <p className="text-sm text-secondary-foreground/50 transition-colors duration-200 group-hover:text-primary-foreground/70">
                     {feature.description}
                   </p>
                 </div>

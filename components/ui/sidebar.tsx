@@ -2,20 +2,13 @@
 
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { SidebarLeftIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
+import { Drawer } from "vaul";
+import { SidebarCollapseIcon } from "@/components/dashboard/sidebar-collapse-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -180,26 +173,36 @@ function Sidebar({
 
   if (isMobile) {
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-        <SheetContent
-          data-sidebar="sidebar"
-          data-slot="sidebar"
-          data-mobile="true"
-          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
-          style={
-            {
-              "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-            } as React.CSSProperties
-          }
-          side={side}
-        >
-          <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
-          </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
-        </SheetContent>
-      </Sheet>
+      <Drawer.Root
+        direction={side}
+        open={openMobile}
+        onOpenChange={setOpenMobile}
+        shouldScaleBackground
+      >
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 z-50 bg-black/40" />
+          <Drawer.Content
+            data-sidebar="sidebar"
+            data-slot="sidebar"
+            data-mobile="true"
+            className={cn(
+              "bg-sidebar text-sidebar-foreground fixed inset-y-0 z-50 flex h-svh w-(--sidebar-width) flex-col p-0 outline-none",
+              side === "left" ? "left-0" : "right-0",
+            )}
+            style={
+              {
+                "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+              } as React.CSSProperties
+            }
+          >
+            <Drawer.Title className="sr-only">Sidebar</Drawer.Title>
+            <Drawer.Description className="sr-only">
+              Displays the mobile sidebar.
+            </Drawer.Description>
+            <div className="flex h-full w-full flex-col">{children}</div>
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
     );
   }
 
@@ -271,7 +274,7 @@ function SidebarTrigger({
       }}
       {...props}
     >
-      <HugeiconsIcon icon={SidebarLeftIcon} strokeWidth={2} />
+      <SidebarCollapseIcon className="size-4" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );
@@ -518,7 +521,7 @@ function SidebarMenuButton({
       },
       props,
     ),
-    render: !tooltip ? render : TooltipTrigger,
+    render: !tooltip ? render : <TooltipTrigger render={render} />,
     state: {
       slot: "sidebar-menu-button",
       sidebar: "menu-button",

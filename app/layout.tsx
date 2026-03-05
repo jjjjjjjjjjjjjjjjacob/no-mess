@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Anton, DM_Sans, Space_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { VtDebugPanel } from "@/components/dev/vt-debug-panel";
@@ -35,9 +35,20 @@ export const metadata: Metadata = {
     "A stupid-simple headless CMS for devs and their clients. Zero bloat. Zero config. Just ship.",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "no-mess",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f5f1" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f0f0f" },
+  ],
 };
 
 export default function RootLayout({
@@ -50,9 +61,11 @@ export default function RootLayout({
       <body
         className={`${dmSans.variable} ${anton.variable} ${spaceMono.variable} antialiased`}
       >
-        <Providers>{children}</Providers>
-        <Toaster />
-        {process.env.NODE_ENV === "development" && <VtDebugPanel />}
+        <div data-vaul-drawer-wrapper="" className="bg-background">
+          <Providers>{children}</Providers>
+          <Toaster />
+          {process.env.NODE_ENV === "development" && <VtDebugPanel />}
+        </div>
       </body>
     </html>
   );

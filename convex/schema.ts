@@ -8,6 +8,8 @@ export default defineSchema({
     name: v.string(),
     avatarUrl: v.optional(v.string()),
     createdAt: v.number(),
+    deletedAt: v.optional(v.number()),
+    scheduledDeletionId: v.optional(v.string()),
   })
     .index("by_clerk", ["clerkId"])
     .index("by_email", ["email"]),
