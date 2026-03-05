@@ -39,13 +39,16 @@ describe("SelectField", () => {
     const onChange = vi.fn();
     render(<SelectField value="" onChange={onChange} choices={choices} />);
 
-    // Click the trigger to open the dropdown
+    // Focus the trigger and use keyboard navigation since Base UI's
+    // popup doesn't fully open in JSDOM (hidden attribute persists)
     const trigger = screen.getByRole("combobox");
     await user.click(trigger);
-
-    // Click an option
-    const option = screen.getByRole("option", { name: "Published" });
-    await user.click(option);
+    // ArrowDown opens dropdown + highlights first item (Draft)
+    await user.keyboard("{ArrowDown}");
+    // ArrowDown again moves to Published
+    await user.keyboard("{ArrowDown}");
+    // Enter selects the highlighted item
+    await user.keyboard("{Enter}");
 
     expect(onChange).toHaveBeenCalledWith("published");
   });
