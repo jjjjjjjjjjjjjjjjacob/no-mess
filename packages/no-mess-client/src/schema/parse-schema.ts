@@ -534,7 +534,7 @@ function extractBalancedFrom(
  * Matches: propName: "value" or propName: 'value'
  */
 function extractPropertyString(body: string, propName: string): string | null {
-  const pattern = new RegExp(`${propName}\\s*:\\s*`);
+  const pattern = new RegExp(`(?<![\\w])${propName}\\s*:\\s*`);
   const match = pattern.exec(body);
   if (!match) return null;
 

@@ -48,12 +48,13 @@ export function AppSidebar() {
   const sites = useQuery(api.sites.listForCurrentUser);
   const { user } = useUser();
   const posthog = usePostHog();
-  const identifiedRef = useRef(false);
+  const lastIdentifiedUserIdRef = useRef<string | null>(null);
 
   // PostHog user identification — connect anonymous events to authenticated user
   useEffect(() => {
-    if (!user || !posthog || identifiedRef.current) return;
-    identifiedRef.current = true;
+    if (!user || !posthog || lastIdentifiedUserIdRef.current === user.id)
+      return;
+    lastIdentifiedUserIdRef.current = user.id;
     posthog.identify(user.id, {
       email: user.primaryEmailAddress?.emailAddress,
       name: user.fullName,

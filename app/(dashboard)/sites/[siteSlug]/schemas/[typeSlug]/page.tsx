@@ -100,15 +100,17 @@ export default function EditSchemaPage() {
     };
   }, [contentType]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: isDirty triggers recomputation so export reflects unsaved form data
   const exportCode = useMemo(() => {
     if (!contentType) return "";
+    const source = formDataRef.current ?? contentType;
     return generateContentTypeSource({
-      slug: contentType.slug,
-      name: contentType.name,
-      description: contentType.description,
-      fields: contentType.fields,
+      slug: source.slug,
+      name: source.name,
+      description: source.description,
+      fields: source.fields,
     });
-  }, [contentType]);
+  }, [contentType, isDirty]);
 
   // Track form changes
   const handleFormChange = useCallback(

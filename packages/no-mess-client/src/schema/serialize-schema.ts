@@ -84,10 +84,14 @@ function generateFieldCall(f: FieldDefinition): string {
   }
 
   if (f.type === "select" && f.options?.choices) {
-    const choiceEntries = f.options.choices.map(
-      (c) => `{ label: ${quote(c.label)}, value: ${quote(c.value)} }`,
-    );
-    opts.push(`choices: [\n        ${choiceEntries.join(",\n        ")},\n      ]`);
+    if (f.options.choices.length === 0) {
+      opts.push("choices: []");
+    } else {
+      const choiceEntries = f.options.choices.map(
+        (c) => `{ label: ${quote(c.label)}, value: ${quote(c.value)} }`,
+      );
+      opts.push(`choices: [\n        ${choiceEntries.join(",\n        ")},\n      ]`);
+    }
   }
 
   if (opts.length === 0) {

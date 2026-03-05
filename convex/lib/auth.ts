@@ -21,6 +21,10 @@ export async function getCurrentUser(ctx: QueryCtx | MutationCtx) {
     throw new ConvexError("User not found in database");
   }
 
+  if (user.deletedAt) {
+    throw new ConvexError("Account has been deleted");
+  }
+
   return user;
 }
 
@@ -33,8 +37,14 @@ export async function getCurrentUserOrNull(ctx: QueryCtx | MutationCtx) {
     return null;
   }
 
-  return await ctx.db
+  const user = await ctx.db
     .query("users")
     .withIndex("by_clerk", (q) => q.eq("clerkId", identity.subject))
     .first();
+
+  if (user?.deletedAt) {
+    return null;
+  }
+
+  return user;
 }

@@ -1,5 +1,5 @@
-import { existsSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 const SCHEMA_TEMPLATE = `import { defineSchema, defineContentType, field } from "@no-mess/client/schema";
 
@@ -35,6 +35,7 @@ export async function initCommand(args: string[]): Promise<void> {
   if (existsSync(schemaPath)) {
     console.log(`Schema file already exists at ${schemaPath} — skipping.`);
   } else {
+    mkdirSync(dirname(schemaPath), { recursive: true });
     writeFileSync(schemaPath, SCHEMA_TEMPLATE, "utf-8");
     console.log(`Created ${schemaPath}`);
   }

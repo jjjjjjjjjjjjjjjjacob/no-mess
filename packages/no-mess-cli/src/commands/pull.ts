@@ -17,7 +17,9 @@ export async function pullCommand(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  console.log(`Pulling schemas from ${config.apiUrl}...`);
+  const log = toStdout ? console.error : console.log;
+
+  log(`Pulling schemas from ${config.apiUrl}...`);
 
   try {
     const response = await pullSchema(config.apiUrl, config.apiKey);
@@ -34,7 +36,7 @@ export async function pullCommand(args: string[]): Promise<void> {
     );
 
     if (contentTypes.length === 0) {
-      console.log("No published schemas found.");
+      log("No published schemas found.");
       return;
     }
 

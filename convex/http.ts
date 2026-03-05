@@ -102,8 +102,12 @@ http.route({
       });
     }
 
-    // user.deleted events are intentionally ignored for v1
-    // to preserve site ownership references
+    if (eventType === "user.deleted") {
+      const { id } = payload.data;
+      await ctx.runMutation(internal.userDeletion.softDeleteUser, {
+        clerkId: id,
+      });
+    }
 
     return new Response("OK", { status: 200 });
   }),
