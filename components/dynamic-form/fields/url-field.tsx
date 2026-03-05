@@ -10,6 +10,7 @@ export function UrlField({ value, onChange, disabled }: UrlFieldProps) {
   return (
     <Input
       type="url"
+      inputMode="url"
       placeholder="https://..."
       value={value}
       onChange={(e) => onChange(e.target.value)}

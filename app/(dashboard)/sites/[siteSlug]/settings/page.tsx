@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "convex/react";
-import { Check, Copy, RefreshCw, Trash2 } from "lucide-react";
+import { Check, Copy, RefreshCw, Terminal, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useSite } from "@/hooks/use-site";
 
@@ -46,6 +47,8 @@ export default function SiteSettingsPage() {
   const { copied: apiKeyCopied, copy: copyApiKey } = useCopyToClipboard();
   const { copied: pubKeyCopied, copy: copyPubKey } = useCopyToClipboard();
   const { copied: secretCopied, copy: copySecret } = useCopyToClipboard();
+  const { copied: installCopied, copy: copyInstall } = useCopyToClipboard();
+  const analytics = useAnalytics();
 
   const [name, setName] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
@@ -76,10 +79,18 @@ export default function SiteSettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const fieldsChanged: string[] = [];
+      if (name.trim() !== site.name) fieldsChanged.push("name");
+      if ((previewUrl.trim() || "") !== (site.previewUrl ?? ""))
+        fieldsChanged.push("previewUrl");
       await updateSite({
         siteId: site._id as Id<"sites">,
         name: name.trim(),
         previewUrl: previewUrl.trim() || undefined,
+      });
+      analytics.trackSiteSettingsSaved({
+        site_id: site._id,
+        fields_changed: fieldsChanged,
       });
       toast.success("Settings saved");
     } catch {
@@ -93,6 +104,7 @@ export default function SiteSettingsPage() {
     setIsDeleting(true);
     try {
       await removeSite({ siteId: site._id as Id<"sites"> });
+      analytics.trackSiteDeleted({ site_id: site._id });
       toast.success("Site deleted");
       router.push("/");
     } catch {
@@ -104,6 +116,7 @@ export default function SiteSettingsPage() {
   const handleRegenerateApiKey = async () => {
     try {
       await regenerateApiKey({ siteId: site._id as Id<"sites"> });
+      analytics.trackApiKeyRegenerated({ key_type: "secret" });
       toast.success("API key regenerated");
     } catch {
       toast.error("Failed to regenerate API key");
@@ -113,6 +126,7 @@ export default function SiteSettingsPage() {
   const handleRegeneratePublishableKey = async () => {
     try {
       await regeneratePublishableKey({ siteId: site._id as Id<"sites"> });
+      analytics.trackApiKeyRegenerated({ key_type: "publishable" });
       toast.success("Publishable key regenerated");
     } catch {
       toast.error("Failed to regenerate publishable key");
@@ -122,6 +136,7 @@ export default function SiteSettingsPage() {
   const handleRegeneratePreviewSecret = async () => {
     try {
       await regeneratePreviewSecret({ siteId: site._id as Id<"sites"> });
+      analytics.trackApiKeyRegenerated({ key_type: "preview" });
       toast.success("Preview secret regenerated");
     } catch {
       toast.error("Failed to regenerate preview secret");
@@ -182,7 +197,10 @@ export default function SiteSettingsPage() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => copyApiKey(site.apiKey)}
+              onClick={() => {
+                copyApiKey(site.apiKey);
+                analytics.trackApiKeyCopied({ key_type: "secret" });
+              }}
             >
               {apiKeyCopied ? (
                 <Check className="h-4 w-4" />
@@ -219,9 +237,12 @@ export default function SiteSettingsPage() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() =>
-                site.publishableKey && copyPubKey(site.publishableKey)
-              }
+              onClick={() => {
+                if (site.publishableKey) {
+                  copyPubKey(site.publishableKey);
+                  analytics.trackApiKeyCopied({ key_type: "publishable" });
+                }
+              }}
               disabled={!site.publishableKey}
             >
               {pubKeyCopied ? (
@@ -259,7 +280,10 @@ export default function SiteSettingsPage() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => copySecret(site.previewSecret)}
+              onClick={() => {
+                copySecret(site.previewSecret);
+                analytics.trackApiKeyCopied({ key_type: "preview" });
+              }}
             >
               {secretCopied ? (
                 <Check className="h-4 w-4" />
@@ -276,6 +300,58 @@ export default function SiteSettingsPage() {
             <RefreshCw className="mr-2 h-3 w-3" />
             Regenerate
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Terminal className="h-5 w-5" />
+            CLI Setup
+          </CardTitle>
+          <CardDescription>
+            Define schemas in TypeScript and sync with the CLI.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Install</Label>
+            <div className="flex gap-2">
+              <Input
+                value="npm install -g no-mess"
+                readOnly
+                className="font-mono text-sm"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  copyInstall("npm install -g no-mess");
+                  analytics.trackApiKeyCopied({ key_type: "cli_install" });
+                }}
+              >
+                {installCopied ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Quick start</Label>
+            <div className="rounded-lg border bg-muted/30 p-4 font-mono text-sm text-muted-foreground">
+              <p>$ no-mess init</p>
+              <p>$ no-mess push</p>
+              <p>$ no-mess dev</p>
+            </div>
+          </div>
+          <a
+            href="/docs/cli"
+            className="inline-block text-sm font-medium text-primary underline"
+          >
+            View CLI documentation
+          </a>
         </CardContent>
       </Card>
 

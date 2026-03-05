@@ -2,9 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useAnalytics } from "@/hooks/use-analytics";
+import { useHaptics } from "@/hooks/use-haptics";
 
 export function MobileNav({ isSignedIn }: { isSignedIn: boolean }) {
   const [open, setOpen] = useState(false);
+  const haptic = useHaptics();
+  const analytics = useAnalytics();
 
   return (
     <>
@@ -12,8 +16,13 @@ export function MobileNav({ isSignedIn }: { isSignedIn: boolean }) {
       <div className="flex items-center gap-2 md:hidden">
         <button
           type="button"
-          onClick={() => setOpen(!open)}
-          className="flex h-9 w-9 items-center justify-center border-[3px] border-foreground bg-background transition-colors hover:bg-primary hover:border-primary group"
+          onClick={() => {
+            haptic("tap");
+            const nextOpen = !open;
+            setOpen(nextOpen);
+            analytics.trackMobileMenuToggled(nextOpen);
+          }}
+          className="flex h-11 w-11 items-center justify-center border-[3px] border-foreground bg-background transition-colors hover:bg-primary hover:border-primary group"
           aria-label="Toggle menu"
         >
           <div className="flex flex-col gap-[5px]">
@@ -42,7 +51,11 @@ export function MobileNav({ isSignedIn }: { isSignedIn: boolean }) {
           <div className="flex flex-col gap-0">
             <Link
               href="/docs"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                haptic("tap");
+                analytics.trackCtaClicked("DOCS", "navbar");
+                setOpen(false);
+              }}
               className="border-b-[3px] border-foreground/10 px-6 py-4 font-mono text-xs font-bold uppercase tracking-widest text-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
             >
               DOCS
@@ -50,7 +63,11 @@ export function MobileNav({ isSignedIn }: { isSignedIn: boolean }) {
             {isSignedIn ? (
               <Link
                 href="/dashboard"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  haptic("tap");
+                  analytics.trackCtaClicked("DASHBOARD", "navbar");
+                  setOpen(false);
+                }}
                 className="bg-primary px-6 py-4 font-display text-sm text-primary-foreground"
               >
                 DASHBOARD →
@@ -59,14 +76,22 @@ export function MobileNav({ isSignedIn }: { isSignedIn: boolean }) {
               <>
                 <Link
                   href="/sign-in"
-                  onClick={() => setOpen(false)}
+                  onClick={() => {
+                    haptic("tap");
+                    analytics.trackCtaClicked("SIGN_IN", "navbar");
+                    setOpen(false);
+                  }}
                   className="border-b-[3px] border-foreground/10 px-6 py-4 font-mono text-xs font-bold uppercase tracking-widest text-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
                 >
                   SIGN IN
                 </Link>
                 <Link
                   href="/sign-up"
-                  onClick={() => setOpen(false)}
+                  onClick={() => {
+                    haptic("tap");
+                    analytics.trackCtaClicked("GET_STARTED", "navbar");
+                    setOpen(false);
+                  }}
                   className="bg-accent px-6 py-4 font-display text-sm text-accent-foreground"
                 >
                   GET STARTED →

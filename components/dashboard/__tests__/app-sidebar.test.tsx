@@ -32,6 +32,7 @@ vi.mock("convex/react", () => ({
 
 vi.mock("@clerk/nextjs", () => ({
   UserButton: () => <div data-testid="user-button" />,
+  useUser: vi.fn().mockReturnValue({ user: null }),
 }));
 
 vi.mock("@/convex/_generated/api", () => ({
@@ -44,19 +45,25 @@ vi.mock("@/convex/_generated/api", () => ({
 
 // Stub icon libraries so they don't trip up jsdom
 vi.mock("lucide-react", () => ({
+  ArrowLeft: (props: Record<string, unknown>) => <svg {...props} />,
+  BookOpen: (props: Record<string, unknown>) => <svg {...props} />,
+  Files: (props: Record<string, unknown>) => <svg {...props} />,
+  FileText: (props: Record<string, unknown>) => <svg {...props} />,
   Globe: (props: Record<string, unknown>) => (
     <svg data-testid="globe-icon" {...props} />
   ),
-  Files: (props: Record<string, unknown>) => <svg {...props} />,
-  FileText: (props: Record<string, unknown>) => <svg {...props} />,
   Image: (props: Record<string, unknown>) => <svg {...props} />,
-  Settings: (props: Record<string, unknown>) => <svg {...props} />,
-  Store: (props: Record<string, unknown>) => <svg {...props} />,
+  LayoutDashboard: (props: Record<string, unknown>) => <svg {...props} />,
   Monitor: (props: Record<string, unknown>) => <svg {...props} />,
   Moon: (props: Record<string, unknown>) => <svg {...props} />,
-  Sun: (props: Record<string, unknown>) => <svg {...props} />,
-  BookOpen: (props: Record<string, unknown>) => <svg {...props} />,
   MousePointerClick: (props: Record<string, unknown>) => <svg {...props} />,
+  Settings: (props: Record<string, unknown>) => <svg {...props} />,
+  Store: (props: Record<string, unknown>) => <svg {...props} />,
+  Sun: (props: Record<string, unknown>) => <svg {...props} />,
+}));
+
+vi.mock("posthog-js/react", () => ({
+  usePostHog: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock("next-themes", () => ({
@@ -77,6 +84,11 @@ vi.mock("@hugeicons/react", () => ({
 // Mock useIsMobile to return false (desktop) by default
 vi.mock("@/hooks/use-mobile", () => ({
   useIsMobile: vi.fn().mockReturnValue(false),
+}));
+
+// Stub PaletteSwitcher — it has many dependencies irrelevant to sidebar tests
+vi.mock("@/components/palette-switcher", () => ({
+  PaletteSwitcher: () => <div data-testid="palette-switcher" />,
 }));
 
 // ---------------------------------------------------------------------------
@@ -137,7 +149,7 @@ describe("AppSidebar", () => {
     expect(screen.getByText("Blog")).toBeInTheDocument();
   });
 
-  it("highlights the active site based on pathname", () => {
+  it("shows site sub-nav when a site is active", () => {
     mockUsePathname.mockReturnValue("/sites/blog");
     mockUseQuery.mockReturnValue([
       { _id: "site1", name: "Marketing Site", slug: "marketing-site" },
@@ -146,16 +158,16 @@ describe("AppSidebar", () => {
 
     renderSidebar();
 
-    // The active menu button will have data-active attribute set by SidebarMenuButton
-    const blogButton = screen
-      .getByText("Blog")
-      .closest("[data-slot='sidebar-menu-button']");
-    expect(blogButton).toHaveAttribute("data-active");
+    // Site sub-nav items should be visible
+    expect(screen.getByText("Overview")).toBeInTheDocument();
+    expect(screen.getByText("Schemas")).toBeInTheDocument();
+    expect(screen.getByText("Content")).toBeInTheDocument();
 
-    const marketingButton = screen
-      .getByText("Marketing Site")
+    // Overview should be active (exact match on /sites/blog)
+    const overviewButton = screen
+      .getByText("Overview")
       .closest("[data-slot='sidebar-menu-button']");
-    expect(marketingButton).not.toHaveAttribute("data-active");
+    expect(overviewButton).toHaveAttribute("data-active");
   });
 
   it("renders the brand link pointing to /dashboard", () => {

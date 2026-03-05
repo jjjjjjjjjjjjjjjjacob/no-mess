@@ -1,8 +1,10 @@
 "use client";
 
+import { useQuery } from "convex/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment } from "react";
+import { SiteSelectorBreadcrumb } from "@/components/dashboard/site-selector-breadcrumb";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,16 +13,15 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { api } from "@/convex/_generated/api";
 
-// Map known path segments to display labels
 const segmentLabels: Record<string, string> = {
-  dashboard: "Dashboard",
-  sites: "Sites",
   schemas: "Schemas",
   content: "Content",
   media: "Media",
   settings: "Settings",
   shopify: "Shopify",
+  "live-edit": "Live Edit",
   new: "New",
 };
 
@@ -31,52 +32,82 @@ function getLabel(segment: string): string {
 export function DashboardBreadcrumb() {
   const pathname = usePathname();
 
-  // Don't show breadcrumbs on the dashboard root
-  if (pathname === "/dashboard") return null;
+  const siteSlugMatch = pathname.match(/^\/sites\/([^/]+)/);
+  const activeSiteSlug = siteSlugMatch ? siteSlugMatch[1] : null;
 
-  const segments = pathname.split("/").filter(Boolean);
+  if (!activeSiteSlug) {
+    return (
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbPage>Dashboard</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    );
+  }
 
-  // Build breadcrumb items: each has a label and href
+  return <SiteBreadcrumb siteSlug={activeSiteSlug} pathname={pathname} />;
+}
+
+function SiteBreadcrumb({
+  siteSlug,
+  pathname,
+}: {
+  siteSlug: string;
+  pathname: string;
+}) {
+  const site = useQuery(api.sites.getBySlug, { slug: siteSlug });
+
+  // Get path segments after /sites/[slug]
+  const afterSite = pathname
+    .replace(`/sites/${siteSlug}`, "")
+    .split("/")
+    .filter(Boolean);
+
   const items: { label: string; href: string }[] = [];
-
-  // Always start with Dashboard
-  items.push({ label: "Dashboard", href: "/dashboard" });
-
-  // Build cumulative path
-  let currentPath = "";
-  for (let i = 0; i < segments.length; i++) {
-    const segment = segments[i];
+  let currentPath = `/sites/${siteSlug}`;
+  for (const segment of afterSite) {
     currentPath += `/${segment}`;
-
-    // Skip "dashboard" (already added) and "sites" (not a page)
-    if (segment === "dashboard" || segment === "sites") continue;
-
     items.push({ label: getLabel(segment), href: currentPath });
   }
 
-  if (items.length <= 1) return null;
-
   return (
-    <Breadcrumb>
-      <BreadcrumbList>
-        {items.map((item, index) => {
-          const isLast = index === items.length - 1;
-          return (
-            <Fragment key={item.href}>
-              {index > 0 && <BreadcrumbSeparator />}
-              <BreadcrumbItem>
-                {isLast ? (
-                  <BreadcrumbPage>{item.label}</BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink render={<Link href={item.href} />}>
-                    {item.label}
-                  </BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-            </Fragment>
-          );
-        })}
-      </BreadcrumbList>
-    </Breadcrumb>
+    <div className="min-w-0 overflow-hidden [direction:rtl]">
+      <Breadcrumb className="w-max [direction:ltr]">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            {items.length === 0 ? (
+              <BreadcrumbPage>
+                <SiteSelectorBreadcrumb
+                  currentSiteName={site?.name ?? siteSlug}
+                />
+              </BreadcrumbPage>
+            ) : (
+              <SiteSelectorBreadcrumb
+                currentSiteName={site?.name ?? siteSlug}
+              />
+            )}
+          </BreadcrumbItem>
+          {items.map((item, index) => {
+            const isLast = index === items.length - 1;
+            return (
+              <Fragment key={item.href}>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  {isLast ? (
+                    <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink render={<Link href={item.href} />}>
+                      {item.label}
+                    </BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>
+              </Fragment>
+            );
+          })}
+        </BreadcrumbList>
+      </Breadcrumb>
+    </div>
   );
 }

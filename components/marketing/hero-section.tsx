@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { forwardRef, useEffect, useState } from "react";
+import { useAnalytics } from "@/hooks/use-analytics";
+import { useHaptics } from "@/hooks/use-haptics";
 import { cn } from "@/lib/utils";
 
 export const HeroSection = forwardRef<HTMLElement>(
   function HeroSection(_, ref) {
     const [mounted, setMounted] = useState(false);
+    const haptic = useHaptics();
+    const analytics = useAnalytics();
 
     useEffect(() => {
       setMounted(true);
@@ -29,7 +33,7 @@ export const HeroSection = forwardRef<HTMLElement>(
           <div
             className={cn(
               "absolute -right-28 top-[10%] h-[300px] w-[300px] rounded-full bg-primary opacity-0 transition-opacity duration-1000 sm:h-[400px] sm:w-[400px] lg:h-[600px] lg:w-[600px]",
-              mounted && "animate-shape-breathe opacity-[0.05]",
+              mounted && "animate-shape-breathe opacity-[0.1]",
             )}
           />
 
@@ -37,7 +41,7 @@ export const HeroSection = forwardRef<HTMLElement>(
           <div
             className={cn(
               "absolute left-[8%] top-[15%] h-16 w-16 rounded-full border-[3px] border-primary opacity-0 transition-opacity duration-1000 sm:h-20 sm:w-20 md:h-24 md:w-24 md:border-4",
-              mounted && "animate-shape-drift opacity-[0.06]",
+              mounted && "animate-shape-drift opacity-[0.12]",
             )}
           />
 
@@ -45,7 +49,7 @@ export const HeroSection = forwardRef<HTMLElement>(
           <div
             className={cn(
               "absolute bottom-[20%] right-[12%] rotate-12 opacity-0 transition-opacity duration-1000",
-              mounted && "opacity-[0.04]",
+              mounted && "opacity-[0.09]",
             )}
           >
             <div
@@ -60,7 +64,7 @@ export const HeroSection = forwardRef<HTMLElement>(
           <div
             className={cn(
               "absolute left-[20%] top-[30%] rotate-45 opacity-0 transition-opacity duration-1000",
-              mounted && "opacity-[0.03]",
+              mounted && "opacity-[0.08]",
             )}
           >
             <div
@@ -72,11 +76,11 @@ export const HeroSection = forwardRef<HTMLElement>(
             />
           </div>
 
-          {/* Shape 4 — Morphing blob */}
+          {/* Shape 4 — Breathing blob */}
           <div
             className={cn(
-              "absolute -left-20 top-[40%] h-40 w-40 rounded-full bg-primary opacity-0 transition-opacity duration-1000 sm:h-56 sm:w-56 md:h-72 md:w-72",
-              mounted && "animate-shape-morph opacity-[0.04]",
+              "absolute -left-20 top-[35%] h-48 w-48 rounded-full bg-primary opacity-0 transition-opacity duration-1000 sm:h-64 sm:w-64 md:h-80 md:w-80",
+              mounted && "animate-shape-breathe opacity-[0.12]",
             )}
           />
 
@@ -84,7 +88,7 @@ export const HeroSection = forwardRef<HTMLElement>(
           <div
             className={cn(
               "absolute left-[30%] top-[8%] h-6 w-6 rounded-full bg-accent opacity-0 transition-opacity duration-1000 sm:h-7 sm:w-7 md:h-8 md:w-8",
-              mounted && "animate-shape-pulse-scale opacity-[0.07]",
+              mounted && "animate-shape-pulse-scale opacity-[0.14]",
             )}
             style={{ animationDelay: "1.5s" }}
           />
@@ -141,71 +145,82 @@ export const HeroSection = forwardRef<HTMLElement>(
                 </h1>
               </div>
 
-              <p
-                className={cn(
-                  "mt-[clamp(0.5rem,min(1.35vw,1.8svh),2rem)] md:ml-[6%] max-w-md text-[clamp(0.875rem,min(1.44vw,1.25svh),1rem)] leading-relaxed text-muted-foreground opacity-0",
-                  mounted && "animate-slide-in-up delay-400",
-                )}
-              >
-                Your clients edit content.
-                <br />
-                You ship code.
-                <br />
-                <span className="font-bold text-foreground">
-                  Everyone goes home happy.
-                </span>
-              </p>
-
-              <div
-                className={cn(
-                  "mt-[clamp(0.75rem,min(1.8vw,2.4svh),2.5rem)] md:ml-[6%] flex flex-col items-start gap-[clamp(0.5rem,min(0.9vw,1.2svh),1rem)] opacity-0",
-                  mounted && "animate-slide-in-up delay-500",
-                )}
-              >
-                <Link
-                  href="/sign-up"
-                  className="cta-diagonal group inline-flex max-w-[90vw] border-[4px] border-foreground bg-accent shadow-brutal-lg sm:border-[5px]"
-                  style={{
-                    padding:
-                      "clamp(0.5rem, min(0.9vw, 1.2svh), 1.5rem) clamp(1.5rem, min(3.6vw, 4.8svh), 4rem)",
-                  }}
+              <div className="flex flex-col px-12 md:px-0">
+                <p
+                  className={cn(
+                    "mt-[clamp(0.5rem,min(1.35vw,1.8svh),2rem)] self-center max-w-md text-[clamp(0.875rem,min(1.44vw,1.25svh),1rem)] leading-relaxed text-muted-foreground opacity-0",
+                    mounted && "animate-slide-in-up delay-400",
+                  )}
                 >
-                  <span
-                    className="flex items-center gap-3 font-display text-accent-foreground sm:gap-4"
+                  Your clients edit content.
+                  <br />
+                  You ship code.
+                  <br />
+                  <span className="font-bold text-foreground">
+                    Everyone goes home happy.
+                  </span>
+                </p>
+
+                <div
+                  className={cn(
+                    "mt-[clamp(1rem,min(1.8vw,2.4svh),2.5rem)] self-center xs:ml-[clamp(4rem,min(1.8vw,2svh),6rem)] flex flex-col items-start gap-[clamp(1.25rem,min(0.9vw,1.2svh),1.5rem)] opacity-0",
+                    mounted && "animate-slide-in-up delay-500",
+                  )}
+                >
+                  <Link
+                    href="/sign-up"
+                    onClick={() => {
+                      haptic("tap");
+                      analytics.trackCtaClicked("START_BUILDING", "hero");
+                    }}
+                    className="cta-diagonal group inline-flex max-w-[90vw] border-[4px] border-foreground bg-accent shadow-brutal-lg sm:border-[5px] -translate-x-4"
                     style={{
-                      fontSize: "clamp(1rem, min(1.8vw, 2.4svh), 1.5rem)",
+                      padding:
+                        "clamp(0.5rem, min(0.9vw, 1.2svh), 1.5rem) clamp(1.5rem, min(3.6vw, 4.8svh), 4rem)",
                     }}
                   >
-                    START BUILDING
                     <span
-                      className="transition-transform duration-200 group-hover:translate-x-2"
+                      className="flex items-center gap-3 font-display text-accent-foreground sm:gap-4"
                       style={{
-                        fontSize:
-                          "clamp(1.125rem, min(2.25vw, 3svh), 1.875rem)",
+                        fontSize: "clamp(1.5rem, min(1.8vw, 2.4svh), 2.5rem)",
                       }}
                     >
-                      &rarr;
+                      START BUILDING
+                      <span
+                        className="transition-transform duration-200 group-hover:translate-x-2"
+                        style={{
+                          fontSize:
+                            "clamp(1.125rem, min(2.25vw, 3svh), 1.875rem)",
+                        }}
+                      >
+                        &rarr;
+                      </span>
                     </span>
-                  </span>
-                </Link>
+                  </Link>
 
-                <Link
-                  href="/docs"
-                  className="group inline-flex border-[4px] border-foreground bg-background transition-colors hover:bg-foreground hover:text-background sm:border-[5px]"
-                  style={{
-                    padding:
-                      "clamp(0.375rem, min(0.675vw, 0.9svh), 0.75rem) clamp(1rem, min(1.8vw, 2.4svh), 2rem)",
-                  }}
-                >
-                  <span
-                    className="font-display"
+                  <Link
+                    href="/docs"
+                    onClick={() => {
+                      haptic("tap");
+                      analytics.trackCtaClicked("READ_DOCS", "hero");
+                    }}
+                    className="group inline-flex border-[4px] border-foreground bg-background transition-colors hover:bg-foreground hover:text-background sm:border-[5px]"
                     style={{
-                      fontSize: "clamp(0.75rem, min(1.35vw, 1.8svh), 1.125rem)",
+                      padding:
+                        "clamp(0.375rem, min(0.675vw, 0.9svh), 0.75rem) clamp(1rem, min(1.8vw, 2.4svh), 2rem)",
                     }}
                   >
-                    READ DOCS &rarr;
-                  </span>
-                </Link>
+                    <span
+                      className="font-display"
+                      style={{
+                        fontSize:
+                          "clamp(0.75rem, min(1.35vw, 1.8svh), 1.125rem)",
+                      }}
+                    >
+                      READ DOCS &rarr;
+                    </span>
+                  </Link>
+                </div>
               </div>
             </div>
 

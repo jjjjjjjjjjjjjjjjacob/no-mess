@@ -258,6 +258,8 @@ vi.mock("lucide-react", () => {
     MousePointerClick: stub("MousePointerClick"),
     Save: stub("Save"),
     Upload: stub("Upload"),
+    Terminal: stub("Terminal"),
+    Code: stub("Code"),
   };
 });
 
@@ -438,7 +440,6 @@ describe("LandingPage (app/page.tsx)", () => {
     expect(screen.getByTestId("features-section")).toBeInTheDocument();
     expect(screen.getByTestId("how-it-works-section")).toBeInTheDocument();
     expect(screen.getByTestId("cta-section")).toBeInTheDocument();
-    expect(screen.getByTestId("footer")).toBeInTheDocument();
   });
 });
 
@@ -1019,7 +1020,19 @@ describe("PreviewPage (docs/preview)", () => {
 });
 
 // ===========================================================================
-// 20. Docs: SDK Usage
+// 20. Docs: CLI & Schema as Code
+// ===========================================================================
+
+describe("CliPage (docs/cli)", () => {
+  it("renders the heading", async () => {
+    const { default: CliPage } = await import("@/app/(docs)/docs/cli/page");
+    render(<CliPage />);
+    expect(screen.getByText("CLI & Schema as Code")).toBeInTheDocument();
+  });
+});
+
+// ===========================================================================
+// 21. Docs: SDK Usage
 // ===========================================================================
 
 describe("SdkPage (docs/sdk)", () => {

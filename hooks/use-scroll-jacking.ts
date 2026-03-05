@@ -7,13 +7,20 @@ interface UseScrollJackingOptions {
   cooldown?: number;
   /** Set false to disable scroll-jacking (e.g. on mobile) */
   enabled?: boolean;
+  /** Called just before a beat transition with navigation context */
+  onNavigate?: (
+    method: string,
+    direction: "up" | "down",
+    fromBeat: number,
+    toBeat: number,
+  ) => void;
 }
 
 export function useScrollJacking(
   beatRefs: React.RefObject<HTMLElement | null>[],
   options: UseScrollJackingOptions = {},
 ) {
-  const { cooldown = 800, enabled = true } = options;
+  const { cooldown = 800, enabled = true, onNavigate } = options;
 
   const [currentBeat, setCurrentBeat] = useState(0);
   const isTransitioning = useRef(false);
@@ -60,12 +67,16 @@ export function useScrollJacking(
       if (Math.abs(e.deltaY) < 5) return;
 
       const direction = e.deltaY > 0 ? "down" : "up";
-
-      if (direction === "down") {
-        scrollToBeat(currentBeat + 1);
-      } else {
-        scrollToBeat(currentBeat - 1);
-      }
+      const toBeat = Math.max(
+        0,
+        Math.min(
+          direction === "down" ? currentBeat + 1 : currentBeat - 1,
+          totalBeats - 1,
+        ),
+      );
+      if (toBeat === currentBeat) return;
+      onNavigate?.("wheel", direction, currentBeat, toBeat);
+      scrollToBeat(toBeat);
     };
 
     window.addEventListener("wheel", handleWheel, { passive: false });
@@ -73,7 +84,7 @@ export function useScrollJacking(
     return () => {
       window.removeEventListener("wheel", handleWheel);
     };
-  }, [currentBeat, scrollToBeat, enabled]);
+  }, [currentBeat, scrollToBeat, enabled, onNavigate, totalBeats]);
 
   // Touch: prevent native touch scroll, trigger on swipe end
   useEffect(() => {
@@ -94,11 +105,17 @@ export function useScrollJacking(
       const deltaY = touchStartY.current - e.changedTouches[0].clientY;
       if (Math.abs(deltaY) < 50) return;
 
-      if (deltaY > 0) {
-        scrollToBeat(currentBeat + 1);
-      } else {
-        scrollToBeat(currentBeat - 1);
-      }
+      const direction = deltaY > 0 ? "down" : "up";
+      const toBeat = Math.max(
+        0,
+        Math.min(
+          direction === "down" ? currentBeat + 1 : currentBeat - 1,
+          totalBeats - 1,
+        ),
+      );
+      if (toBeat === currentBeat) return;
+      onNavigate?.("touch", direction, currentBeat, toBeat);
+      scrollToBeat(toBeat);
     };
 
     window.addEventListener("touchstart", handleTouchStart, { passive: true });
@@ -110,7 +127,7 @@ export function useScrollJacking(
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [currentBeat, scrollToBeat, enabled]);
+  }, [currentBeat, scrollToBeat, enabled, onNavigate, totalBeats]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -122,17 +139,56 @@ export function useScrollJacking(
       if (e.key === "ArrowDown" || e.key === "PageDown") {
         if (currentBeat >= totalBeats - 1) return;
         e.preventDefault();
+        onNavigate?.("keyboard", "down", currentBeat, currentBeat + 1);
         scrollToBeat(currentBeat + 1);
       } else if (e.key === "ArrowUp" || e.key === "PageUp") {
         if (currentBeat === 0) return;
         e.preventDefault();
+        onNavigate?.("keyboard", "up", currentBeat, currentBeat - 1);
         scrollToBeat(currentBeat - 1);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentBeat, scrollToBeat, enabled, totalBeats]);
+  }, [currentBeat, scrollToBeat, enabled, totalBeats, onNavigate]);
+
+  // Scroll sync: detect native scrollbar drags and resync currentBeat
+  useEffect(() => {
+    if (!enabled) return;
+
+    let rafId: number | null = null;
+
+    const handleScroll = () => {
+      // Skip during programmatic transitions (scrollIntoView)
+      if (isTransitioning.current) return;
+
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        let closestBeat = 0;
+        let closestDistance = Infinity;
+
+        for (let i = 0; i < totalBeats; i++) {
+          const el = beatRefs[i]?.current;
+          if (!el) continue;
+          const distance = Math.abs(el.getBoundingClientRect().top);
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestBeat = i;
+          }
+        }
+
+        setCurrentBeat(closestBeat);
+      });
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [beatRefs, enabled, totalBeats]);
 
   return { currentBeat, scrollToBeat, totalBeats };
 }

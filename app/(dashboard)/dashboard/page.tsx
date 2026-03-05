@@ -10,9 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
+import { useAnalytics } from "@/hooks/use-analytics";
 
 export default function DashboardPage() {
   const sites = useQuery(api.sites.listForCurrentUser);
+  const analytics = useAnalytics();
   const [createOpen, setCreateOpen] = useState(false);
   const [showWizard, setShowWizard] = useState<boolean | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -27,6 +29,19 @@ export default function DashboardPage() {
     );
   }, [sites, searchQuery]);
 
+  // Track search (debounced)
+  useEffect(() => {
+    if (!searchQuery.trim() || filteredSites === undefined) return;
+    const timer = setTimeout(() => {
+      analytics.trackSearchPerformed({
+        query_length: searchQuery.length,
+        results_count: filteredSites.length,
+        context: "sites",
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, filteredSites, analytics]);
+
   useEffect(() => {
     if (sites !== undefined && showWizard === null) {
       const dismissed =
@@ -38,8 +53,12 @@ export default function DashboardPage() {
   if (showWizard) {
     return (
       <OnboardingWizard
-        onComplete={() => setShowWizard(false)}
+        onComplete={() => {
+          analytics.trackOnboardingAction("completed");
+          setShowWizard(false);
+        }}
         onDismiss={() => {
+          analytics.trackOnboardingAction("dismissed");
           localStorage.setItem("no-mess:onboarding-dismissed", "true");
           setShowWizard(false);
         }}
@@ -49,14 +68,20 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Your Sites</h1>
           <p className="text-muted-foreground">
             Manage your content across all your sites.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button
+          className="self-start sm:self-auto"
+          onClick={() => {
+            analytics.trackSiteCreated({ source: "header" });
+            setCreateOpen(true);
+          }}
+        >
           <Plus className="mr-2 h-4 w-4" />
           Create Site
         </Button>
@@ -77,15 +102,21 @@ export default function DashboardPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Create your first site to get started.
           </p>
-          <Button className="mt-4" onClick={() => setCreateOpen(true)}>
+          <Button
+            className="mt-4"
+            onClick={() => {
+              analytics.trackSiteCreated({ source: "empty_state" });
+              setCreateOpen(true);
+            }}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Create Site
           </Button>
         </div>
       ) : (
         <>
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <div className="relative flex-1 sm:max-w-sm">
               <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search sites..."

@@ -3,7 +3,12 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Drawer } from "vaul";
+import { useAbPalette } from "@/hooks/use-ab-palette";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { useFavicon } from "@/hooks/use-favicon";
+import { useHaptics } from "@/hooks/use-haptics";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   switchThemeWithTransition,
   withViewTransition,
@@ -68,6 +73,36 @@ const PALETTES: Palette[] = [
     name: "Blood & Bone",
     primary: "oklch(0.50 0.18 20)",
     accent: "oklch(0.85 0.06 90)",
+  },
+  {
+    id: "ultraviolet",
+    name: "Ultraviolet",
+    primary: "oklch(0.45 0.22 290)",
+    accent: "oklch(0.75 0.16 60)",
+  },
+  {
+    id: "sakura",
+    name: "Sakura",
+    primary: "oklch(0.68 0.18 350)",
+    accent: "oklch(0.55 0.12 230)",
+  },
+  {
+    id: "acid-rain",
+    name: "Acid Rain",
+    primary: "oklch(0.78 0.22 110)",
+    accent: "oklch(0.55 0.20 300)",
+  },
+  {
+    id: "rust-steel",
+    name: "Rust & Steel",
+    primary: "oklch(0.55 0.14 40)",
+    accent: "oklch(0.58 0.04 240)",
+  },
+  {
+    id: "tropical",
+    name: "Tropical",
+    primary: "oklch(0.60 0.20 210)",
+    accent: "oklch(0.72 0.22 135)",
   },
 ];
 
@@ -160,11 +195,19 @@ function getButtonCenter(e: React.MouseEvent) {
 // Component
 // ---------------------------------------------------------------------------
 
-export function PaletteSwitcher() {
+export function PaletteSwitcher({
+  variant = "default",
+}: {
+  variant?: "default" | "sidebar";
+} = {}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const { resolvedTheme, theme, setTheme } = useTheme();
+  const haptic = useHaptics();
+  const analytics = useAnalytics();
+  const isMobile = useIsMobile();
+  const abPalette = useAbPalette(PALETTES.map((p) => p.id));
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -183,13 +226,15 @@ export function PaletteSwitcher() {
   }, [cancelClose]);
 
   const handleMouseEnter = useCallback(() => {
+    if (isMobile) return;
     cancelClose();
     setOpen(true);
-  }, [cancelClose]);
+  }, [cancelClose, isMobile]);
 
   const handleMouseLeave = useCallback(() => {
+    if (isMobile) return;
     scheduleClose();
-  }, [scheduleClose]);
+  }, [scheduleClose, isMobile]);
 
   // Resolve initial palette from ?palette= → localStorage → default
   const paramPalette = searchParams.get("palette");
@@ -214,14 +259,25 @@ export function PaletteSwitcher() {
     applyPalette(activeId);
   }, [activeId, mounted]);
 
+  // Apply A/B assigned palette when it resolves (if no manual override)
+  useEffect(() => {
+    if (!mounted || abPalette.isLoading || abPalette.isOverridden) return;
+    // Don't override URL param or existing localStorage preference
+    if (paramPalette) return;
+    if (localStorage.getItem("palette")) return;
+
+    applyPalette(abPalette.assignedPalette);
+    setActiveId(abPalette.assignedPalette);
+  }, [
+    mounted,
+    abPalette.isLoading,
+    abPalette.assignedPalette,
+    abPalette.isOverridden,
+    paramPalette,
+  ]);
+
   // Dynamic favicon
   useFavicon(activeId, resolvedTheme ?? "light");
-
-  // Persist to localStorage
-  useEffect(() => {
-    if (!mounted) return;
-    localStorage.setItem("palette", activeId);
-  }, [activeId, mounted]);
 
   // Sync search param when palette changes (and handle legacy redirects)
   const selectPalette = useCallback(
@@ -283,37 +339,188 @@ export function PaletteSwitcher() {
   const active = PALETTES.find((p) => p.id === activeId) ?? PALETTES[0];
   const isDark = resolvedTheme === "dark";
 
-  return (
-    <div
-      ref={panelRef}
-      className="relative"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {/* Toggle button — sun/moon icon + palette swatches + name */}
+  const isSidebar = variant === "sidebar";
+
+  const handlePaletteClick = (palette: Palette, e: React.MouseEvent) => {
+    haptic("select");
+    analytics.trackPaletteChanged(palette.id, activeId, "manual");
+    const wasOverridden = abPalette.isOverridden;
+    abPalette.markOverride(palette.id);
+    if (!wasOverridden) {
+      analytics.trackPaletteOverride(palette.id, abPalette.assignedPalette);
+    }
+    const origin = getButtonCenter(e);
+    withViewTransition(
+      () => {
+        applyPalette(palette.id);
+        setActiveId(palette.id);
+      },
+      origin,
+      () => {
+        selectPalette(palette.id);
+        setOpen(false);
+      },
+    );
+  };
+
+  // Shared panel content used in both desktop dropdown and mobile sheet
+  const palettePanel = (
+    <>
+      {/* Theme section */}
+      <div
+        className={
+          isSidebar
+            ? "border-b border-border px-3 py-2"
+            : "border-b-[3px] border-foreground px-3 py-2"
+        }
+      >
+        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+          Theme
+        </span>
+      </div>
+      <div
+        className={
+          isSidebar
+            ? "flex gap-1 border-b border-border px-3 py-2"
+            : "flex gap-1 border-b-[3px] border-foreground px-3 py-2"
+        }
+      >
+        {(["light", "dark", "system"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={(e) => {
+              haptic("select");
+              analytics.trackThemeChanged(t, theme ?? "system");
+              const origin = getButtonCenter(e);
+              switchThemeWithTransition(t, setTheme, origin);
+            }}
+            className={
+              isSidebar
+                ? `flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium capitalize transition-colors ${
+                    theme === t
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-muted-foreground hover:bg-sidebar-accent/50"
+                  }`
+                : `flex-1 px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                    theme === t
+                      ? "bg-foreground text-background"
+                      : "bg-muted text-muted-foreground hover:bg-foreground/10"
+                  }`
+            }
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {/* Palette section */}
+      <div
+        className={
+          isSidebar
+            ? "border-b border-border px-3 py-2"
+            : "border-b-[3px] border-foreground px-3 py-2"
+        }
+      >
+        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+          Palette
+        </span>
+      </div>
+      {PALETTES.map((palette) => (
+        <button
+          key={palette.id}
+          type="button"
+          onClick={(e) => handlePaletteClick(palette, e)}
+          className={
+            isSidebar
+              ? `flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-sidebar-accent rounded-sm ${
+                  palette.id === activeId ? "bg-sidebar-accent font-medium" : ""
+                }`
+              : `flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted ${
+                  palette.id === activeId ? "bg-muted font-bold" : ""
+                }`
+          }
+        >
+          <span
+            className={`h-3.5 w-3.5 shrink-0 ${isSidebar ? "rounded-sm" : "border border-foreground"}`}
+            style={{ background: palette.primary }}
+          />
+          <span
+            className={`h-3.5 w-3.5 shrink-0 ${isSidebar ? "rounded-sm" : "border border-foreground"}`}
+            style={{ background: palette.accent }}
+          />
+          <span
+            className={
+              isSidebar
+                ? "flex-1 text-xs"
+                : "flex-1 font-mono text-xs uppercase tracking-wide"
+            }
+          >
+            {palette.name}
+          </span>
+          {palette.id === activeId &&
+            (isSidebar ? (
+              <span className="text-[10px] text-primary">&#10003;</span>
+            ) : (
+              <span className="font-mono text-[10px] text-primary">[ON]</span>
+            ))}
+        </button>
+      ))}
+    </>
+  );
+
+  const themeIcon = (
+    <span className="relative h-4 w-4 shrink-0">
+      <SunIcon
+        className={`absolute inset-0 h-4 w-4 transition-all duration-300 ${
+          isDark
+            ? "rotate-90 scale-0 opacity-0"
+            : "rotate-0 scale-100 opacity-100"
+        }`}
+      />
+      <MoonIcon
+        className={`absolute inset-0 h-4 w-4 transition-all duration-300 ${
+          isDark
+            ? "rotate-0 scale-100 opacity-100"
+            : "-rotate-90 scale-0 opacity-0"
+        }`}
+      />
+    </span>
+  );
+
+  const triggerButton =
+    variant === "sidebar" ? (
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          haptic("tap");
+          setOpen((v) => !v);
+        }}
+        className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0"
+      >
+        {themeIcon}
+        <span
+          className="h-3 w-3 rounded-sm group-data-[collapsible=icon]:hidden"
+          style={{ background: active.primary }}
+        />
+        <span
+          className="h-3 w-3 rounded-sm group-data-[collapsible=icon]:hidden"
+          style={{ background: active.accent }}
+        />
+        <span className="truncate text-xs text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden">
+          {active.name}
+        </span>
+      </button>
+    ) : (
+      <button
+        type="button"
+        onClick={() => {
+          haptic("tap");
+          setOpen((v) => !v);
+        }}
         className="flex h-9 items-center gap-2 border-[3px] border-foreground bg-background px-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors hover:bg-muted"
       >
-        {/* Sun/Moon icon */}
-        <span className="relative h-4 w-4 shrink-0">
-          <SunIcon
-            className={`absolute inset-0 h-4 w-4 transition-all duration-300 ${
-              isDark
-                ? "rotate-0 scale-100 opacity-100"
-                : "rotate-90 scale-0 opacity-0"
-            }`}
-          />
-          <MoonIcon
-            className={`absolute inset-0 h-4 w-4 transition-all duration-300 ${
-              isDark
-                ? "-rotate-90 scale-0 opacity-0"
-                : "rotate-0 scale-100 opacity-100"
-            }`}
-          />
-        </span>
-        {/* Palette swatches */}
+        {themeIcon}
         <span
           className="h-3 w-3 border border-foreground"
           style={{ background: active.primary }}
@@ -324,90 +531,64 @@ export function PaletteSwitcher() {
         />
         <span className="hidden lg:inline">{active.name}</span>
       </button>
+    );
+
+  // Mobile: Vaul drawer with scale effect
+  // When inside the sidebar drawer (variant="sidebar"), use NestedRoot so Vaul
+  // handles 2-level nesting: sidebar scales page (L1), palette scales sidebar (L2).
+  if (isMobile) {
+    const DrawerRoot = isSidebar ? Drawer.NestedRoot : Drawer.Root;
+    const drawerRootProps = isSidebar
+      ? { open, onOpenChange: setOpen }
+      : { open, onOpenChange: setOpen, shouldScaleBackground: true as const };
+
+    return (
+      <>
+        {triggerButton}
+        <DrawerRoot {...drawerRootProps}>
+          <Drawer.Portal>
+            <Drawer.Overlay className="fixed inset-0 z-50 bg-black/40" />
+            <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 rounded-t-xl bg-background border-t border-foreground/10 outline-none">
+              <div className="mx-auto mt-3 mb-2 h-1 w-10 rounded-full bg-muted-foreground/30" />
+              <Drawer.Title className="sr-only">Theme & Palette</Drawer.Title>
+              <Drawer.Description className="sr-only">
+                Choose a theme and color palette.
+              </Drawer.Description>
+              <div className="pb-safe max-h-[80svh] overflow-y-auto">
+                {palettePanel}
+              </div>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </DrawerRoot>
+      </>
+    );
+  }
+
+  // Desktop: hover dropdown
+  return (
+    <div
+      ref={panelRef}
+      className="relative"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {triggerButton}
 
       {/* Dropdown panel — always rendered, animated via CSS */}
       <div
-        className={`absolute top-full right-0 z-[60] mt-2 w-72 border-[3px] border-foreground bg-background shadow-brutal-lg transition-all duration-200 ease-out origin-top-right ${
+        className={`absolute z-[60] w-72 max-h-[calc(100svh-8rem)] overflow-y-auto transition-all duration-200 ease-out ${
+          isSidebar
+            ? "bottom-full left-0 mb-2 origin-bottom-left rounded-lg border border-border bg-popover shadow-md"
+            : "top-full right-0 mt-2 origin-top-right border-[3px] border-foreground bg-background shadow-brutal-lg"
+        } ${
           open
             ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
-            : "opacity-0 -translate-y-2 scale-95 pointer-events-none"
+            : isSidebar
+              ? "opacity-0 translate-y-2 scale-95 pointer-events-none"
+              : "opacity-0 -translate-y-2 scale-95 pointer-events-none"
         }`}
       >
-        {/* Theme section */}
-        <div className="border-b-[3px] border-foreground px-3 py-2">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Theme
-          </span>
-        </div>
-        <div className="flex gap-1 border-b-[3px] border-foreground px-3 py-2">
-          {(["light", "dark", "system"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={(e) => {
-                const origin = getButtonCenter(e);
-                switchThemeWithTransition(t, setTheme, origin);
-              }}
-              className={`flex-1 px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                theme === t
-                  ? "bg-foreground text-background"
-                  : "bg-muted text-muted-foreground hover:bg-foreground/10"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-
-        {/* Palette section */}
-        <div className="border-b-[3px] border-foreground px-3 py-2">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Palette
-          </span>
-        </div>
-        {PALETTES.map((palette) => (
-          <button
-            key={palette.id}
-            type="button"
-            onClick={(e) => {
-              const origin = getButtonCenter(e);
-              withViewTransition(
-                () => {
-                  applyPalette(palette.id);
-                  setActiveId(palette.id);
-                },
-                origin,
-                () => {
-                  selectPalette(palette.id);
-                  setOpen(false);
-                },
-              );
-            }}
-            className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted ${
-              palette.id === activeId ? "bg-muted font-bold" : ""
-            }`}
-          >
-            <span
-              className="h-4 w-4 shrink-0 border border-foreground"
-              style={{ background: palette.primary }}
-            />
-            <span
-              className="h-4 w-4 shrink-0 border border-foreground"
-              style={{ background: palette.accent }}
-            />
-            <span className="flex-1 font-mono text-xs uppercase tracking-wide">
-              {palette.name}
-            </span>
-            {palette.id === activeId && (
-              <span className="font-mono text-[10px] text-primary">[ON]</span>
-            )}
-          </button>
-        ))}
-        <div className="border-t-[3px] border-foreground px-3 py-2">
-          <span className="font-mono text-[10px] text-muted-foreground">
-            {`?palette=${activeId}`}
-          </span>
-        </div>
+        {palettePanel}
       </div>
     </div>
   );

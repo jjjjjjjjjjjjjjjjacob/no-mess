@@ -31,5 +31,10 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "packages/api-gateway", "packages/no-mess-mcp"]
+  "exclude": [
+    "node_modules",
+    "packages/api-gateway",
+    "packages/no-mess-mcp",
+    "packages/no-mess-cli"
+  ]
 }

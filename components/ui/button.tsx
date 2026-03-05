@@ -3,6 +3,7 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { cva, type VariantProps } from "class-variance-authority";
 
+import { type HapticPattern, useHaptics } from "@/hooks/use-haptics";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
@@ -48,14 +49,29 @@ function Button({
   size = "default",
   nativeButton,
   render,
+  haptic: hapticProp = true,
+  onClick,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonPrimitive.Props &
+  VariantProps<typeof buttonVariants> & {
+    haptic?: boolean | HapticPattern;
+  }) {
+  const haptic = useHaptics();
+
+  const handleClick: typeof onClick = hapticProp
+    ? (e) => {
+        haptic(hapticProp === true ? "tap" : hapticProp);
+        onClick?.(e);
+      }
+    : onClick;
+
   return (
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       nativeButton={nativeButton ?? (render ? false : undefined)}
       render={render}
+      onClick={handleClick}
       {...props}
     />
   );

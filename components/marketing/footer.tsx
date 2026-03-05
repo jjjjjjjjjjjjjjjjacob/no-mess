@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import type { FormEvent } from "react";
+import { useAnalytics } from "@/hooks/use-analytics";
+import { useHaptics } from "@/hooks/use-haptics";
 
 const footerLinks = [
   { label: "Docs", href: "/docs" },
@@ -10,8 +12,12 @@ const footerLinks = [
 ];
 
 export function Footer() {
+  const haptic = useHaptics();
+  const analytics = useAnalytics();
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    haptic("tap");
+    analytics.trackNewsletterSubmitted();
   };
 
   return (
@@ -55,7 +61,13 @@ export function Footer() {
                       href={link.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group inline-flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:text-primary sm:text-sm"
+                      onClick={() =>
+                        analytics.trackExternalLinkClicked(
+                          link.href,
+                          link.label,
+                        )
+                      }
+                      className="group inline-flex items-center gap-2 py-2 font-mono text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:text-primary sm:text-sm"
                     >
                       {link.label}
                       <span className="opacity-0 transition-opacity group-hover:opacity-100">
@@ -65,7 +77,7 @@ export function Footer() {
                   ) : (
                     <Link
                       href={link.href}
-                      className="font-mono text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:text-primary sm:text-sm"
+                      className="inline-block py-2 font-mono text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:text-primary sm:text-sm"
                     >
                       {link.label}
                     </Link>
@@ -86,6 +98,8 @@ export function Footer() {
             <form className="flex" onSubmit={handleSubmit}>
               <input
                 type="email"
+                inputMode="email"
+                autoComplete="email"
                 placeholder="you@email.com"
                 className="min-w-0 flex-1 border-[4px] border-r-0 border-foreground bg-background px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary sm:border-[5px] sm:px-4 sm:text-sm"
               />
@@ -101,11 +115,25 @@ export function Footer() {
       </div>
 
       {/* Bottom bar */}
-      <div className="border-t-[4px] border-foreground sm:border-t-[5px]">
+      <div className="border-t-[4px] border-foreground safe-bottom sm:border-t-[5px]">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-4 sm:flex-row sm:gap-4 sm:px-6 sm:py-6">
           <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground sm:text-[10px]">
             © {new Date().getFullYear()} no-mess. Built with zero bloat.
           </p>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/terms"
+              className="font-mono text-[8px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-primary sm:text-[9px]"
+            >
+              Terms
+            </Link>
+            <Link
+              href="/privacy"
+              className="font-mono text-[8px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-primary sm:text-[9px]"
+            >
+              Privacy
+            </Link>
+          </div>
           <div className="flex items-center gap-2 sm:gap-3">
             {["Next.js", "Convex", "TypeScript"].map((tech) => (
               <span

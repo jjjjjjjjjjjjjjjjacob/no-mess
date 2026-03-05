@@ -52,6 +52,7 @@ describe("flatNavItems", () => {
       "Getting Started",
       "Local Development",
       "Field Types",
+      "CLI & Schema as Code",
       "SDK Usage",
       "API Reference",
       "Shopify",
@@ -78,7 +79,7 @@ describe("getPrevNext", () => {
 
   it("returns both prev and next for middle item", () => {
     const { prev, next } = getPrevNext("/docs/sdk");
-    expect(prev?.title).toBe("Field Types");
+    expect(prev?.title).toBe("CLI & Schema as Code");
     expect(next?.title).toBe("API Reference");
   });
 

@@ -298,8 +298,8 @@ describe("ContentTypeForm", () => {
     // Open the select dropdown
     await user.click(typeSelect);
 
-    // Check all field type options are present
-    const options = screen.getAllByRole("option");
+    // Check all field type options are present (async — Base UI renders via portal)
+    const options = await screen.findAllByRole("option");
     const optionLabels = options.map((o) => o.textContent);
 
     for (const label of FIELD_TYPE_LABELS) {
