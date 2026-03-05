@@ -12,6 +12,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  commit-lint:
+    name: Commit Lint
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bunx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
+
   static-checks:
     name: Static Checks
     runs-on: ubuntu-latest
@@ -21,10 +33,19 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - name: Commitlint (PR commits)
-        if: github.event_name == 'pull_request'
-        run: bunx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
-      - run: bun run static-checks
+      - run: bun run lint
+      - run: tsc --noEmit
+      - run: tsc -p packages/no-mess-client
+      - run: tsc --noEmit -p packages/no-mess-cli
+
+  test-root:
+    name: Test (root)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run test
 
   test-sdk:
     name: Test (SDK)
