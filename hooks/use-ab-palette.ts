@@ -80,7 +80,7 @@ export function useAbPalette(validPaletteIds: string[]): UseAbPaletteResult {
 
     localStorage.setItem(STORAGE_KEY, assignedPalette);
 
-    if (!hasTracked.current) {
+    if (!hasTracked.current && !posthog?.has_opted_out_capturing()) {
       hasTracked.current = true;
       posthog?.capture(LANDING_AB_PALETTE_ASSIGNED, {
         palette: assignedPalette,

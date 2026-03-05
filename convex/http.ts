@@ -373,6 +373,10 @@ http.route({
       return corsJsonError("Invalid JSON body", 400);
     }
 
+    if (typeof body !== "object" || body === null) {
+      return corsJsonError("Invalid request body", 400);
+    }
+
     if (!body.contentTypes || !Array.isArray(body.contentTypes)) {
       return corsJsonError(
         "Missing or invalid contentTypes array in request body",
@@ -422,9 +426,8 @@ http.route({
         errors: [],
       });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to sync schema";
-      return corsJsonError(message, 500);
+      console.error("Schema sync failed:", err);
+      return corsJsonError("Internal server error", 500);
     }
   }),
 });

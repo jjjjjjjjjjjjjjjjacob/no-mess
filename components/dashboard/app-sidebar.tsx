@@ -33,7 +33,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 
-const siteSubNav = [
+const SITE_SUB_NAV = [
   { label: "Overview", icon: LayoutDashboard, path: "" },
   { label: "Schemas", icon: FileText, path: "/schemas" },
   { label: "Content", icon: Files, path: "/content" },
@@ -54,6 +54,7 @@ export function AppSidebar() {
   useEffect(() => {
     if (!user || !posthog || lastIdentifiedUserIdRef.current === user.id)
       return;
+    if (posthog.has_opted_out_capturing()) return;
     lastIdentifiedUserIdRef.current = user.id;
     posthog.identify(user.id, {
       email: user.primaryEmailAddress?.emailAddress,
@@ -64,6 +65,7 @@ export function AppSidebar() {
   // Keep site_count person property updated
   useEffect(() => {
     if (sites === undefined || !posthog) return;
+    if (posthog.has_opted_out_capturing()) return;
     posthog.setPersonProperties({ site_count: sites.length });
   }, [sites, posthog]);
 
@@ -111,7 +113,7 @@ export function AppSidebar() {
                 {activeSite?.name ?? activeSiteSlug}
               </SidebarGroupLabel>
               <SidebarMenu>
-                {siteSubNav.map((item) => {
+                {SITE_SUB_NAV.map((item) => {
                   const href = `/sites/${activeSiteSlug}${item.path}`;
                   const isActiveSubItem =
                     item.path === ""

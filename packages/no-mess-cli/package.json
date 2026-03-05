@@ -15,11 +15,11 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
+    "@no-mess/client": "workspace:*",
     "chokidar": "^4.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "@no-mess/client": "workspace:*"
+    "typescript": "^5.0.0"
   },
   "repository": {
     "type": "git",

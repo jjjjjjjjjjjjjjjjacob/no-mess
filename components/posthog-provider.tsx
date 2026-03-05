@@ -35,6 +35,7 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
         person_profiles: "identified_only",
         capture_pageview: false,
         capture_pageleave: true,
+        respect_dnt: true,
       });
     }
   }, [key, host]);
