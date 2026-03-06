@@ -54,6 +54,7 @@ jobs:
         uses: changesets/action@v1
         with:
           publish: bun run release
+          commit: "chore(release): version packages"
           createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
