@@ -49,14 +49,11 @@ jobs:
           cd packages/no-mess-mcp && bun run build && cd ../..
           cd packages/no-mess-cli && bun run build && cd ../..
 
-      - name: Create Release PR or Publish
+      - name: Publish Packages
         id: changesets
         uses: changesets/action@v1
         with:
           publish: bun run release
-          version: bun run version
-          title: "chore(release): version packages"
-          commit: "chore(release): version packages"
           createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
