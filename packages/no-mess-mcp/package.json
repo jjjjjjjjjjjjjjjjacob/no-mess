@@ -1,6 +1,6 @@
 {
   "name": "@no-mess/mcp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "MCP server for no-mess headless CMS — schema introspection and content tools for AI coding agents",
   "type": "module",
   "bin": {

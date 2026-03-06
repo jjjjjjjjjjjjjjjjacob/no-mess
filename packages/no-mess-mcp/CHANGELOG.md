@@ -1,5 +1,14 @@
 # @no-mess/mcp 1.0.0 (2026-03-03)
 
+## 1.0.2
+
+### Patch Changes
+
+- [#5](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/pull/5) [`615f07d`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/615f07df6162accc4a253b4ae4947a0e34681eff) Thanks [@jjjjjjjjjjjjjjjjacob](https://github.com/jjjjjjjjjjjjjjjjacob)! - Add package README with available tools, configuration, and IDE setup examples. Switch `@no-mess/client` dependency to workspace protocol.
+
+- Updated dependencies [[`615f07d`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/615f07df6162accc4a253b4ae4947a0e34681eff)]:
+  - @no-mess/client@0.3.0
+
 ## 1.0.1
 
 ### Patch Changes
