@@ -57,6 +57,7 @@ jobs:
           version: bun run version
           title: "chore(release): version packages"
           commit: "chore(release): version packages"
+          createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
