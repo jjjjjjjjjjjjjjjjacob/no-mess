@@ -56,6 +56,8 @@ jobs:
       - name: Version packages
         if: steps.changesets.outputs.has_changesets == 'true'
         run: bun run version
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Build packages
         if: steps.changesets.outputs.has_changesets == 'true'
@@ -76,6 +78,7 @@ jobs:
         if: steps.changesets.outputs.has_changesets == 'true'
         run: bun run release
         env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Push to main
