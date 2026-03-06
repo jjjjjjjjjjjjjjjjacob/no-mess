@@ -33,10 +33,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-<<<<<<< HEAD
           token: ${{ steps.app-token.outputs.token }}
-=======
->>>>>>> 615f07df6162accc4a253b4ae4947a0e34681eff
 
       - uses: oven-sh/setup-bun@v2
       - uses: actions/setup-node@v4
@@ -61,9 +58,5 @@ jobs:
           title: "chore(release): version packages"
           commit: "chore(release): version packages"
         env:
-<<<<<<< HEAD
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-=======
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
->>>>>>> 615f07df6162accc4a253b4ae4947a0e34681eff
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
