@@ -7,16 +7,14 @@ export interface CliConfig {
   schemaPath: string;
 }
 
-const DEFAULT_API_URL = "https://api.no-mess.xyz";
+const DEFAULT_API_URL = "https://api.nomess.xyz";
 const DEFAULT_SCHEMA_PATH = "schema.ts";
 
 /**
- * Loads CLI configuration from environment variables and .env file.
+ * Loads CLI configuration from environment variables and .env files.
  */
-export function loadConfig(overrides?: {
-  schema?: string;
-}): CliConfig {
-  // Try loading .env file
+export function loadConfig(overrides?: { schema?: string }): CliConfig {
+  // Load environment variables from local env files without overriding shell-provided values.
   loadDotEnv();
 
   const apiKey = process.env.NO_MESS_API_KEY ?? "";
@@ -37,7 +35,7 @@ export function validateApiKey(apiKey: string): {
     return {
       valid: false,
       error:
-        "NO_MESS_API_KEY is not set. Run `no-mess init` or set it in your .env file.",
+        "NO_MESS_API_KEY is not set. Run `no-mess init` or set it in your .env.local or .env file.",
     };
   }
 
@@ -62,32 +60,76 @@ export function validateApiKey(apiKey: string): {
 
 /**
  * Simple .env file loader (no dependencies).
+ * Precedence: process.env > .env.local > .env
  */
 function loadDotEnv(): void {
-  const envPath = resolve(".env");
+  const shellEnvKeys = new Set(Object.keys(process.env));
+  const loadedEnvKeys = new Set<string>();
+
+  loadEnvFile(resolve(".env"), {
+    shellEnvKeys,
+    loadedEnvKeys,
+    allowLoadedOverrides: false,
+  });
+  loadEnvFile(resolve(".env.local"), {
+    shellEnvKeys,
+    loadedEnvKeys,
+    allowLoadedOverrides: true,
+  });
+}
+
+function loadEnvFile(
+  envPath: string,
+  options: {
+    shellEnvKeys: Set<string>;
+    loadedEnvKeys: Set<string>;
+    allowLoadedOverrides: boolean;
+  },
+): void {
   if (!existsSync(envPath)) return;
 
   try {
     const content = readFileSync(envPath, "utf-8");
     for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eqIdx = trimmed.indexOf("=");
-      if (eqIdx === -1) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      let value = trimmed.slice(eqIdx + 1).trim();
-      // Strip quotes
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
-      }
-      if (!process.env[key]) {
-        process.env[key] = value;
-      }
+      const parsed = parseEnvLine(line);
+      if (!parsed) continue;
+
+      const { key, value } = parsed;
+      if (options.shellEnvKeys.has(key)) continue;
+
+      const shouldOverrideLoadedValue =
+        options.allowLoadedOverrides && options.loadedEnvKeys.has(key);
+
+      if (key in process.env && !shouldOverrideLoadedValue) continue;
+
+      process.env[key] = value;
+      options.loadedEnvKeys.add(key);
     }
   } catch {
     // Ignore .env read errors
   }
+}
+
+function parseEnvLine(line: string): {
+  key: string;
+  value: string;
+} | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) return null;
+
+  const eqIdx = trimmed.indexOf("=");
+  if (eqIdx === -1) return null;
+
+  const key = trimmed.slice(0, eqIdx).trim();
+  let value = trimmed.slice(eqIdx + 1).trim();
+
+  // Strip matching quotes.
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1);
+  }
+
+  return { key, value };
 }

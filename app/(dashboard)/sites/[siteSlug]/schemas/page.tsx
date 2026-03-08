@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import { ArrowUpDown, Code, FileText, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ContentTypeContextMenu } from "@/components/content-types/content-type-context-menu";
 import { SchemaExportPanel } from "@/components/schemas/schema-export-panel";
 import { SchemaImportDialog } from "@/components/schemas/schema-import-dialog";
 import { SchemaImportDropzone } from "@/components/schemas/schema-import-dropzone";
@@ -100,6 +101,8 @@ export default function SchemasPage() {
     }, 500);
     return () => clearTimeout(timer);
   }, [searchQuery, filteredSchemas, analytics]);
+
+  if (!site) return null;
 
   return (
     <div className="space-y-6">
@@ -212,28 +215,38 @@ export default function SchemasPage() {
           {filteredSchemas && filteredSchemas.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredSchemas.map((type) => (
-                <Link
+                <ContentTypeContextMenu
                   key={type._id}
-                  href={`/sites/${siteSlug}/schemas/${type.slug}`}
+                  onImportFromCode={() => {
+                    analytics.trackSchemaImported({ step: "dialog_opened" });
+                    setShowImportDialog(true);
+                  }}
+                  siteId={site._id}
+                  siteSlug={siteSlug}
+                  type={type}
                 >
-                  <Card className="transition-colors hover:bg-muted/50">
-                    <CardHeader>
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-base">{type.name}</CardTitle>
-                        {type.status === "draft" && (
-                          <Badge variant="secondary">Draft</Badge>
-                        )}
-                        {type.status === "published" && type.hasDraft && (
-                          <Badge variant="outline">Unpublished changes</Badge>
-                        )}
-                      </div>
-                      <CardDescription>
-                        {type.slug} · {type.fields.length} field
-                        {type.fields.length !== 1 ? "s" : ""}
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                </Link>
+                  <Link href={`/sites/${siteSlug}/schemas/${type.slug}`}>
+                    <Card className="transition-colors hover:bg-muted/50">
+                      <CardHeader>
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-base">
+                            {type.name}
+                          </CardTitle>
+                          {type.status === "draft" && (
+                            <Badge variant="secondary">Draft</Badge>
+                          )}
+                          {type.status === "published" && type.hasDraft && (
+                            <Badge variant="outline">Unpublished changes</Badge>
+                          )}
+                        </div>
+                        <CardDescription>
+                          {type.slug} · {type.fields.length} field
+                          {type.fields.length !== 1 ? "s" : ""}
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+                  </Link>
+                </ContentTypeContextMenu>
               ))}
             </div>
           ) : (
@@ -257,7 +270,7 @@ export default function SchemasPage() {
       )}
 
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-[90vw] max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Export All Schemas</DialogTitle>
           </DialogHeader>

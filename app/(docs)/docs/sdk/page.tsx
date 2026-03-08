@@ -45,7 +45,7 @@ const cms = createNoMessClient({
         <code className="rounded bg-muted px-1 font-mono text-xs">apiUrl</code>{" "}
         option is optional and defaults to{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">
-          https://api.no-mess.xyz
+          https://api.nomess.xyz
         </code>
         . For self-hosted or development setups, you can pass a custom{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">apiUrl</code>.
@@ -163,7 +163,8 @@ const collection = await cms.getCollection("summer-sale");`}
         <code className="rounded bg-muted px-1 font-mono text-xs">
           NoMessError
         </code>{" "}
-        for API errors. It includes the HTTP status code.
+        for API errors. It includes the HTTP status code plus structured error
+        metadata you can use for retry and logging decisions.
       </p>
       <CodeBlock
         code={`import { NoMessError } from "@no-mess/client";
@@ -172,8 +173,12 @@ try {
   const post = await cms.getEntry("blog-posts", "nonexistent");
 } catch (error) {
   if (error instanceof NoMessError) {
-    console.error(error.message); // "Entry not found"
-    console.error(error.status);  // 404
+    console.error(error.message);   // "Entry not found (HTTP 404)"
+    console.error(error.status);    // 404
+    console.error(error.code);      // "http_error"
+    console.error(error.kind);      // "http"
+    console.error(error.retryable); // false
+    console.error(error.requestId); // if returned by the API
   }
 }`}
         language="typescript"
@@ -190,9 +195,10 @@ try {
 export default function PreviewPage() {
   return (
     <NoMessPreview apiKey={process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY!}>
-      {({ entry, error, isLoading }) => {
+      {({ entry, error, isLoading, status }) => {
         if (isLoading) return <p>Loading preview...</p>;
         if (error) return <p>Error: {error.message}</p>;
+        if (status !== "ready") return null;
         if (!entry) return null;
         return <h1>{entry.title}</h1>;
       }}

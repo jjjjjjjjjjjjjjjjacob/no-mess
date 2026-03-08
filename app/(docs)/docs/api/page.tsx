@@ -17,7 +17,7 @@ export default function ApiReferencePage() {
       <p className="text-muted-foreground">
         All requests go through the no-mess API gateway:
       </p>
-      <CodeBlock code="https://api.no-mess.xyz" language="bash" />
+      <CodeBlock code="https://api.nomess.xyz" language="bash" />
       <p className="mt-2 text-sm text-muted-foreground">
         During local development, you can bypass the gateway and call your
         Convex deployment directly by passing{" "}
@@ -61,7 +61,7 @@ export default function ApiReferencePage() {
       </p>
       <CodeBlock
         code={`curl -H "Authorization: Bearer nm_pub_your_publishable_key" \\
-  https://api.no-mess.xyz/api/content/blog-posts`}
+  https://api.nomess.xyz/api/content/blog-posts`}
         language="bash"
       />
 

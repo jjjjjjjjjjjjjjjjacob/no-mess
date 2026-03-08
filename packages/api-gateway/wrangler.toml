@@ -3,9 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2025-01-15"
 compatibility_flags = ["nodejs_compat"]
 
-# Custom domain — configure DNS to point api.no-mess.xyz to Cloudflare
+# Custom domain — configure DNS to point api.nomess.xyz to Cloudflare
 # routes = [
-#   { pattern = "api.no-mess.xyz", custom_domain = true }
+#   { pattern = "api.nomess.xyz", custom_domain = true }
 # ]
 
 [vars]

@@ -37,7 +37,7 @@ export function SchemaExportPanel({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3 min-h-0 overflow-hidden">
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
@@ -66,7 +66,7 @@ export function SchemaExportPanel({
           Download {filename}
         </Button>
       </div>
-      <div className="overflow-x-auto rounded-lg border bg-muted/30">
+      <div className="overflow-auto min-h-0 flex-1 rounded-lg border bg-muted/30">
         <pre className="p-4 text-xs font-mono leading-relaxed whitespace-pre">
           {code}
         </pre>

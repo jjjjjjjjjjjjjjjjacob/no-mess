@@ -71,6 +71,42 @@ jobs:
           cd packages/no-mess-mcp && bun run build && cd ../..
           cd packages/no-mess-cli && bun run build && cd ../..
 
+      # Changesets doesn't replace workspace:* protocol references when publishing
+      # with bun/npm (only pnpm does this automatically). This step resolves them
+      # to real version ranges (e.g. workspace:* -> ^0.1.1) so npm consumers can
+      # install the packages without being inside the monorepo workspace.
+      - name: Replace workspace protocol references
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: |
+          for pkg_json in packages/*/package.json; do
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('$pkg_json', 'utf8'));
+              let changed = false;
+              // Check all dependency groups for workspace: references
+              for (const depType of ['dependencies', 'devDependencies', 'peerDependencies']) {
+                if (!pkg[depType]) continue;
+                for (const [name, version] of Object.entries(pkg[depType])) {
+                  if (version.startsWith('workspace:')) {
+                    // Find the referenced package in the monorepo to read its version
+                    const depPkgPath = 'packages/' + fs.readdirSync('packages').find(d => {
+                      try {
+                        const p = JSON.parse(fs.readFileSync('packages/' + d + '/package.json', 'utf8'));
+                        return p.name === name;
+                      } catch { return false; }
+                    }) + '/package.json';
+                    const depPkg = JSON.parse(fs.readFileSync(depPkgPath, 'utf8'));
+                    // workspace:* -> ^version, workspace:^x -> ^version, etc.
+                    const suffix = version.replace('workspace:', '');
+                    pkg[depType][name] = suffix === '*' ? '^' + depPkg.version : suffix.replace('*', depPkg.version);
+                    changed = true;
+                  }
+                }
+              }
+              if (changed) fs.writeFileSync('$pkg_json', JSON.stringify(pkg, null, 2) + '\n');
+            "
+          done
+
       - name: Publish to npm
         if: steps.changesets.outputs.has_changesets == 'true'
         run: bun run release

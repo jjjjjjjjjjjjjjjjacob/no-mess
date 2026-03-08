@@ -25,7 +25,7 @@ describe("proxyToUpstream", () => {
 
   it("constructs correct upstream URL", async () => {
     const request = new Request(
-      "https://api.no-mess.xyz/api/content/blog?preview=true",
+      "https://api.nomess.xyz/api/content/blog?preview=true",
     );
 
     await proxyToUpstream(env, request);
@@ -37,7 +37,7 @@ describe("proxyToUpstream", () => {
   });
 
   it("forwards Authorization header", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog", {
+    const request = new Request("https://api.nomess.xyz/api/content/blog", {
       headers: { Authorization: "Bearer nm_abc123" },
     });
 
@@ -52,7 +52,7 @@ describe("proxyToUpstream", () => {
   it("sets Content-Type from request or defaults to application/json", async () => {
     // With explicit Content-Type
     const requestWithCt = new Request(
-      "https://api.no-mess.xyz/api/content/blog",
+      "https://api.nomess.xyz/api/content/blog",
       {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
@@ -72,7 +72,7 @@ describe("proxyToUpstream", () => {
 
     // Without Content-Type — should default
     const requestWithoutCt = new Request(
-      "https://api.no-mess.xyz/api/content/blog",
+      "https://api.nomess.xyz/api/content/blog",
     );
 
     await proxyToUpstream(env, requestWithoutCt);
@@ -82,7 +82,7 @@ describe("proxyToUpstream", () => {
   });
 
   it("sets X-Gateway header", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog");
+    const request = new Request("https://api.nomess.xyz/api/content/blog");
 
     await proxyToUpstream(env, request);
 
@@ -93,7 +93,7 @@ describe("proxyToUpstream", () => {
   });
 
   it("forwards CF-Connecting-IP as X-Forwarded-For", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog", {
+    const request = new Request("https://api.nomess.xyz/api/content/blog", {
       headers: { "CF-Connecting-IP": "192.168.1.1" },
     });
 
@@ -104,7 +104,7 @@ describe("proxyToUpstream", () => {
   });
 
   it("omits X-Forwarded-For when no CF-Connecting-IP", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog");
+    const request = new Request("https://api.nomess.xyz/api/content/blog");
 
     await proxyToUpstream(env, request);
 
@@ -113,7 +113,7 @@ describe("proxyToUpstream", () => {
   });
 
   it("does not send body for GET requests", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog", {
+    const request = new Request("https://api.nomess.xyz/api/content/blog", {
       method: "GET",
     });
 
@@ -125,7 +125,7 @@ describe("proxyToUpstream", () => {
 
   it("sends body for POST requests", async () => {
     const body = JSON.stringify({ title: "Test" });
-    const request = new Request("https://api.no-mess.xyz/api/content/blog", {
+    const request = new Request("https://api.nomess.xyz/api/content/blog", {
       method: "POST",
       body,
       headers: { "Content-Type": "application/json" },
@@ -148,7 +148,7 @@ describe("proxyToUpstream", () => {
       }),
     );
 
-    const request = new Request("https://api.no-mess.xyz/api/content/blog");
+    const request = new Request("https://api.nomess.xyz/api/content/blog");
     const response = await proxyToUpstream(env, request);
 
     expect(response.headers.get("server")).toBeNull();
@@ -165,7 +165,7 @@ describe("proxyToUpstream", () => {
       }),
     );
 
-    const request = new Request("https://api.no-mess.xyz/api/content/blog");
+    const request = new Request("https://api.nomess.xyz/api/content/blog");
     const response = await proxyToUpstream(env, request);
 
     expect(response.headers.get("x-convex-request-id")).toBeNull();
@@ -179,7 +179,7 @@ describe("proxyToUpstream", () => {
       }),
     );
 
-    const request = new Request("https://api.no-mess.xyz/api/content/blog", {
+    const request = new Request("https://api.nomess.xyz/api/content/blog", {
       method: "GET",
     });
 
@@ -198,7 +198,7 @@ describe("proxyToUpstream", () => {
       }),
     );
 
-    const request = new Request("https://api.no-mess.xyz/api/content/blog", {
+    const request = new Request("https://api.nomess.xyz/api/content/blog", {
       method: "POST",
       body: JSON.stringify({ title: "Test" }),
       headers: { "Content-Type": "application/json" },
@@ -217,7 +217,7 @@ describe("proxyToUpstream", () => {
       }),
     );
 
-    const request = new Request("https://api.no-mess.xyz/api/content/blog");
+    const request = new Request("https://api.nomess.xyz/api/content/blog");
     const response = await proxyToUpstream(env, request);
 
     expect(response.status).toBe(404);

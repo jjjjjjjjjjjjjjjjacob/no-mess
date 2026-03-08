@@ -31,7 +31,7 @@ bun add -g @no-mess/mcp
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NO_MESS_API_KEY` | Yes | Secret API key (starts with `nm_`) |
-| `NO_MESS_API_URL` | No | Custom API URL (defaults to `https://api.no-mess.xyz`) |
+| `NO_MESS_API_URL` | No | Custom API URL (defaults to `https://api.nomess.xyz`) |
 
 ## IDE Setup
 

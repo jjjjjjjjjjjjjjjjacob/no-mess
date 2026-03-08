@@ -119,7 +119,7 @@ Contextually relevant advice from building the no-mess CMS. Reference when worki
 
 ### SDK default API URL
 - **When:** Initializing the SDK client
-- **Pattern:** `apiUrl` is optional, defaults to `https://api.no-mess.xyz` (the hosted API gateway)
+- **Pattern:** `apiUrl` is optional, defaults to `https://api.nomess.xyz` (the hosted API gateway)
 - **Override:** Pass custom `apiUrl` for self-hosted or dev setups: `createNoMessClient({ apiUrl: "https://...", apiKey: "nm_..." })`
 - **Constant:** `DEFAULT_API_URL` exported from `@no-mess/client`
 

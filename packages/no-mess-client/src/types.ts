@@ -1,5 +1,55 @@
-export const DEFAULT_API_URL = "https://api.no-mess.xyz";
+export const DEFAULT_API_URL = "https://api.nomess.xyz";
 export const DEFAULT_ADMIN_ORIGIN = "https://admin.no-mess.xyz";
+
+export type NoMessErrorKind =
+  | "config"
+  | "network"
+  | "http"
+  | "response"
+  | "crypto"
+  | "protocol"
+  | "runtime";
+
+export type NoMessErrorCode =
+  | "secret_key_in_browser"
+  | "request_failed"
+  | "http_error"
+  | "invalid_success_response"
+  | "invalid_error_response"
+  | "crypto_unavailable"
+  | "invalid_session_secret"
+  | "preview_message_invalid"
+  | "preview_exchange_failed"
+  | "preview_postmessage_failed"
+  | "live_edit_runtime_failed";
+
+export type NoMessLogLevel = "debug" | "info" | "warn" | "error";
+
+export interface NoMessLogEvent {
+  level: NoMessLogLevel;
+  code: NoMessErrorCode;
+  message: string;
+  scope: string;
+  operation?: string;
+  error?: NoMessError;
+  timestamp: string;
+  context: Record<string, unknown>;
+}
+
+export type NoMessLogger = (event: NoMessLogEvent) => void;
+
+export interface NoMessErrorOptions {
+  kind?: NoMessErrorKind;
+  code?: NoMessErrorCode;
+  status?: number;
+  retryable?: boolean;
+  operation?: string;
+  method?: string;
+  url?: string;
+  requestId?: string;
+  details?: Record<string, unknown>;
+  cause?: unknown;
+}
 
 export interface NoMessClientConfig {
   apiUrl?: string;
@@ -11,6 +61,7 @@ export interface NoMessClientConfig {
    * - **Publishable key**: Safe for client-side use. Read-only access to published content.
    */
   apiKey: string;
+  logger?: NoMessLogger;
 }
 
 /** Returns true if the key is a publishable key (nm_pub_ prefix). */
@@ -87,18 +138,28 @@ export interface PreviewHandlerConfig {
   adminOrigin: string;
   onEntry: (entry: NoMessEntry) => void;
   onError?: (error: Error) => void;
+  logger?: NoMessLogger;
 }
 
 export interface UseNoMessPreviewConfig {
   apiKey: string;
   apiUrl?: string;
   adminOrigin?: string;
+  logger?: NoMessLogger;
 }
+
+export type UseNoMessPreviewStatus =
+  | "waiting-for-admin"
+  | "exchanging-session"
+  | "ready"
+  | "error";
 
 export interface UseNoMessPreviewResult<T extends NoMessEntry = NoMessEntry> {
   entry: T | null;
   error: Error | null;
+  errorDetails: NoMessError | null;
   isLoading: boolean;
+  status: UseNoMessPreviewStatus;
 }
 
 export interface ContentTypeSchema {
@@ -157,6 +218,8 @@ export interface LiveEditConfig {
   onFieldClicked?: (fieldName: string) => void;
   onEnter?: () => void;
   onExit?: () => void;
+  onError?: (error: Error) => void;
+  logger?: NoMessLogger;
 }
 
 export interface LiveEditHandle {
@@ -165,19 +228,58 @@ export interface LiveEditHandle {
 
 export interface UseNoMessLiveEditConfig {
   adminOrigin?: string;
+  logger?: NoMessLogger;
 }
 
 export interface UseNoMessLiveEditResult {
   isLiveEditActive: boolean;
   fieldOverrides: Record<string, unknown>;
+  error: Error | null;
+  errorDetails: NoMessError | null;
 }
 
 export class NoMessError extends Error {
-  status: number;
+  readonly kind: NoMessErrorKind;
+  readonly code: NoMessErrorCode;
+  readonly status?: number;
+  readonly retryable: boolean;
+  readonly operation?: string;
+  readonly method?: string;
+  readonly url?: string;
+  readonly requestId?: string;
+  readonly details?: Record<string, unknown>;
+  readonly cause?: unknown;
 
-  constructor(message: string, status: number) {
-    super(message);
+  constructor(message: string, status: number);
+  constructor(message: string, options?: NoMessErrorOptions);
+  constructor(
+    message: string,
+    statusOrOptions?: number | NoMessErrorOptions,
+  ) {
+    const options =
+      typeof statusOrOptions === "number"
+        ? { status: statusOrOptions }
+        : (statusOrOptions ?? {});
+    const formattedMessage =
+      typeof options.status === "number" &&
+      !message.endsWith(`(HTTP ${options.status})`)
+        ? `${message} (HTTP ${options.status})`
+        : message;
+
+    super(formattedMessage);
     this.name = "NoMessError";
-    this.status = status;
+    this.kind = options.kind ?? "runtime";
+    this.code = options.code ?? "live_edit_runtime_failed";
+    this.status = options.status;
+    this.retryable =
+      options.retryable ?? (typeof options.status === "number" && options.status >= 500);
+    this.operation = options.operation;
+    this.method = options.method;
+    this.url = options.url;
+    this.requestId = options.requestId;
+    this.details = options.details;
+    this.cause = options.cause;
+
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }

@@ -52,7 +52,7 @@ describe("Worker fetch handler", () => {
   });
 
   it("OPTIONS request returns CORS preflight (204)", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog", {
+    const request = new Request("https://api.nomess.xyz/api/content/blog", {
       method: "OPTIONS",
     });
     const ctx = createExecutionContext();
@@ -67,7 +67,7 @@ describe("Worker fetch handler", () => {
   });
 
   it("GET request proxies to upstream and has CORS headers", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog", {
+    const request = new Request("https://api.nomess.xyz/api/content/blog", {
       method: "GET",
       headers: { Authorization: "Bearer nm_testkey" },
     });
@@ -104,7 +104,7 @@ describe("Worker fetch handler", () => {
       RATE_LIMIT_KV: mockKV as unknown as KVNamespace,
     };
 
-    const request = new Request("https://api.no-mess.xyz/api/content/blog", {
+    const request = new Request("https://api.nomess.xyz/api/content/blog", {
       method: "GET",
       headers: { Authorization: "Bearer nm_testkey" },
     });
@@ -118,7 +118,7 @@ describe("Worker fetch handler", () => {
   });
 
   it("GET request without auth still proxies (no rate limit applied)", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog", {
+    const request = new Request("https://api.nomess.xyz/api/content/blog", {
       method: "GET",
     });
     const ctx = createExecutionContext();

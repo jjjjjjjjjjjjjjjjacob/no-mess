@@ -5,6 +5,7 @@ import { ArrowUpDown, FileText, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { EntryContextMenu } from "@/components/content-entries/entry-context-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -191,30 +192,37 @@ export default function EntriesListPage() {
           ) : (
             <div className="divide-y rounded-lg border">
               {filteredEntries.map((entry) => (
-                <Link
+                <EntryContextMenu
                   key={entry._id}
-                  href={`/sites/${siteSlug}/content/${params.typeSlug}/${entry.slug}`}
-                  className="flex items-center justify-between p-4 transition-colors hover:bg-muted/50"
+                  entry={entry}
+                  previewUrl={site.previewUrl}
+                  siteSlug={siteSlug}
+                  typeSlug={params.typeSlug}
                 >
-                  <div>
-                    <p className="font-medium">{entry.title}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {entry.slug}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge
-                      variant={
-                        entry.status === "published" ? "default" : "secondary"
-                      }
-                    >
-                      {entry.status}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(entry.updatedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                </Link>
+                  <Link
+                    href={`/sites/${siteSlug}/content/${params.typeSlug}/${entry.slug}`}
+                    className="flex items-center justify-between p-4 transition-colors hover:bg-muted/50"
+                  >
+                    <div>
+                      <p className="font-medium">{entry.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {entry.slug}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge
+                        variant={
+                          entry.status === "published" ? "default" : "secondary"
+                        }
+                      >
+                        {entry.status}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(entry.updatedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </Link>
+                </EntryContextMenu>
               ))}
             </div>
           )}

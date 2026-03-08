@@ -3,7 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   NoMessEntry,
-  PreviewExchangeResult,
+  NoMessLogger,
 } from "../../types.js";
 import { DEFAULT_ADMIN_ORIGIN } from "../../types.js";
 
@@ -16,6 +16,7 @@ let capturedConfig: {
   adminOrigin: string;
   onEntry: (entry: NoMessEntry) => void;
   onError: (error: Error) => void;
+  logger?: NoMessLogger;
 };
 
 vi.mock("../../client.js", () => ({
@@ -59,7 +60,9 @@ describe("useNoMessPreview", () => {
 
     expect(result.current.entry).toBeNull();
     expect(result.current.error).toBeNull();
+    expect(result.current.errorDetails).toBeNull();
     expect(result.current.isLoading).toBe(true);
+    expect(result.current.status).toBe("waiting-for-admin");
   });
 
   it("calls createPreviewHandler with default adminOrigin", () => {
@@ -127,7 +130,9 @@ describe("useNoMessPreview", () => {
 
     expect(result.current.entry).toEqual(mockEntry);
     expect(result.current.error).toBeNull();
+    expect(result.current.errorDetails).toBeNull();
     expect(result.current.isLoading).toBe(false);
+    expect(result.current.status).toBe("ready");
   });
 
   it("sets error when onError is called", () => {
@@ -140,9 +145,12 @@ describe("useNoMessPreview", () => {
       capturedConfig.onError(err);
     });
 
-    expect(result.current.error).toBe(err);
+    expect(result.current.error).toBeInstanceOf(Error);
+    expect(result.current.errorDetails).toBe(result.current.error);
+    expect(result.current.errorDetails?.code).toBe("preview_exchange_failed");
     expect(result.current.entry).toBeNull();
     expect(result.current.isLoading).toBe(false);
+    expect(result.current.status).toBe("error");
   });
 
   it("clears error when new entry arrives", () => {
@@ -159,6 +167,24 @@ describe("useNoMessPreview", () => {
       capturedConfig.onEntry(mockEntry);
     });
     expect(result.current.error).toBeNull();
+    expect(result.current.errorDetails).toBeNull();
     expect(result.current.entry).toEqual(mockEntry);
+    expect(result.current.status).toBe("ready");
+  });
+
+  it("forwards custom logger to handler and client", () => {
+    const logger = vi.fn();
+
+    renderHook(() =>
+      useNoMessPreview({
+        apiKey: "nm_test",
+        logger,
+      }),
+    );
+
+    expect(capturedConfig.logger).toBe(logger);
+    expect(NoMessClient).toHaveBeenCalledWith(
+      expect.objectContaining({ logger }),
+    );
   });
 });
