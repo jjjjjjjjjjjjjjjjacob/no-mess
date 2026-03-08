@@ -1,5 +1,11 @@
 ## @no-mess/client [0.1.1](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/compare/@no-mess/client@0.1.0...@no-mess/client@0.1.1) (2026-03-03)
 
+## 0.3.0
+
+### Minor Changes
+
+- [#20](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/pull/20) [`299507e`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/299507e0a5b03ede81d7a3cfb67c7d39bdc87ea2) Thanks [@jjjjjjjjjjjjjjjjacob](https://github.com/jjjjjjjjjjjjjjjjacob)! - Enhance SDK client with error utils, logging module, improved live-edit/preview, and comprehensive test coverage. Improve CLI config handling with validation and tests. Update MCP README documentation.
+
 ## 0.2.0
 
 ### Minor Changes

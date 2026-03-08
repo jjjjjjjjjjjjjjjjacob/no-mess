@@ -1,5 +1,14 @@
 # @no-mess/mcp 1.0.0 (2026-03-03)
 
+## 1.0.2
+
+### Patch Changes
+
+- [#20](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/pull/20) [`299507e`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/299507e0a5b03ede81d7a3cfb67c7d39bdc87ea2) Thanks [@jjjjjjjjjjjjjjjjacob](https://github.com/jjjjjjjjjjjjjjjjacob)! - Enhance SDK client with error utils, logging module, improved live-edit/preview, and comprehensive test coverage. Improve CLI config handling with validation and tests. Update MCP README documentation.
+
+- Updated dependencies [[`299507e`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/299507e0a5b03ede81d7a3cfb67c7d39bdc87ea2)]:
+  - @no-mess/client@0.3.0
+
 ## 1.0.1
 
 ### Patch Changes

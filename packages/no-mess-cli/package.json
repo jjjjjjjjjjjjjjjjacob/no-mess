@@ -1,6 +1,6 @@
 {
   "name": "no-mess",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CLI for the no-mess headless CMS",
   "type": "module",
   "bin": {
@@ -15,7 +15,7 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@no-mess/client": "workspace:*",
+    "@no-mess/client": "^0.3.0",
     "chokidar": "^4.0.0"
   },
   "devDependencies": {
