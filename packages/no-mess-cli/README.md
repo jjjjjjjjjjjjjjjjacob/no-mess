@@ -17,7 +17,7 @@ npx no-mess
 # Scaffold a schema.ts and .env file
 no-mess init
 
-# Edit .env with your secret API key
+# Edit .env or .env.local with your secret API key
 # NO_MESS_API_KEY=nm_your_secret_key
 
 # Push your schema to the dashboard
@@ -40,6 +40,7 @@ no-mess init --schema content/schema.ts
 
 - Creates `schema.ts` with an example content type if the file doesn't exist
 - Creates `.env` with a `NO_MESS_API_KEY` placeholder if the file doesn't exist
+- The CLI also reads `.env.local` if you prefer not to store local secrets in `.env`
 
 ### `no-mess push`
 
@@ -84,12 +85,16 @@ Uses a 300ms stability threshold before syncing. Gracefully shuts down on SIGINT
 
 ## Configuration
 
-The CLI reads environment variables from a `.env` file in the current directory.
+The CLI reads environment variables from env files in the current directory with this precedence:
+
+1. Shell-provided environment variables
+2. `.env.local`
+3. `.env`
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NO_MESS_API_KEY` | Yes | Secret API key (must start with `nm_`) |
-| `NO_MESS_API_URL` | No | Custom API URL (defaults to `https://api.no-mess.xyz`) |
+| `NO_MESS_API_URL` | No | Custom API URL (defaults to `https://api.nomess.xyz`) |
 
 ### API Key Types
 
@@ -97,6 +102,38 @@ The CLI reads environment variables from a `.env` file in the current directory.
 - **Publishable keys** (`nm_pub_...`) — Not accepted by the CLI. These are for client-side content fetching only.
 
 Get your API key from the [no-mess dashboard](https://admin.no-mess.xyz) under workspace settings.
+
+## Local Development Against Another Repo
+
+For local CLI development, build the CLI in this repo and invoke the built entrypoint from the consumer project. This is the fastest way to test changes without publishing.
+
+Example: testing against `/Users/jacob/Developer/mershy`
+
+```bash
+# Terminal 1: rebuild the SDK when it changes
+cd /Users/jacob/Developer/no-mess
+bunx tsc -w -p packages/no-mess-client
+```
+
+```bash
+# Terminal 2: rebuild the CLI when it changes
+cd /Users/jacob/Developer/no-mess
+bunx tsc -w -p packages/no-mess-cli
+```
+
+```bash
+# Terminal 3: run the local CLI from the consumer project
+cd /Users/jacob/Developer/mershy
+bun ../no-mess/packages/no-mess-cli/dist/cli.js init --schema lib/cms/schema.ts
+bun ../no-mess/packages/no-mess-cli/dist/cli.js push --schema lib/cms/schema.ts
+bun ../no-mess/packages/no-mess-cli/dist/cli.js dev --schema lib/cms/schema.ts
+```
+
+Notes:
+
+- `mershy` keeps its CMS code under `lib/cms`, so the schema path is `lib/cms/schema.ts`
+- the CLI resolves `.env`, `.env.local`, and relative schema paths from the current working directory, so run it from the consumer project
+- `dev` watches schema file changes, but if you change CLI or SDK source you still need to restart the running CLI process after the rebuild finishes
 
 ## Schema File
 

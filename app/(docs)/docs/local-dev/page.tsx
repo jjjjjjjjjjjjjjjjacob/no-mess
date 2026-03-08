@@ -44,7 +44,7 @@ NO_MESS_API_KEY=nm_your_api_key
 NEXT_PUBLIC_NO_MESS_API_KEY=nm_your_api_key
 
 # Optional — point the SDK directly at your Convex deployment
-# instead of going through the API gateway (https://api.no-mess.xyz).
+# instead of going through the API gateway (https://api.nomess.xyz).
 # Useful when developing locally against a Convex dev deployment.
 # NO_MESS_API_URL=https://your-convex-deployment.convex.site
 # NEXT_PUBLIC_NO_MESS_API_URL=https://your-convex-deployment.convex.site`}
@@ -56,7 +56,7 @@ NEXT_PUBLIC_NO_MESS_API_KEY=nm_your_api_key
           By default the SDK routes all requests through the no-mess API gateway
           at{" "}
           <code className="rounded bg-muted px-1 font-mono text-xs">
-            https://api.no-mess.xyz
+            https://api.nomess.xyz
           </code>
           . If you are running a local Convex dev deployment and want to bypass
           the gateway, set{" "}
@@ -251,7 +251,7 @@ export default function PreviewPage() {
               </td>
               <td className="py-2 pr-4">
                 <code className="rounded bg-muted px-1 font-mono text-xs">
-                  https://api.no-mess.xyz
+                  https://api.nomess.xyz
                 </code>
               </td>
               <td className="py-2">

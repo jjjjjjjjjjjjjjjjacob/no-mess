@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { NoMessClient } from "../client.js";
+import { normalizeNoMessError } from "../error-utils.js";
 import { createPreviewHandler } from "../index.js";
 import type {
   NoMessEntry,
+  NoMessError,
   UseNoMessPreviewConfig,
   UseNoMessPreviewResult,
 } from "../types.js";
@@ -15,28 +17,47 @@ export function useNoMessPreview<T extends NoMessEntry = NoMessEntry>(
 ): UseNoMessPreviewResult<T> {
   const [entry, setEntry] = useState<T | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [errorDetails, setErrorDetails] = useState<NoMessError | null>(null);
+  const [status, setStatus] = useState<UseNoMessPreviewResult<T>["status"]>(
+    "waiting-for-admin",
+  );
 
   const configRef = useRef(config);
   configRef.current = config;
 
   useEffect(() => {
-    const client = new NoMessClient({
+    const baseClient = new NoMessClient({
       apiKey: configRef.current.apiKey,
       apiUrl: configRef.current.apiUrl,
+      logger: configRef.current.logger,
     });
+
+    const client = {
+      exchangePreviewSession: async (...args: Parameters<NoMessClient["exchangePreviewSession"]>) => {
+        setStatus("exchanging-session");
+        return baseClient.exchangePreviewSession(...args);
+      },
+    };
 
     const handler = createPreviewHandler({
       client,
       adminOrigin: configRef.current.adminOrigin ?? DEFAULT_ADMIN_ORIGIN,
+      logger: configRef.current.logger,
       onEntry: (e) => {
         setEntry(e as T);
         setError(null);
-        setIsLoading(false);
+        setErrorDetails(null);
+        setStatus("ready");
       },
       onError: (err) => {
-        setError(err);
-        setIsLoading(false);
+        const normalized = normalizeNoMessError(err, {
+          kind: "runtime",
+          code: "preview_exchange_failed",
+          operation: "useNoMessPreview.onError",
+        });
+        setError(normalized);
+        setErrorDetails(normalized);
+        setStatus("error");
       },
     });
 
@@ -44,5 +65,11 @@ export function useNoMessPreview<T extends NoMessEntry = NoMessEntry>(
     return () => handler.cleanup();
   }, []);
 
-  return { entry, error, isLoading };
+  return {
+    entry,
+    error,
+    errorDetails,
+    isLoading: status !== "ready" && status !== "error",
+    status,
+  };
 }

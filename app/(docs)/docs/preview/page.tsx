@@ -189,7 +189,7 @@ export default function PreviewPage() {
               </td>
               <td className="py-2 pr-4">
                 <code className="rounded bg-muted px-1 font-mono text-xs">
-                  https://api.no-mess.xyz
+                  https://api.nomess.xyz
                 </code>
               </td>
               <td className="py-2">
@@ -242,26 +242,24 @@ export default function PreviewPage() {
 
 const client = createNoMessClient({
   apiKey: "nm_pub_your_publishable_key",
+  logger: (event) => {
+    console.debug(event.code, event.context);
+  },
 });
 
-const handler = createPreviewHandler(client, {
-  apiKey: "nm_pub_your_publishable_key",
-  // apiUrl: "https://your-convex-deployment.convex.site",
-  // adminOrigin: "http://localhost:3000",
+const handler = createPreviewHandler({
+  client,
+  adminOrigin: "https://admin.no-mess.xyz",
+  onEntry: (entry) => {
+    document.getElementById("preview-title")!.textContent = entry.title;
+  },
+  onError: (error) => {
+    console.error("Preview error:", error.message);
+  },
 });
 
 // Start listening for postMessage events from the dashboard
 handler.start();
-
-// The handler calls your onEntry callback when draft content arrives
-handler.onEntry((entry) => {
-  document.getElementById("preview-title")!.textContent = entry.title;
-  // Render other fields...
-});
-
-handler.onError((error) => {
-  console.error("Preview error:", error.message);
-});
 
 // Clean up when the page is destroyed
 // handler.cleanup();`}
