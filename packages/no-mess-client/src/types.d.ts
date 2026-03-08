@@ -1,4 +1,4 @@
-export declare const DEFAULT_API_URL = "https://api.no-mess.xyz";
+export declare const DEFAULT_API_URL = "https://api.nomess.xyz";
 export declare const DEFAULT_ADMIN_ORIGIN = "https://admin.no-mess.xyz";
 export interface NoMessClientConfig {
     apiUrl?: string;

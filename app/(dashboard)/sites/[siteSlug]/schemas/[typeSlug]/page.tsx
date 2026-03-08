@@ -411,7 +411,7 @@ export default function EditSchemaPage() {
 
       {/* Export dialog */}
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-[90vw] max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Export: {contentType.name}</DialogTitle>
           </DialogHeader>

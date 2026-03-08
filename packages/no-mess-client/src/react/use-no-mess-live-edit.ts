@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { normalizeNoMessError } from "../error-utils.js";
+import { createSdkLogger } from "../logging.js";
 import { createLiveEditHandler } from "../live-edit.js";
 import type {
+  NoMessError,
   UseNoMessLiveEditConfig,
   UseNoMessLiveEditResult,
 } from "../types.js";
@@ -29,9 +32,13 @@ export function useNoMessLiveEdit(
   const [fieldOverrides, setFieldOverrides] = useState<Record<string, unknown>>(
     {},
   );
+  const [error, setError] = useState<Error | null>(null);
+  const [errorDetails, setErrorDetails] = useState<NoMessError | null>(null);
 
   const configRef = useRef(config);
   configRef.current = config;
+  const loggerRef = useRef(createSdkLogger(config.logger));
+  loggerRef.current = createSdkLogger(config.logger);
 
   const handleFieldUpdate = useCallback((event: MessageEvent) => {
     const origin = configRef.current.adminOrigin ?? DEFAULT_ADMIN_ORIGIN;
@@ -40,11 +47,24 @@ export function useNoMessLiveEdit(
     const data = event.data;
     if (!data || typeof data.type !== "string") return;
 
-    if (data.type === "no-mess:field-updated" && data.fieldName) {
+    if (data.type === "no-mess:field-updated" && typeof data.fieldName === "string") {
       setFieldOverrides((prev) => ({
         ...prev,
         [data.fieldName]: data.value,
       }));
+      return;
+    }
+
+    if (data.type === "no-mess:field-updated") {
+      loggerRef.current({
+        level: "debug",
+        code: "live_edit_runtime_failed",
+        message: "Ignored malformed live edit field update message in React state bridge",
+        scope: "live-edit-react",
+        operation: "useNoMessLiveEdit.handleFieldUpdate",
+        timestamp: new Date().toISOString(),
+        context: {},
+      });
     }
   }, []);
 
@@ -53,13 +73,25 @@ export function useNoMessLiveEdit(
 
     const handle = createLiveEditHandler({
       adminOrigin,
+      logger: configRef.current.logger,
       onEnter: () => {
         setIsLiveEditActive(true);
         setFieldOverrides({});
+        setError(null);
+        setErrorDetails(null);
       },
       onExit: () => {
         setIsLiveEditActive(false);
         setFieldOverrides({});
+      },
+      onError: (err) => {
+        const normalized = normalizeNoMessError(err, {
+          kind: "runtime",
+          code: "live_edit_runtime_failed",
+          operation: "useNoMessLiveEdit.onError",
+        });
+        setError(normalized);
+        setErrorDetails(normalized);
       },
     });
 
@@ -72,5 +104,5 @@ export function useNoMessLiveEdit(
     };
   }, [handleFieldUpdate]);
 
-  return { isLiveEditActive, fieldOverrides };
+  return { isLiveEditActive, fieldOverrides, error, errorDetails };
 }

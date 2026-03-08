@@ -572,6 +572,69 @@ describe("ContentPage (app/(dashboard)/sites/[siteSlug]/content)", () => {
     render(<ContentPage />);
     expect(screen.getByText("No content types")).toBeInTheDocument();
   });
+
+  it("renders uniform-height content tiles with clamped descriptions", async () => {
+    const { default: ContentPage } = await import(
+      "@/app/(dashboard)/sites/[siteSlug]/content/page"
+    );
+    const mockContentTypes = [
+      {
+        _id: "ct1",
+        name: "Hero Slideshow",
+        slug: "hero-slideshow",
+        fields: Array.from({ length: 17 }, (_, index) => ({
+          name: `field-${index + 1}`,
+        })),
+        description:
+          "Quick-flashing images that provide vibe, brand identity, and a glimpse into merchant offerings with enough extra copy to force wrapping in the card description.",
+      },
+      {
+        _id: "ct2",
+        name: "Featured Products",
+        slug: "featured-products",
+        fields: Array.from({ length: 3 }, (_, index) => ({
+          name: `field-${index + 1}`,
+        })),
+        description: "Products to feature on homepage.",
+      },
+    ];
+    const mockEntries = [
+      {
+        _id: "entry-1",
+        contentTypeId: "ct1",
+        status: "published",
+      },
+      {
+        _id: "entry-2",
+        contentTypeId: "ct1",
+        status: "draft",
+      },
+    ];
+
+    mockUseQuery
+      .mockReturnValueOnce(mockSite)
+      .mockReturnValueOnce(mockContentTypes)
+      .mockReturnValueOnce(mockEntries);
+
+    render(<ContentPage />);
+
+    const heroLink = screen.getByRole("link", { name: /Hero Slideshow/i });
+    expect(heroLink).toHaveClass("block", "h-full");
+
+    const heroCard = heroLink.querySelector('[data-slot="card"]');
+    expect(heroCard).toHaveClass("h-[15rem]");
+
+    const heroDescription = screen.getByText(/Quick-flashing images/i);
+    expect(heroDescription).toHaveClass("line-clamp-4");
+
+    const featuredLink = screen.getByRole("link", {
+      name: /Featured Products/i,
+    });
+    expect(featuredLink).toHaveClass("block", "h-full");
+
+    const featuredCard = featuredLink.querySelector('[data-slot="card"]');
+    expect(featuredCard).toHaveClass("h-[15rem]");
+  });
 });
 
 // ===========================================================================

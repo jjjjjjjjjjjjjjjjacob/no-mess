@@ -34,18 +34,41 @@ const post = await client.getEntry("blog-post", "hello-world");
 import { useNoMessPreview } from "@no-mess/client/react";
 
 function PreviewPage() {
-  const { entry, isLoading, error } = useNoMessPreview({
+  const { entry, isLoading, error, status } = useNoMessPreview({
     apiKey: "your-api-key",
+    logger: (event) => {
+      // Forward structured diagnostics to your own telemetry pipeline.
+      console.debug(event.code, event.context);
+    },
   });
 
   if (isLoading) return <p>Loading preview...</p>;
   if (error) return <p>Error: {error.message}</p>;
+  if (status !== "ready") return null;
 
-  return <h1>{entry?.fields.title}</h1>;
+  return <h1>{entry?.title}</h1>;
 }
 ```
 
 The `useNoMessPreview` hook handles the postMessage handshake between the no-mess admin dashboard and your preview iframe automatically.
+
+### Error handling
+
+```ts
+import { NoMessError } from "@no-mess/client";
+
+try {
+  const post = await client.getEntry("blog-post", "missing");
+} catch (error) {
+  if (error instanceof NoMessError) {
+    console.error(error.message);   // "Entry not found (HTTP 404)"
+    console.error(error.code);      // "http_error"
+    console.error(error.kind);      // "http"
+    console.error(error.retryable); // false
+    console.error(error.requestId); // if provided by the API
+  }
+}
+```
 
 ### Shopify data
 
@@ -61,7 +84,8 @@ const collection = await client.getCollection("collection-handle");
 ```ts
 const client = createNoMessClient({
   apiKey: "nm_...",           // Required — secret or publishable key
-  apiUrl: "https://...",      // Optional — defaults to https://api.no-mess.xyz
+  apiUrl: "https://...",      // Optional — defaults to https://api.nomess.xyz
+  logger: (event) => {},      // Optional — structured diagnostics hook
 });
 ```
 

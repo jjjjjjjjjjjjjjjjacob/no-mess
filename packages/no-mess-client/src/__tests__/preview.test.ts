@@ -5,11 +5,12 @@ const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
 // Mock crypto.subtle for HMAC computation
+const mockImportKey = vi.fn().mockResolvedValue("mock-key");
 const mockSign = vi.fn();
 Object.defineProperty(globalThis, "crypto", {
   value: {
     subtle: {
-      importKey: vi.fn().mockResolvedValue("mock-key"),
+      importKey: mockImportKey,
       sign: mockSign.mockResolvedValue(new ArrayBuffer(32)),
     },
   },
@@ -24,7 +25,18 @@ describe("exchangePreviewSession", () => {
 
   beforeEach(() => {
     mockFetch.mockReset();
+    mockImportKey.mockReset();
+    mockImportKey.mockResolvedValue("mock-key");
     mockSign.mockResolvedValue(new ArrayBuffer(32));
+    Object.defineProperty(globalThis, "crypto", {
+      value: {
+        subtle: {
+          importKey: mockImportKey,
+          sign: mockSign,
+        },
+      },
+      writable: true,
+    });
   });
 
   it("sends POST to /api/preview/exchange", async () => {
@@ -151,5 +163,74 @@ describe("exchangePreviewSession", () => {
         sessionSecret: "f".repeat(64),
       }),
     ).rejects.toThrow("Invalid proof or stale timestamp");
+  });
+
+  it("rejects invalid non-hex preview secrets", async () => {
+    await expect(
+      client.exchangePreviewSession({
+        sessionId: "sess123",
+        sessionSecret: "not-hex",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_session_secret",
+      kind: "crypto",
+    });
+  });
+
+  it("rejects odd-length preview secrets", async () => {
+    await expect(
+      client.exchangePreviewSession({
+        sessionId: "sess123",
+        sessionSecret: "abc",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_session_secret",
+      kind: "crypto",
+    });
+  });
+
+  it("throws when Web Crypto is unavailable", async () => {
+    Object.defineProperty(globalThis, "crypto", {
+      value: {},
+      writable: true,
+    });
+
+    await expect(
+      client.exchangePreviewSession({
+        sessionId: "sess123",
+        sessionSecret: "f".repeat(64),
+      }),
+    ).rejects.toMatchObject({
+      code: "crypto_unavailable",
+      kind: "crypto",
+    });
+  });
+
+  it("normalizes importKey failures", async () => {
+    mockImportKey.mockRejectedValueOnce(new Error("bad key"));
+
+    await expect(
+      client.exchangePreviewSession({
+        sessionId: "sess123",
+        sessionSecret: "a".repeat(64),
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_session_secret",
+      kind: "crypto",
+    });
+  });
+
+  it("normalizes sign failures", async () => {
+    mockSign.mockRejectedValueOnce(new Error("sign failed"));
+
+    await expect(
+      client.exchangePreviewSession({
+        sessionId: "sess123",
+        sessionSecret: "a".repeat(64),
+      }),
+    ).rejects.toMatchObject({
+      code: "crypto_unavailable",
+      kind: "crypto",
+    });
   });
 });

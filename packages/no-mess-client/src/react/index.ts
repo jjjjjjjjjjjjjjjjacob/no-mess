@@ -2,10 +2,17 @@
 
 export type {
   NoMessEntry,
+  NoMessErrorCode,
+  NoMessErrorKind,
+  NoMessErrorOptions,
+  NoMessLogEvent,
+  NoMessLogLevel,
+  NoMessLogger,
   UseNoMessLiveEditConfig,
   UseNoMessLiveEditResult,
   UseNoMessPreviewConfig,
   UseNoMessPreviewResult,
+  UseNoMessPreviewStatus,
 } from "../types.js";
 export type { NoMessPreviewProps } from "./no-mess-preview.js";
 export { NoMessPreview } from "./no-mess-preview.js";
