@@ -113,6 +113,30 @@ describe("NoMessClient", () => {
     expect(calledUrl).toContain("secret=secret123");
   });
 
+  it("reports live edit routes", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ ok: true }),
+    });
+
+    const result = await client.reportLiveEditRoute({
+      entryId: "entry_1",
+      url: "https://example.com/blog/hello-world",
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.test.convex.site/api/live-edit/routes/report",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          entryId: "entry_1",
+          url: "https://example.com/blog/hello-world",
+        }),
+      }),
+    );
+  });
+
   it("throws NoMessError on API errors", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,

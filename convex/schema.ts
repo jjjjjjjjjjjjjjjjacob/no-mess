@@ -112,6 +112,21 @@ export default defineSchema({
     .index("by_slug", ["siteId", "contentTypeId", "slug"])
     .index("by_status", ["siteId", "status"]),
 
+  contentEntryRoutes: defineTable({
+    siteId: v.id("sites"),
+    entryId: v.id("contentEntries"),
+    url: v.string(),
+    source: v.union(v.literal("discovered"), v.literal("manual")),
+    firstSeenAt: v.number(),
+    lastSeenAt: v.number(),
+    lastSelectedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_site", ["siteId"])
+    .index("by_entry", ["entryId"])
+    .index("by_entry_url", ["entryId", "url"]),
+
   assets: defineTable({
     siteId: v.id("sites"),
     storageId: v.id("_storage"),

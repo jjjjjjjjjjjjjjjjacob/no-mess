@@ -123,6 +123,12 @@ export interface PreviewSessionAuth {
   sessionSecret: string;
 }
 
+/** Report a delivery URL for route-aware Live Edit. */
+export interface ReportLiveEditRouteOptions {
+  entryId: string;
+  url?: string;
+}
+
 export interface PreviewExchangeResult {
   entry: NoMessEntry;
   sessionId: string;
@@ -205,6 +211,35 @@ export interface SchemaGetResponse {
   sdkExample: string;
 }
 
+// --- Provider types ---
+
+/** Props for the route-aware provider used on real site routes. */
+export interface NoMessLiveRouteProviderProps extends UseNoMessPreviewConfig {
+  children: import("react").ReactNode;
+  liveEditConfig?: UseNoMessLiveEditConfig;
+}
+
+/** Backward-compatible alias for the route-aware provider props. */
+export interface NoMessProviderProps extends NoMessLiveRouteProviderProps {}
+
+/** Options for binding a rendered entry to the current route. */
+export interface UseNoMessEditableEntryOptions {
+  registerCurrentUrl?: boolean;
+  url?: string;
+}
+
+/** Shared provider context for preview/live-edit state. */
+export interface NoMessContextValue {
+  adminOrigin: string;
+  apiKey: string;
+  apiUrl?: string;
+  bindEntry: (entryId: string) => void;
+  client: Pick<import("./client.js").NoMessClient, "reportLiveEditRoute">;
+  isIframe: boolean;
+  preview: UseNoMessPreviewResult;
+  liveEdit: UseNoMessLiveEditResult;
+}
+
 // --- Live Edit types ---
 
 export interface LiveEditFieldInfo {
@@ -252,10 +287,7 @@ export class NoMessError extends Error {
 
   constructor(message: string, status: number);
   constructor(message: string, options?: NoMessErrorOptions);
-  constructor(
-    message: string,
-    statusOrOptions?: number | NoMessErrorOptions,
-  ) {
+  constructor(message: string, statusOrOptions?: number | NoMessErrorOptions) {
     const options =
       typeof statusOrOptions === "number"
         ? { status: statusOrOptions }
@@ -272,7 +304,8 @@ export class NoMessError extends Error {
     this.code = options.code ?? "live_edit_runtime_failed";
     this.status = options.status;
     this.retryable =
-      options.retryable ?? (typeof options.status === "number" && options.status >= 500);
+      options.retryable ??
+      (typeof options.status === "number" && options.status >= 500);
     this.operation = options.operation;
     this.method = options.method;
     this.url = options.url;

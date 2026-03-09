@@ -11,16 +11,16 @@ import type {
   GetEntryOptions,
   NoMessClientConfig,
   NoMessEntry,
-  NoMessErrorCode,
   NoMessLogLevel,
   PreviewExchangeResult,
   PreviewSessionAuth,
+  ReportLiveEditRouteOptions,
   SchemaGetResponse,
   SchemaListResponse,
   ShopifyCollection,
   ShopifyProduct,
 } from "./types.js";
-import { DEFAULT_API_URL, NoMessError } from "./types.js";
+import { DEFAULT_API_URL, type NoMessError } from "./types.js";
 
 interface RequestOptions {
   method: "GET" | "POST";
@@ -158,12 +158,17 @@ export class NoMessClient {
     }
 
     const requestId = extractRequestId(response);
-    const text = await this.readResponseText(response, operation, method, requestUrl);
+    const text = await this.readResponseText(
+      response,
+      operation,
+      method,
+      requestUrl,
+    );
 
     if (!response.ok) {
       const parsed = text.trim() ? safeParseJsonText(text) : null;
       const parsedBody =
-        parsed && parsed.ok && parsed.value && typeof parsed.value === "object"
+        parsed?.ok && parsed.value && typeof parsed.value === "object"
           ? (parsed.value as { error?: unknown })
           : null;
       const message =
@@ -187,18 +192,21 @@ export class NoMessClient {
 
     const parsed = safeParseJsonText(text);
     if (!parsed.ok) {
-      const error = createNoMessResponseError("Received invalid JSON response", {
-        kind: "response",
-        code: "invalid_success_response",
-        operation,
-        method,
-        url: requestUrl,
-        requestId,
-        details: {
-          responseText: text.slice(0, 200),
+      const error = createNoMessResponseError(
+        "Received invalid JSON response",
+        {
+          kind: "response",
+          code: "invalid_success_response",
+          operation,
+          method,
+          url: requestUrl,
+          requestId,
+          details: {
+            responseText: text.slice(0, 200),
+          },
+          cause: parsed.error,
         },
-        cause: parsed.error,
-      });
+      );
       this.emitErrorLog(error, "client", operation);
       throw error;
     }
@@ -337,6 +345,20 @@ export class NoMessClient {
   }
 
   /**
+   * Report that an entry is rendered on the current site URL for route-aware live edit.
+   */
+  async reportLiveEditRoute(
+    options: ReportLiveEditRouteOptions,
+  ): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>({
+      method: "POST",
+      path: "/api/live-edit/routes/report",
+      operation: "reportLiveEditRoute",
+      body: options,
+    });
+  }
+
+  /**
    * Compute HMAC-SHA256 proof for preview session authentication.
    * Uses Web Crypto API (works in browsers, Node.js 18+, Deno, Bun, edge runtimes).
    */
@@ -345,28 +367,38 @@ export class NoMessClient {
     sessionId: string,
     timestamp: string,
   ): Promise<string> {
-    if (!sessionSecret || sessionSecret.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(sessionSecret)) {
-      const error = createNoMessCryptoError("Preview session secret must be a valid hex string", {
-        kind: "crypto",
-        code: "invalid_session_secret",
-        operation: "computeProof",
-        details: {
-          sessionId,
+    if (
+      !sessionSecret ||
+      sessionSecret.length % 2 !== 0 ||
+      !/^[0-9a-fA-F]+$/.test(sessionSecret)
+    ) {
+      const error = createNoMessCryptoError(
+        "Preview session secret must be a valid hex string",
+        {
+          kind: "crypto",
+          code: "invalid_session_secret",
+          operation: "computeProof",
+          details: {
+            sessionId,
+          },
         },
-      });
+      );
       this.emitErrorLog(error, "client", "computeProof");
       throw error;
     }
 
     if (typeof crypto === "undefined" || !crypto.subtle) {
-      const error = createNoMessCryptoError("Web Crypto API is not available in this runtime", {
-        kind: "crypto",
-        code: "crypto_unavailable",
-        operation: "computeProof",
-        details: {
-          sessionId,
+      const error = createNoMessCryptoError(
+        "Web Crypto API is not available in this runtime",
+        {
+          kind: "crypto",
+          code: "crypto_unavailable",
+          operation: "computeProof",
+          details: {
+            sessionId,
+          },
         },
-      });
+      );
       this.emitErrorLog(error, "client", "computeProof");
       throw error;
     }
@@ -385,15 +417,18 @@ export class NoMessClient {
         ["sign"],
       );
     } catch (error) {
-      const normalized = createNoMessCryptoError("Failed to initialize preview proof signing key", {
-        kind: "crypto",
-        code: "invalid_session_secret",
-        operation: "computeProof",
-        details: {
-          sessionId,
+      const normalized = createNoMessCryptoError(
+        "Failed to initialize preview proof signing key",
+        {
+          kind: "crypto",
+          code: "invalid_session_secret",
+          operation: "computeProof",
+          details: {
+            sessionId,
+          },
+          cause: error,
         },
-        cause: error,
-      });
+      );
       this.emitErrorLog(normalized, "client", "computeProof");
       throw normalized;
     }
@@ -404,15 +439,18 @@ export class NoMessClient {
       const signature = await crypto.subtle.sign("HMAC", key, message);
       return this.toBase64(new Uint8Array(signature));
     } catch (error) {
-      const normalized = createNoMessCryptoError("Failed to sign preview proof", {
-        kind: "crypto",
-        code: "crypto_unavailable",
-        operation: "computeProof",
-        details: {
-          sessionId,
+      const normalized = createNoMessCryptoError(
+        "Failed to sign preview proof",
+        {
+          kind: "crypto",
+          code: "crypto_unavailable",
+          operation: "computeProof",
+          details: {
+            sessionId,
+          },
+          cause: error,
         },
-        cause: error,
-      });
+      );
       this.emitErrorLog(normalized, "client", "computeProof");
       throw normalized;
     }

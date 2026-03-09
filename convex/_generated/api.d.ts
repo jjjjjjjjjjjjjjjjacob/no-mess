@@ -11,6 +11,7 @@
 import type * as __tests___helpers_mockCtx from "../__tests__/helpers/mockCtx.js";
 import type * as assets from "../assets.js";
 import type * as contentEntries from "../contentEntries.js";
+import type * as contentEntryRoutes from "../contentEntryRoutes.js";
 import type * as contentTypes from "../contentTypes.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   "__tests__/helpers/mockCtx": typeof __tests___helpers_mockCtx;
   assets: typeof assets;
   contentEntries: typeof contentEntries;
+  contentEntryRoutes: typeof contentEntryRoutes;
   contentTypes: typeof contentTypes;
   crons: typeof crons;
   http: typeof http;
