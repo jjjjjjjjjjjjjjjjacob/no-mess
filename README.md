@@ -28,6 +28,15 @@ no-mess/
 | `packages/no-mess-cli` | [`no-mess`](packages/no-mess-cli) | CLI for managing schemas (`init`, `push`, `pull`, `dev`) | 0.1.0 |
 | `packages/api-gateway` | `@no-mess/api-gateway` | Edge API gateway on Cloudflare Workers (private) | 0.1.0 |
 
+## Docs
+
+- [Getting Started](app/(docs)/docs/getting-started/page.tsx) for the core CMS flow
+- [Preview Mode](app/(docs)/docs/preview/page.tsx) for route-aware preview and the legacy fallback route
+- [Live Edit](app/(docs)/docs/live-edit/page.tsx) for URL-aware live editing on real site routes
+- [Local Development](app/(docs)/docs/local-dev/page.tsx) for localhost preview and Live Edit setup
+- [SDK Usage](app/(docs)/docs/sdk/page.tsx) for `@no-mess/client` examples
+- [API Reference](app/(docs)/docs/api/page.tsx) for content, preview, and route-reporting endpoints
+
 ## Prerequisites
 
 - [Bun](https://bun.sh) (package manager and runtime)
@@ -82,19 +91,27 @@ bunx changeset
 # 3. Commit the generated .changeset/*.md file with your PR
 
 # On merge to main:
-# - The release workflow creates a "Version Packages" PR that bumps versions
-# - Merging that PR publishes to npm automatically
+# - CI runs
+# - Convex deploys to production automatically
+# - If changesets are present, packages are versioned, published to npm, tagged, and released on GitHub automatically
 ```
 
 The `@no-mess/api-gateway` package is excluded from releases (it's private and deployed via Wrangler).
+Use the manual `Backfill GitHub Releases` workflow if older tags are missing GitHub releases.
 
 ## CI/CD
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | `ci.yml` | Push/PR to `main`/`dev` | Static checks, tests, build verification |
-| `release.yml` | Push to `main` | Changeset version PR or npm publish |
+| `release.yml` | Push to `main` | Convex production deploy, npm publish, GitHub release creation |
+| `backfill-github-releases.yml` | Manual (`workflow_dispatch`) | Create missing GitHub releases for existing tags |
 | `auto-approve.yml` | PR to `main` | Auto-approve PRs from repo owner |
+
+Required GitHub Actions secrets:
+- `AUTO_APPROVE_APP_ID`
+- `AUTO_APPROVE_PRIVATE_KEY`
+- `CONVEX_DEPLOY_KEY_PRODUCTION`
 
 ### CI Pipeline
 

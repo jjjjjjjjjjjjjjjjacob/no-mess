@@ -234,6 +234,24 @@ function corsJsonResponseNoCache(data: unknown, status = 200): Response {
   });
 }
 
+function getRequestOrigin(request: Request): string | null {
+  const origin = request.headers.get("Origin");
+  if (origin) {
+    return origin;
+  }
+
+  const referer = request.headers.get("Referer");
+  if (!referer) {
+    return null;
+  }
+
+  try {
+    return new URL(referer).origin;
+  } catch {
+    return null;
+  }
+}
+
 // CORS preflight for all content API routes
 http.route({
   pathPrefix: "/api/content/",
@@ -651,6 +669,87 @@ http.route({
         "Access-Control-Max-Age": "86400",
       },
     });
+  }),
+});
+
+http.route({
+  path: "/api/live-edit/routes/report",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }),
+});
+
+http.route({
+  path: "/api/live-edit/routes/report",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const auth = await authenticateRequest(ctx, request);
+    if ("error" in auth) return auth.error;
+    const { site } = auth;
+
+    let body: { entryId?: string; url?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return corsJsonError("Invalid JSON body", 400);
+    }
+
+    if (!body.entryId) {
+      return corsJsonError("Missing required field: entryId", 400);
+    }
+
+    const sitePreviewUrl =
+      typeof site.previewUrl === "string" ? site.previewUrl : null;
+
+    if (!sitePreviewUrl) {
+      return corsJsonError("Preview URL not configured for this site", 400);
+    }
+
+    const rawUrl =
+      (typeof body.url === "string" ? body.url : undefined) ??
+      request.headers.get("Referer") ??
+      sitePreviewUrl;
+
+    let resolvedUrl: URL;
+    try {
+      resolvedUrl = new URL(rawUrl, sitePreviewUrl);
+    } catch {
+      return corsJsonError("Invalid route URL", 400);
+    }
+
+    const requestOrigin = getRequestOrigin(request);
+    if (requestOrigin && requestOrigin !== resolvedUrl.origin) {
+      return corsJsonError(
+        "Route URL origin must match the request origin",
+        403,
+      );
+    }
+
+    try {
+      await ctx.runMutation(
+        internal.contentEntryRoutes.reportDiscoveredInternal,
+        {
+          siteId: site._id as any,
+          entryId: body.entryId as any,
+          url: resolvedUrl.toString(),
+        },
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to report route";
+      return corsJsonError(message, 400);
+    }
+
+    return corsJsonResponseNoCache({ ok: true });
   }),
 });
 

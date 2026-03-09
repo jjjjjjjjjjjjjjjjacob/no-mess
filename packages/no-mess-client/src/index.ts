@@ -10,16 +10,20 @@ export type {
   NoMessErrorCode,
   NoMessErrorKind,
   NoMessErrorOptions,
+  NoMessLiveRouteProviderProps,
   NoMessLogEvent,
-  NoMessLogLevel,
   NoMessLogger,
+  NoMessLogLevel,
+  NoMessProviderProps,
   PreviewExchangeResult,
   PreviewHandlerConfig,
   PreviewSessionAuth,
+  ReportLiveEditRouteOptions,
   SchemaGetResponse,
   SchemaListResponse,
   ShopifyCollection,
   ShopifyProduct,
+  UseNoMessEditableEntryOptions,
   UseNoMessLiveEditConfig,
   UseNoMessLiveEditResult,
   UseNoMessPreviewConfig,
@@ -175,11 +179,19 @@ export function createPreviewHandler(config: PreviewHandlerConfig): {
     );
   };
 
-  const runExchange = async (reason: "session-auth" | "refresh", origin: string) => {
+  const runExchange = async (
+    reason: "session-auth" | "refresh",
+    origin: string,
+  ) => {
     if (!sessionAuth) {
-      logEvent("debug", "preview_message_invalid", "Preview refresh ignored because no session is available", {
-        reason,
-      });
+      logEvent(
+        "debug",
+        "preview_message_invalid",
+        "Preview refresh ignored because no session is available",
+        {
+          reason,
+        },
+      );
       return;
     }
 
@@ -193,12 +205,17 @@ export function createPreviewHandler(config: PreviewHandlerConfig): {
         requestId < inFlightRequestId ||
         requestId <= latestCompletedRequestId
       ) {
-        logEvent("debug", "preview_exchange_failed", "Discarded stale preview exchange result", {
-          reason,
-          requestId,
-          inFlightRequestId,
-          latestCompletedRequestId,
-        });
+        logEvent(
+          "debug",
+          "preview_exchange_failed",
+          "Discarded stale preview exchange result",
+          {
+            reason,
+            requestId,
+            inFlightRequestId,
+            latestCompletedRequestId,
+          },
+        );
         return;
       }
 
@@ -220,23 +237,28 @@ export function createPreviewHandler(config: PreviewHandlerConfig): {
         return;
       }
 
-      postToParent(
-        { type: "no-mess:preview-loaded" },
-        origin,
-        { reason, requestId, phase: "loaded" },
-      );
+      postToParent({ type: "no-mess:preview-loaded" }, origin, {
+        reason,
+        requestId,
+        phase: "loaded",
+      });
     } catch (error) {
       if (
         disposed ||
         requestId < inFlightRequestId ||
         requestId <= latestCompletedRequestId
       ) {
-        logEvent("debug", "preview_exchange_failed", "Discarded stale preview exchange error", {
-          reason,
-          requestId,
-          inFlightRequestId,
-          latestCompletedRequestId,
-        });
+        logEvent(
+          "debug",
+          "preview_exchange_failed",
+          "Discarded stale preview exchange error",
+          {
+            reason,
+            requestId,
+            inFlightRequestId,
+            latestCompletedRequestId,
+          },
+        );
         return;
       }
 
@@ -266,15 +288,18 @@ export function createPreviewHandler(config: PreviewHandlerConfig): {
         typeof data.sessionSecret !== "string"
       ) {
         emitPreviewError(
-          createNoMessProtocolError("Received invalid preview session credentials", {
-            kind: "protocol",
-            code: "preview_message_invalid",
-            operation: "preview.session-auth",
-            details: {
-              receivedKeys:
-                data && typeof data === "object" ? Object.keys(data) : [],
+          createNoMessProtocolError(
+            "Received invalid preview session credentials",
+            {
+              kind: "protocol",
+              code: "preview_message_invalid",
+              operation: "preview.session-auth",
+              details: {
+                receivedKeys:
+                  data && typeof data === "object" ? Object.keys(data) : [],
+              },
             },
-          }),
+          ),
           event.origin,
           { type: data.type },
         );
@@ -291,9 +316,14 @@ export function createPreviewHandler(config: PreviewHandlerConfig): {
 
     if (data.type === "no-mess:refresh") {
       if (!sessionAuth) {
-        logEvent("debug", "preview_message_invalid", "Ignored preview refresh before session authentication", {
-          type: data.type,
-        });
+        logEvent(
+          "debug",
+          "preview_message_invalid",
+          "Ignored preview refresh before session authentication",
+          {
+            type: data.type,
+          },
+        );
         return;
       }
 
@@ -305,11 +335,7 @@ export function createPreviewHandler(config: PreviewHandlerConfig): {
     start: () => {
       disposed = false;
       window.addEventListener("message", handleMessage);
-      postToParent(
-        { type: "no-mess:preview-ready" },
-        "*",
-        { phase: "ready" },
-      );
+      postToParent({ type: "no-mess:preview-ready" }, "*", { phase: "ready" });
     },
     cleanup: () => {
       disposed = true;

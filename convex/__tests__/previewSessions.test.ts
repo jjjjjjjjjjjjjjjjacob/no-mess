@@ -111,6 +111,7 @@ describe("previewSessions.create", () => {
     expect(result).toEqual({
       sessionId: "mock_session_id_abc",
       sessionSecret: "mock_session_secret_xyz",
+      siteBaseUrl: "https://preview.example.com",
       previewUrl:
         "https://preview.example.com/no-mess-preview?sid=mock_session_id_abc",
     });
@@ -173,6 +174,7 @@ describe("previewSessions.create", () => {
     const result = await handler(ctx, { entryId: "entry_1" });
 
     expect(result.previewUrl).toBeNull();
+    expect(result.siteBaseUrl).toBeNull();
   });
 
   it("throws when entry not found", async () => {

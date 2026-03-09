@@ -18,6 +18,20 @@ jobs:
     name: CI
     uses: ./.github/workflows/ci.yml
 
+  deploy-convex:
+    name: Deploy Convex Production
+    needs: ci
+    if: "${{ github.event.head_commit.message != 'chore(release): version packages [skip ci]' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Deploy Convex
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PRODUCTION }}
+        run: bunx convex deploy -y
+
   release:
     name: Release Packages
     needs: ci
@@ -129,15 +143,7 @@ jobs:
         if: steps.changesets.outputs.has_changesets == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          for tag in $(git tag --points-at HEAD); do
-            echo "Creating release for $tag..."
-            gh release create "$tag" \
-              --title "$tag" \
-              --generate-notes \
-              --verify-tag \
-            || echo "Warning: release for $tag may already exist"
-          done
+        run: ./scripts/ensure-github-releases.sh --points-at-ref HEAD --pattern '@no-mess/*'
 
       - name: Sync versions to dev
         if: steps.changesets.outputs.has_changesets == 'true'

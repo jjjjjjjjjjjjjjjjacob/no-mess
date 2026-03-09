@@ -62,6 +62,7 @@ export const create = mutation({
     return {
       sessionId,
       sessionSecret,
+      siteBaseUrl: site?.previewUrl ?? null,
       previewUrl: site?.previewUrl
         ? `${site.previewUrl}/no-mess-preview?sid=${sessionId}`
         : null,
