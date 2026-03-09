@@ -16,6 +16,9 @@ const OVERLAY_CSS = `
   height: 100%;
   z-index: 2147483646;
 }
+#${OVERLAY_CONTAINER_ID}[data-select-mode="false"] {
+  opacity: 0;
+}
 .no-mess-overlay {
   position: absolute;
   border: 2px solid oklch(0.623 0.214 259.1);
@@ -111,6 +114,7 @@ export function createLiveEditHandler(config: LiveEditConfig): LiveEditHandle {
   let mutationObserver: MutationObserver | null = null;
   let scrollListener: (() => void) | null = null;
   let rafId: number | null = null;
+  let selectModeEnabled = true;
 
   const emitLog = (
     level: "debug" | "warn" | "error",
@@ -196,7 +200,15 @@ export function createLiveEditHandler(config: LiveEditConfig): LiveEditHandle {
   function createContainer() {
     container = document.createElement("div");
     container.id = OVERLAY_CONTAINER_ID;
+    container.dataset.selectMode = String(selectModeEnabled);
     document.body.appendChild(container);
+  }
+
+  function applySelectMode(enabled: boolean) {
+    selectModeEnabled = enabled;
+    if (container) {
+      container.dataset.selectMode = String(enabled);
+    }
   }
 
   function getFieldElements(): Map<string, HTMLElement[]> {
@@ -312,6 +324,7 @@ export function createLiveEditHandler(config: LiveEditConfig): LiveEditHandle {
     try {
       injectStyles();
       createContainer();
+      applySelectMode(selectModeEnabled);
 
       if (typeof ResizeObserver !== "undefined") {
         resizeObserver = new ResizeObserver(() => {
@@ -365,6 +378,7 @@ export function createLiveEditHandler(config: LiveEditConfig): LiveEditHandle {
   function exitLiveEdit() {
     if (!active) return;
     active = false;
+    selectModeEnabled = true;
 
     try {
       if (rafId !== null) {
@@ -452,6 +466,15 @@ export function createLiveEditHandler(config: LiveEditConfig): LiveEditHandle {
           break;
         case "no-mess:live-edit-exit":
           exitLiveEdit();
+          break;
+        case "no-mess:select-mode":
+          if (typeof data.enabled !== "boolean") {
+            emitLog("debug", "Ignored malformed live edit select mode message", {
+              type: data.type,
+            });
+            break;
+          }
+          applySelectMode(data.enabled);
           break;
         case "no-mess:field-updated":
           if (!active) break;

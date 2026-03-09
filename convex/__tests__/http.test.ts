@@ -40,6 +40,10 @@ vi.mock("../_generated/api", () => ({
       getValidSession: "internal:previewSessions:getValidSession",
       markSessionUsed: "internal:previewSessions:markSessionUsed",
     },
+    contentEntryRoutes: {
+      reportDiscoveredInternal:
+        "internal:contentEntryRoutes:reportDiscoveredInternal",
+    },
   },
 }));
 
@@ -104,6 +108,19 @@ describe("http router", () => {
   it("has routes defined for /api/preview/exchange POST", () => {
     const previewExchange = http.lookup("/api/preview/exchange", "POST");
     expect(previewExchange).not.toBeNull();
+  });
+
+  it("has routes defined for /api/live-edit/routes/report OPTIONS", () => {
+    const reportOptions = http.lookup(
+      "/api/live-edit/routes/report",
+      "OPTIONS",
+    );
+    expect(reportOptions).not.toBeNull();
+  });
+
+  it("has routes defined for /api/live-edit/routes/report POST", () => {
+    const reportRoute = http.lookup("/api/live-edit/routes/report", "POST");
+    expect(reportRoute).not.toBeNull();
   });
 
   it("has routes defined for /api/schema OPTIONS preflight", () => {

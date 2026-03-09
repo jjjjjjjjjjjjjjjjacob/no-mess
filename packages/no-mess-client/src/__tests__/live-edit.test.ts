@@ -168,4 +168,65 @@ describe("createLiveEditHandler", () => {
 
     handler.cleanup();
   });
+
+  it("toggles select mode without leaving live edit", () => {
+    const element = document.createElement("div");
+    element.setAttribute("data-no-mess-field", "title");
+    element.getBoundingClientRect = vi.fn(() => ({
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 20,
+      top: 0,
+      right: 100,
+      bottom: 20,
+      left: 0,
+      toJSON: () => ({
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 20,
+        top: 0,
+        right: 100,
+        bottom: 20,
+        left: 0,
+      }),
+    })) as unknown as typeof element.getBoundingClientRect;
+    document.body.appendChild(element);
+
+    const handler = createLiveEditHandler({
+      adminOrigin: ADMIN_ORIGIN,
+    });
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        origin: ADMIN_ORIGIN,
+        data: { type: "no-mess:live-edit-enter" },
+      }),
+    );
+
+    const overlayContainer = document.getElementById(
+      "no-mess-live-edit-overlays",
+    );
+    expect(overlayContainer?.dataset.selectMode).toBe("true");
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        origin: ADMIN_ORIGIN,
+        data: { type: "no-mess:select-mode", enabled: false },
+      }),
+    );
+
+    expect(overlayContainer?.dataset.selectMode).toBe("false");
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        origin: ADMIN_ORIGIN,
+        data: { type: "no-mess:field-updated", fieldName: "title", value: "Updated" },
+      }),
+    );
+
+    expect(element.textContent).toBe("Updated");
+    handler.cleanup();
+  });
 });

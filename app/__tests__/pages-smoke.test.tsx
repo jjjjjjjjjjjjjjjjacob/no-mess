@@ -214,6 +214,12 @@ vi.mock("@/convex/_generated/api", () => ({
       unpublish: "contentEntries:unpublish",
       remove: "contentEntries:remove",
     },
+    contentEntryRoutes: {
+      listForEntry: "contentEntryRoutes:listForEntry",
+      addManual: "contentEntryRoutes:addManual",
+      select: "contentEntryRoutes:select",
+      remove: "contentEntryRoutes:remove",
+    },
     assets: {
       listBySite: "assets:listBySite",
       generateUploadUrl: "assets:generateUploadUrl",
