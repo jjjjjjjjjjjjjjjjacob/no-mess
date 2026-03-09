@@ -10,65 +10,119 @@ npm install @no-mess/client
 bun add @no-mess/client
 ```
 
-## Usage
-
-### Fetching content
+## Fetch Content
 
 ```ts
 import { createNoMessClient } from "@no-mess/client";
 
 const client = createNoMessClient({
-  apiKey: "your-api-key",
+  apiKey: process.env.NO_MESS_API_KEY!,
 });
 
-// Get all entries of a content type
 const posts = await client.getEntries("blog-post");
-
-// Get a single entry by slug
 const post = await client.getEntry("blog-post", "hello-world");
 ```
 
-### Live preview (React)
+## Preview-Only Route
+
+Use this when you want a dedicated `/no-mess-preview` page.
 
 ```tsx
-import { useNoMessPreview } from "@no-mess/client/react";
+"use client";
 
-function PreviewPage() {
-  const { entry, isLoading, error } = useNoMessPreview({
-    apiKey: "your-api-key",
-  });
+import { NoMessPreview } from "@no-mess/client/react";
 
-  if (isLoading) return <p>Loading preview...</p>;
-  if (error) return <p>Error: {error.message}</p>;
+export default function PreviewPage() {
+  return (
+    <NoMessPreview apiKey={process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY!}>
+      {({ entry, error, isLoading }) => {
+        if (isLoading) return <p>Loading preview...</p>;
+        if (error) return <p>{error.message}</p>;
+        if (!entry) return null;
 
-  return <h1>{entry?.fields.title}</h1>;
+        return <h1>{entry.title}</h1>;
+      }}
+    </NoMessPreview>
+  );
 }
 ```
 
-The `useNoMessPreview` hook handles the postMessage handshake between the no-mess admin dashboard and your preview iframe automatically.
+## Route-Aware Preview and Live Edit
 
-### Shopify data
+This is the recommended integration path. It lets the dashboard open real site
+routes, apply unsaved iframe-only edits before publish, and store reported
+delivery URLs per entry.
 
-```ts
-const products = await client.getProducts();
-const product = await client.getProduct("product-handle");
-const collections = await client.getCollections();
-const collection = await client.getCollection("collection-handle");
+### 1. Wrap the route tree
+
+```tsx
+"use client";
+
+import { NoMessLiveRouteProvider } from "@no-mess/client/react";
+
+export default function SiteLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <NoMessLiveRouteProvider
+      apiKey={process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY!}
+    >
+      {children}
+    </NoMessLiveRouteProvider>
+  );
+}
 ```
 
-## Configuration
+### 2. Bind the rendered entry
+
+```tsx
+"use client";
+
+import {
+  NoMessField,
+  useNoMessEditableEntry,
+} from "@no-mess/client/react";
+
+export function BlogArticle({ entry }) {
+  const editableEntry = useNoMessEditableEntry(entry);
+
+  return (
+    <article>
+      <NoMessField as="h1" name="title">
+        {editableEntry.title}
+      </NoMessField>
+      <NoMessField as="div" name="body">
+        {editableEntry.body}
+      </NoMessField>
+    </article>
+  );
+}
+```
+
+`useNoMessEditableEntry()` automatically:
+- swaps in draft content for the active iframe session
+- applies unsaved field overrides from Live Edit
+- reports the current URL for route-aware reopening
+- emits the entry-bound signal used by dashboard warnings
+
+## Manual Route Reporting
+
+If you need custom reporting logic, call the client method directly:
 
 ```ts
+import { createNoMessClient } from "@no-mess/client";
+
 const client = createNoMessClient({
-  apiKey: "nm_...",           // Required — secret or publishable key
-  apiUrl: "https://...",      // Optional — defaults to https://api.no-mess.xyz
+  apiKey: process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY!,
+});
+
+await client.reportLiveEditRoute({
+  entryId: "entry_123",
+  url: window.location.href,
 });
 ```
-
-### API Key Types
-
-- **Secret keys** (`nm_...`) — Full access. Use server-side only.
-- **Publishable keys** (`nm_pub_...`) — Read-only access to published content. Safe for client-side use.
 
 ## API Reference
 
@@ -81,108 +135,37 @@ const client = createNoMessClient({
 | `client.getEntries(contentType)` | Fetch all published entries of a content type |
 | `client.getEntry(contentType, slug)` | Get a single entry by slug |
 
-### Shopify
+### Preview / Live Edit
 
 | Method | Description |
 |--------|-------------|
-| `client.getProducts()` | List all synced Shopify products |
-| `client.getProduct(handle)` | Get a product by handle |
-| `client.getCollections()` | List all synced Shopify collections |
-| `client.getCollection(handle)` | Get a collection by handle |
+| `client.exchangePreviewSession(session)` | Exchange a preview session token for draft content |
+| `client.reportLiveEditRoute({ entryId, url? })` | Report the current delivery URL for route-aware Live Edit |
 
-### Preview
+### React (`@no-mess/client/react`)
 
-| Method | Description |
-|--------|-------------|
-| `client.exchangePreviewSession(session)` | Exchange a preview session token (HMAC-SHA256 auth) |
+| API | Description |
+|-----|-------------|
+| `NoMessPreview` | Preview-only route wrapper |
+| `useNoMessPreview(config)` | Hook alternative for preview-only pages |
+| `NoMessLiveRouteProvider` | Route-aware provider for real site routes |
+| `useNoMessEditableEntry(entry, options?)` | Returns the active draft entry and reports the route |
+| `NoMessField` | Convenience component for `data-no-mess-field` annotations |
+| `useNoMessField(fieldName)` | Read a single field override from provider context |
 
-### React Hooks (`@no-mess/client/react`)
+## Migration
 
-| Hook | Description |
-|------|-------------|
-| `useNoMessPreview(config)` | Subscribe to live preview updates in an iframe |
-| `useNoMessLiveEdit(config)` | Enable live editing with field-level updates |
+If you already use `useNoMessPreview()` and `useNoMessLiveEdit()` on
+`/no-mess-preview`:
 
-## Schema Builder
+1. Keep the existing preview route in place.
+2. Add `NoMessLiveRouteProvider` to the real route tree.
+3. Replace direct entry rendering with `useNoMessEditableEntry(entry)` on the
+   routes you want Live Edit to open.
+4. Add `data-no-mess-field` annotations or `NoMessField` wrappers.
 
-The `@no-mess/client/schema` export provides helpers for defining content type schemas in code. Used by the [no-mess CLI](../no-mess-cli) to push and pull schemas.
-
-```ts
-import { defineSchema, defineContentType, field } from "@no-mess/client/schema";
-
-export default defineSchema({
-  contentTypes: [
-    defineContentType("blog-post", {
-      name: "Blog Post",
-      description: "Articles for the blog",
-      fields: {
-        title: field.text({ required: true }),
-        body: field.textarea({ required: true }),
-        heroImage: field.image(),
-        publishedAt: field.datetime(),
-        featured: field.boolean(),
-        externalUrl: field.url(),
-        category: field.select({
-          choices: [
-            { label: "Tech", value: "tech" },
-            { label: "Design", value: "design" },
-          ],
-        }),
-        relatedProduct: field.shopifyProduct(),
-        featuredCollection: field.shopifyCollection(),
-      },
-    }),
-  ],
-});
-```
-
-### Field Types
-
-| Builder | Type | Description |
-|---------|------|-------------|
-| `field.text()` | `text` | Plain text input |
-| `field.textarea()` | `textarea` | Multi-line text |
-| `field.number()` | `number` | Numeric value |
-| `field.boolean()` | `boolean` | True/false toggle |
-| `field.datetime()` | `datetime` | Date/time picker |
-| `field.url()` | `url` | URL field |
-| `field.image()` | `image` | Image upload |
-| `field.select(opts)` | `select` | Dropdown with choices (requires `choices` array) |
-| `field.shopifyProduct()` | `shopifyProduct` | Shopify product reference |
-| `field.shopifyCollection()` | `shopifyCollection` | Shopify collection reference |
-
-### Field Options
-
-All field builders accept an options object:
-
-```ts
-field.text({
-  required: true,        // Whether the field is required (default: false)
-  description: "...",    // Help text shown in the dashboard
-})
-```
-
-The `select` builder additionally requires a `choices` array:
-
-```ts
-field.select({
-  required: true,
-  choices: [
-    { label: "Draft", value: "draft" },
-    { label: "Published", value: "published" },
-  ],
-})
-```
-
-### Schema Utilities
-
-| Function | Description |
-|----------|-------------|
-| `defineSchema({ contentTypes })` | Define a complete schema with content types |
-| `defineContentType(slug, options)` | Define a single content type |
-| `parseSchemaSource(source)` | Parse a schema.ts source string into a schema definition |
-| `generateSchemaSource(schema)` | Generate schema.ts source from a schema definition |
-| `generateContentTypeSource(contentType)` | Generate source for a single content type |
+If you do nothing, the legacy preview route keeps working. You only miss the
+route-aware Live Edit workflow.
 
 ## License
 

@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import { FileText } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
+import { ContentTypeContextMenu } from "@/components/content-types/content-type-context-menu";
 import {
   Card,
   CardContent,
@@ -14,6 +15,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import { useSite } from "@/hooks/use-site";
+
+const contentTileHeightClass = "h-[15rem]";
 
 export default function ContentPage() {
   const { site, siteSlug } = useSite();
@@ -50,6 +53,8 @@ export default function ContentPage() {
     return counts;
   }, [entries]);
 
+  if (!site) return null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -62,7 +67,10 @@ export default function ContentPage() {
       {contentTypes === undefined ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
+            <Skeleton
+              key={i}
+              className={`${contentTileHeightClass} rounded-xl`}
+            />
           ))}
         </div>
       ) : contentTypes.length === 0 ? (
@@ -82,37 +90,46 @@ export default function ContentPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {contentTypes.map((type) => (
-            <Link
+            <ContentTypeContextMenu
               key={type._id}
-              href={`/sites/${siteSlug}/content/${type.slug}`}
+              siteId={site._id}
+              siteSlug={siteSlug}
+              type={type}
             >
-              <Card className="transition-colors hover:bg-muted/50">
-                <CardHeader>
-                  <CardTitle className="text-base">{type.name}</CardTitle>
-                  <CardDescription>
-                    {type.fields.length} field
-                    {type.fields.length !== 1 ? "s" : ""}
-                    {type.description ? ` · ${type.description}` : ""}
-                  </CardDescription>
-                </CardHeader>
-                {(() => {
-                  const counts = entryCounts.get(type._id);
-                  if (!counts || counts.total === 0) return null;
-                  return (
-                    <CardContent className="pt-0">
-                      <p className="text-xs text-muted-foreground">
-                        {counts.total}{" "}
-                        {counts.total === 1 ? "entry" : "entries"}
-                        {counts.published > 0 &&
-                          ` · ${counts.published} published`}
-                        {counts.draft > 0 &&
-                          ` · ${counts.draft} draft${counts.draft !== 1 ? "s" : ""}`}
-                      </p>
-                    </CardContent>
-                  );
-                })()}
-              </Card>
-            </Link>
+              <Link
+                href={`/sites/${siteSlug}/content/${type.slug}`}
+                className="block h-full"
+              >
+                <Card
+                  className={`${contentTileHeightClass} transition-colors hover:bg-muted/50`}
+                >
+                  <CardHeader>
+                    <CardTitle className="text-base">{type.name}</CardTitle>
+                    <CardDescription className="line-clamp-4">
+                      {type.fields.length} field
+                      {type.fields.length !== 1 ? "s" : ""}
+                      {type.description ? ` · ${type.description}` : ""}
+                    </CardDescription>
+                  </CardHeader>
+                  {(() => {
+                    const counts = entryCounts.get(type._id);
+                    if (!counts || counts.total === 0) return null;
+                    return (
+                      <CardContent className="mt-auto pt-0">
+                        <p className="text-xs text-muted-foreground">
+                          {counts.total}{" "}
+                          {counts.total === 1 ? "entry" : "entries"}
+                          {counts.published > 0 &&
+                            ` · ${counts.published} published`}
+                          {counts.draft > 0 &&
+                            ` · ${counts.draft} draft${counts.draft !== 1 ? "s" : ""}`}
+                        </p>
+                      </CardContent>
+                    );
+                  })()}
+                </Card>
+              </Link>
+            </ContentTypeContextMenu>
           ))}
         </div>
       )}

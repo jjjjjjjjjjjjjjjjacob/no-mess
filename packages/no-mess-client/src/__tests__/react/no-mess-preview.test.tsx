@@ -8,7 +8,9 @@ import type { UseNoMessPreviewResult } from "../../types.js";
 const mockResult: UseNoMessPreviewResult = {
   entry: null,
   error: null,
+  errorDetails: null,
   isLoading: true,
+  status: "waiting-for-admin",
 };
 
 vi.mock("../../react/use-no-mess-preview.js", () => ({
@@ -25,7 +27,9 @@ describe("NoMessPreview", () => {
     vi.clearAllMocks();
     mockResult.entry = null;
     mockResult.error = null;
+    mockResult.errorDetails = null;
     mockResult.isLoading = true;
+    mockResult.status = "waiting-for-admin";
   });
 
   it("renders loading state", () => {
@@ -47,6 +51,7 @@ describe("NoMessPreview", () => {
       _updatedAt: 2000,
     };
     mockResult.isLoading = false;
+    mockResult.status = "ready";
 
     render(
       <NoMessPreview apiKey="nm_test">
@@ -59,7 +64,9 @@ describe("NoMessPreview", () => {
 
   it("renders error state", () => {
     mockResult.error = new Error("Preview failed");
+    mockResult.errorDetails = null;
     mockResult.isLoading = false;
+    mockResult.status = "error";
 
     render(
       <NoMessPreview apiKey="nm_test">
@@ -76,6 +83,7 @@ describe("NoMessPreview", () => {
         apiKey="nm_key"
         apiUrl="https://custom.api.com"
         adminOrigin="https://custom.admin.com"
+        logger={vi.fn()}
       >
         {() => null}
       </NoMessPreview>,
@@ -85,6 +93,7 @@ describe("NoMessPreview", () => {
       apiKey: "nm_key",
       apiUrl: "https://custom.api.com",
       adminOrigin: "https://custom.admin.com",
+      logger: expect.any(Function),
     });
   });
 });

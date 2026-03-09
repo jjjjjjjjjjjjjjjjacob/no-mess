@@ -19,7 +19,7 @@ describe("logRequest", () => {
   });
 
   it("logs JSON with all expected fields", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog", {
+    const request = new Request("https://api.nomess.xyz/api/content/blog", {
       method: "GET",
     });
     const response = new Response(null, { status: 200 });
@@ -38,7 +38,7 @@ describe("logRequest", () => {
   });
 
   it("truncates API key to prefix + '...'", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog");
+    const request = new Request("https://api.nomess.xyz/api/content/blog");
     const response = new Response(null, { status: 200 });
 
     await logRequest(env, request, response, false, "nm_longerkey12345");
@@ -48,7 +48,7 @@ describe("logRequest", () => {
   });
 
   it("handles null API key", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog");
+    const request = new Request("https://api.nomess.xyz/api/content/blog");
     const response = new Response(null, { status: 200 });
 
     await logRequest(env, request, response, false, null);
@@ -58,7 +58,7 @@ describe("logRequest", () => {
   });
 
   it("records cacheHit correctly", async () => {
-    const request = new Request("https://api.no-mess.xyz/api/content/blog");
+    const request = new Request("https://api.nomess.xyz/api/content/blog");
     const response = new Response(null, { status: 200 });
 
     await logRequest(env, request, response, true, "nm_test123");

@@ -9,38 +9,154 @@ export default function PreviewPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Preview Mode</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Preview draft content live on your site before publishing. The SDK
-          handles the preview handshake automatically.
-        </p>
-      </div>
-
-      <DocsHeading>Setup</DocsHeading>
-
-      <DocsStep number={1} title="Set your preview URL">
-        <p>
-          Go to your site&apos;s <strong>Settings</strong> page in the no-mess
-          dashboard and enter the base URL of your client site (e.g.,{" "}
-          <code className="rounded bg-muted px-1 font-mono text-xs">
-            https://mysite.com
-          </code>
-          ). This tells the dashboard where to load your preview.
-        </p>
-      </DocsStep>
-
-      <DocsStep number={2} title="Add a preview route">
-        <p>
-          Create a{" "}
+          Preview drafts on the real route they are delivered to. The
+          recommended setup is route-aware and works on normal pages, while the
+          legacy{" "}
           <code className="rounded bg-muted px-1 font-mono text-xs">
             /no-mess-preview
           </code>{" "}
-          route in your site and use the{" "}
+          route remains supported as a fallback.
+        </p>
+      </div>
+
+      <DocsCallout type="info" title="Preview URL">
+        <p>
+          In site settings, <strong>Preview URL</strong> is the base URL of your
+          site, for example{" "}
           <code className="rounded bg-muted px-1 font-mono text-xs">
-            NoMessPreview
+            https://mysite.com
+          </code>
+          . no-mess uses it to build preview and Live Edit iframe URLs. It is no
+          longer just a preview-only endpoint.
+        </p>
+      </DocsCallout>
+
+      <DocsHeading>Recommended Setup</DocsHeading>
+
+      <DocsStep number={1} title="Wrap route-aware pages">
+        <p>
+          Add{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            NoMessLiveRouteProvider
           </code>{" "}
-          component from the SDK:
+          near the route tree that renders no-mess content.
         </p>
         <CodeBlock
           code={`"use client";
+
+import { NoMessLiveRouteProvider } from "@no-mess/client/react";
+
+export default function MarketingLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <NoMessLiveRouteProvider
+      apiKey={process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY!}
+    >
+      {children}
+    </NoMessLiveRouteProvider>
+  );
+}`}
+          language="tsx"
+          filename="app/(site)/layout.tsx"
+        />
+      </DocsStep>
+
+      <DocsStep number={2} title="Bind each rendered entry">
+        <p>
+          Wherever a route renders a no-mess entry, call{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            useNoMessEditableEntry()
+          </code>
+          . This swaps in the active draft when the iframe session targets that
+          entry and reports the current route back to no-mess.
+        </p>
+        <CodeBlock
+          code={`"use client";
+
+import {
+  NoMessField,
+  useNoMessEditableEntry,
+} from "@no-mess/client/react";
+
+type BlogEntry = {
+  _id: string;
+  slug: string;
+  title: string;
+  body: string;
+  heroImage?: string;
+};
+
+export function BlogArticle({ entry }: { entry: BlogEntry }) {
+  const editableEntry = useNoMessEditableEntry(entry);
+
+  return (
+    <article>
+      <NoMessField as="h1" name="title">
+        {editableEntry.title}
+      </NoMessField>
+      <NoMessField as="img" name="heroImage" src={editableEntry.heroImage} />
+      <NoMessField as="div" name="body">
+        {editableEntry.body}
+      </NoMessField>
+    </article>
+  );
+}`}
+          language="tsx"
+          filename="components/blog-article.tsx"
+        />
+      </DocsStep>
+
+      <DocsStep number={3} title="Allow iframe embedding">
+        <p>
+          Route-aware preview loads your real page inside the no-mess iframe, so
+          the actual delivery routes must allow the dashboard origin in{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            frame-ancestors
+          </code>
+          .
+        </p>
+        <CodeBlock
+          code={`// next.config.ts
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/blog/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors 'self' https://admin.no-mess.xyz",
+          },
+        ],
+      },
+    ];
+  },
+};
+
+export default nextConfig;`}
+          language="typescript"
+          filename="next.config.ts"
+        />
+      </DocsStep>
+
+      <DocsHeading>Legacy Fallback</DocsHeading>
+      <p className="text-muted-foreground">
+        If you already have a dedicated preview route, keep using{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          NoMessPreview
+        </code>{" "}
+        or{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          useNoMessPreview
+        </code>
+        . Live Edit falls back to this route when no real delivery URL has been
+        reported yet.
+      </p>
+      <CodeBlock
+        code={`"use client";
 
 import { NoMessPreview } from "@no-mess/client/react";
 
@@ -52,305 +168,64 @@ export default function PreviewPage() {
         if (error) return <p>Preview error: {error.message}</p>;
         if (!entry) return null;
 
-        return (
-          <article>
-            <h1>{entry.title}</h1>
-            {/* Render your content fields here */}
-          </article>
-        );
+        return <article><h1>{entry.title}</h1></article>;
       }}
     </NoMessPreview>
-  );
-}`}
-          language="tsx"
-          filename="app/no-mess-preview/page.tsx"
-        />
-      </DocsStep>
-
-      <DocsStep number={3} title="Configure CSP headers">
-        <p>
-          Your preview route must allow iframe embedding from the no-mess
-          dashboard. Add a{" "}
-          <code className="rounded bg-muted px-1 font-mono text-xs">
-            Content-Security-Policy
-          </code>{" "}
-          header with{" "}
-          <code className="rounded bg-muted px-1 font-mono text-xs">
-            frame-ancestors
-          </code>{" "}
-          that includes the dashboard origin:
-        </p>
-        <CodeBlock
-          code={`// next.config.ts
-const nextConfig = {
-  async headers() {
-    return [{
-      source: "/no-mess-preview",
-      headers: [{
-        key: "Content-Security-Policy",
-        value: "frame-ancestors 'self' https://admin.no-mess.xyz",
-      }],
-    }];
-  },
-};
-
-export default nextConfig;`}
-          language="typescript"
-          filename="next.config.ts"
-        />
-        <p className="mt-2">
-          For local development, see the environment-aware CSP configuration in
-          the{" "}
-          <a
-            href="/docs/local-dev#configure-csp-headers"
-            className="font-medium text-primary underline"
-          >
-            Local Development
-          </a>{" "}
-          guide.
-        </p>
-      </DocsStep>
-
-      <DocsHeading>Hook Alternative</DocsHeading>
-      <p className="text-muted-foreground">
-        If you prefer hooks over render functions, use{" "}
-        <code className="rounded bg-muted px-1 font-mono text-xs">
-          useNoMessPreview
-        </code>{" "}
-        directly:
-      </p>
-      <CodeBlock
-        code={`"use client";
-
-import { useNoMessPreview } from "@no-mess/client/react";
-
-export default function PreviewPage() {
-  const { entry, error, isLoading } = useNoMessPreview({
-    apiKey: process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY!,
-  });
-
-  if (isLoading) return <p>Loading preview...</p>;
-  if (error) return <p>Preview error: {error.message}</p>;
-  if (!entry) return null;
-
-  return (
-    <article>
-      <h1>{entry.title}</h1>
-      {/* Render your content fields here */}
-    </article>
   );
 }`}
         language="tsx"
         filename="app/no-mess-preview/page.tsx"
       />
 
-      <DocsHeading as="h3">useNoMessPreview Options</DocsHeading>
-      <div className="overflow-x-auto">
-        <table className="mt-2 w-full text-sm">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="pb-2 pr-4 font-semibold">Option</th>
-              <th className="pb-2 pr-4 font-semibold">Type</th>
-              <th className="pb-2 pr-4 font-semibold">Default</th>
-              <th className="pb-2 font-semibold">Description</th>
-            </tr>
-          </thead>
-          <tbody className="text-muted-foreground">
-            <tr className="border-b">
-              <td className="py-2 pr-4">
-                <code className="rounded bg-muted px-1 font-mono text-xs">
-                  apiKey
-                </code>
-              </td>
-              <td className="py-2 pr-4">
-                <code className="rounded bg-muted px-1 font-mono text-xs">
-                  string
-                </code>
-              </td>
-              <td className="py-2 pr-4">&mdash;</td>
-              <td className="py-2">
-                Required. Your site&apos;s publishable key (
-                <code className="rounded bg-muted px-1 font-mono text-xs">
-                  nm_pub_
-                </code>
-                ) recommended for client-side preview.
-              </td>
-            </tr>
-            <tr className="border-b">
-              <td className="py-2 pr-4">
-                <code className="rounded bg-muted px-1 font-mono text-xs">
-                  apiUrl
-                </code>
-              </td>
-              <td className="py-2 pr-4">
-                <code className="rounded bg-muted px-1 font-mono text-xs">
-                  string
-                </code>
-              </td>
-              <td className="py-2 pr-4">
-                <code className="rounded bg-muted px-1 font-mono text-xs">
-                  https://api.no-mess.xyz
-                </code>
-              </td>
-              <td className="py-2">
-                Override the API endpoint for the preview session exchange.
-              </td>
-            </tr>
-            <tr>
-              <td className="py-2 pr-4">
-                <code className="rounded bg-muted px-1 font-mono text-xs">
-                  adminOrigin
-                </code>
-              </td>
-              <td className="py-2 pr-4">
-                <code className="rounded bg-muted px-1 font-mono text-xs">
-                  string
-                </code>
-              </td>
-              <td className="py-2 pr-4">
-                <code className="rounded bg-muted px-1 font-mono text-xs">
-                  https://admin.no-mess.xyz
-                </code>
-              </td>
-              <td className="py-2">
-                The origin of the dashboard sending postMessage events. Set this
-                when developing against a local dashboard instance.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <DocsHeading>Fallback Behavior</DocsHeading>
+      <p className="text-muted-foreground">
+        no-mess chooses the most recent reported route for an entry when Live
+        Edit opens. If no route has been reported, it falls back to{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          /no-mess-preview
+        </code>
+        . If a route loads without the no-mess bridge, the dashboard keeps the
+        page visible and shows a warning instead of redirecting.
+      </p>
+
+      <DocsHeading>Migration Notes</DocsHeading>
+      <div className="space-y-3 text-muted-foreground">
+        <p>
+          If you already have{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            /no-mess-preview
+          </code>
+          , you do not need to remove it. Add the route-aware provider and hook
+          gradually to the real routes you want Live Edit to open.
+        </p>
+        <p>
+          If you do nothing, preview-only routes continue to work exactly as
+          before. You only miss real-route auto-navigation, stored delivery
+          URLs, and iframe-only unsaved updates on production routes.
+        </p>
       </div>
 
-      <DocsHeading>Non-React Frameworks</DocsHeading>
-      <p className="text-muted-foreground">
-        If you&apos;re not using React, use{" "}
-        <code className="rounded bg-muted px-1 font-mono text-xs">
-          createPreviewHandler()
-        </code>{" "}
-        from{" "}
-        <code className="rounded bg-muted px-1 font-mono text-xs">
-          @no-mess/client
-        </code>{" "}
-        to manage the preview lifecycle manually. It accepts the same options as{" "}
-        <code className="rounded bg-muted px-1 font-mono text-xs">
-          useNoMessPreview
-        </code>
-        .
-      </p>
-      <CodeBlock
-        code={`import { createNoMessClient, createPreviewHandler } from "@no-mess/client";
-
-const client = createNoMessClient({
-  apiKey: "nm_pub_your_publishable_key",
-});
-
-const handler = createPreviewHandler(client, {
-  apiKey: "nm_pub_your_publishable_key",
-  // apiUrl: "https://your-convex-deployment.convex.site",
-  // adminOrigin: "http://localhost:3000",
-});
-
-// Start listening for postMessage events from the dashboard
-handler.start();
-
-// The handler calls your onEntry callback when draft content arrives
-handler.onEntry((entry) => {
-  document.getElementById("preview-title")!.textContent = entry.title;
-  // Render other fields...
-});
-
-handler.onError((error) => {
-  console.error("Preview error:", error.message);
-});
-
-// Clean up when the page is destroyed
-// handler.cleanup();`}
-        language="typescript"
-      />
-
-      <DocsCallout type="info" title="Local Development">
-        <p>
-          Setting up preview for a local dev server? See the{" "}
-          <a
-            href="/docs/local-dev"
-            className="font-medium text-primary underline"
-          >
-            Local Development
-          </a>{" "}
-          guide for a complete walkthrough including environment variables, CSP
-          configuration with{" "}
-          <code className="rounded bg-muted px-1 font-mono text-xs">
-            NODE_ENV
-          </code>{" "}
-          toggling, and troubleshooting localhost-specific issues.
-        </p>
-      </DocsCallout>
-
       <DocsHeading>Troubleshooting</DocsHeading>
-      <div className="space-y-4">
-        <div>
-          <p className="font-semibold">Iframe shows blank page</p>
-          <p className="text-sm text-muted-foreground">
-            Check that your Content-Security-Policy header allows framing from
-            the dashboard origin. For production, this is{" "}
-            <code className="rounded bg-muted px-1 font-mono text-xs">
-              https://admin.no-mess.xyz
-            </code>
-            . Open your browser&apos;s developer console and look for CSP
-            violation errors.
-          </p>
-        </div>
-
-        <div>
-          <p className="font-semibold">adminOrigin mismatch</p>
-          <p className="text-sm text-muted-foreground">
-            The{" "}
-            <code className="rounded bg-muted px-1 font-mono text-xs">
-              adminOrigin
-            </code>{" "}
-            option must exactly match the origin of the dashboard sending
-            postMessage events, including protocol and port. If you are
-            developing locally and use{" "}
-            <code className="rounded bg-muted px-1 font-mono text-xs">
-              http://localhost:3000
-            </code>{" "}
-            for the dashboard, do not omit{" "}
-            <code className="rounded bg-muted px-1 font-mono text-xs">
-              adminOrigin
-            </code>{" "}
-            &mdash; the default is{" "}
-            <code className="rounded bg-muted px-1 font-mono text-xs">
-              https://admin.no-mess.xyz
-            </code>{" "}
-            and will not match.
-          </p>
-        </div>
-
-        <div>
-          <p className="font-semibold">Preview not working on localhost</p>
-          <p className="text-sm text-muted-foreground">
-            Local development requires additional configuration for CSP headers,{" "}
-            <code className="rounded bg-muted px-1 font-mono text-xs">
-              adminOrigin
-            </code>
-            , and environment variables. See the{" "}
-            <a
-              href="/docs/local-dev"
-              className="font-medium text-primary underline"
-            >
-              Local Development
-            </a>{" "}
-            guide for a step-by-step setup.
-          </p>
-        </div>
-
-        <div>
-          <p className="font-semibold">Session expired</p>
-          <p className="text-sm text-muted-foreground">
-            Preview sessions last 10 minutes. Click <strong>Preview</strong>{" "}
-            again in the dashboard to create a new session.
-          </p>
-        </div>
+      <div className="space-y-3 text-muted-foreground">
+        <p>
+          If the iframe is blank, check CSP and confirm the real route allows{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            https://admin.no-mess.xyz
+          </code>{" "}
+          in{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            frame-ancestors
+          </code>
+          .
+        </p>
+        <p>
+          If Live Edit opens the wrong page, confirm the route renders the entry
+          through{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            useNoMessEditableEntry()
+          </code>{" "}
+          and that the route report endpoint is being called from that page.
+        </p>
       </div>
     </div>
   );

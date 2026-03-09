@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { DeliveryUrlsCard } from "@/components/content-entries/delivery-urls-card";
 import {
   PreviewPanel,
   type PreviewPanelRef,
@@ -291,6 +292,11 @@ export default function EditEntryPage() {
             </Button>
           )}
         </div>
+
+        <DeliveryUrlsCard
+          entryId={entry._id as Id<"contentEntries">}
+          previewUrl={site.previewUrl}
+        />
       </div>
     </div>
   );

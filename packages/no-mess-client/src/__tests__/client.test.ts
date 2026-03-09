@@ -4,6 +4,40 @@ import { createNoMessClient, DEFAULT_API_URL, NoMessError } from "../index.js";
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
+function createMockResponse({
+  ok = true,
+  status = 200,
+  body,
+  text,
+  headers,
+}: {
+  ok?: boolean;
+  status?: number;
+  body?: unknown;
+  text?: string;
+  headers?: Record<string, string>;
+}) {
+  const bodyText =
+    typeof text === "string"
+      ? text
+      : typeof body === "undefined"
+        ? ""
+        : JSON.stringify(body);
+
+  return {
+    ok,
+    status,
+    json: () =>
+      typeof body === "undefined"
+        ? Promise.reject(new Error("no json body"))
+        : Promise.resolve(body),
+    text: () => Promise.resolve(bodyText),
+    headers: {
+      get: (name: string) => headers?.[name.toLowerCase()] ?? null,
+    },
+  };
+}
+
 describe("NoMessClient", () => {
   const client = createNoMessClient({
     apiUrl: "https://api.test.convex.site",
@@ -77,6 +111,30 @@ describe("NoMessClient", () => {
     const calledUrl = mockFetch.mock.calls[0][0];
     expect(calledUrl).toContain("preview=true");
     expect(calledUrl).toContain("secret=secret123");
+  });
+
+  it("reports live edit routes", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ ok: true }),
+    });
+
+    const result = await client.reportLiveEditRoute({
+      entryId: "entry_1",
+      url: "https://example.com/blog/hello-world",
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.test.convex.site/api/live-edit/routes/report",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          entryId: "entry_1",
+          url: "https://example.com/blog/hello-world",
+        }),
+      }),
+    );
   });
 
   it("throws NoMessError on API errors", async () => {
@@ -270,24 +328,75 @@ describe("NoMessClient", () => {
   });
 
   describe("error handling edge cases", () => {
-    it("falls back to 'Unknown error' for non-JSON error response", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        json: () => Promise.reject(new Error("not json")),
-      });
+    it("normalizes fetch rejections as retryable NoMessError", async () => {
+      mockFetch.mockRejectedValueOnce(new TypeError("Network down"));
+
+      try {
+        await client.getEntries("blog-post");
+        expect.unreachable("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(NoMessError);
+        expect((err as NoMessError).code).toBe("request_failed");
+        expect((err as NoMessError).kind).toBe("network");
+        expect((err as NoMessError).retryable).toBe(true);
+      }
+    });
+
+    it("throws NoMessError when a success response is not valid JSON", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          body: undefined,
+          text: "<html>not json</html>",
+        }),
+      );
+
+      try {
+        await client.getEntries("blog-post");
+        expect.unreachable("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(NoMessError);
+        expect((err as NoMessError).code).toBe("invalid_success_response");
+        expect((err as NoMessError).kind).toBe("response");
+      }
+    });
+
+    it("falls back to HTTP status for non-JSON error response", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: false,
+          status: 500,
+          text: "",
+        }),
+      );
 
       await expect(client.getEntries("blog-post")).rejects.toThrow(
-        "Unknown error",
+        "HTTP 500 (HTTP 500)",
+      );
+    });
+
+    it("uses text body when JSON parsing fails", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: false,
+          status: 404,
+          text: "Not Found",
+        }),
+      );
+
+      await expect(client.getEntries("blog-post")).rejects.toThrow(
+        "Not Found (HTTP 404)",
       );
     });
 
     it("throws NoMessError with correct status for 500", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        json: () => Promise.resolve({ error: "Server error" }),
-      });
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: false,
+          status: 500,
+          body: { error: "Server error" },
+          headers: { "x-request-id": "req_123" },
+        }),
+      );
 
       try {
         await client.getEntries("blog-post");
@@ -296,8 +405,31 @@ describe("NoMessClient", () => {
         expect(err).toBeInstanceOf(NoMessError);
         expect((err as InstanceType<typeof NoMessError>).status).toBe(500);
         expect((err as InstanceType<typeof NoMessError>).message).toBe(
-          "Server error",
+          "Server error (HTTP 500)",
         );
+        expect((err as InstanceType<typeof NoMessError>).requestId).toBe(
+          "req_123",
+        );
+        expect((err as InstanceType<typeof NoMessError>).retryable).toBe(true);
+      }
+    });
+
+    it("marks 401 responses as non-retryable", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: false,
+          status: 401,
+          body: { error: "Unauthorized" },
+        }),
+      );
+
+      try {
+        await client.getEntries("blog-post");
+        expect.unreachable("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(NoMessError);
+        expect((err as NoMessError).retryable).toBe(false);
+        expect((err as NoMessError).code).toBe("http_error");
       }
     });
   });

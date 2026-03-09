@@ -1,6 +1,6 @@
 {
   "name": "@no-mess/client",
-  "version": "0.1.1",
+  "version": "0.3.0",
   "description": "TypeScript SDK for the no-mess headless CMS",
   "type": "module",
   "main": "./dist/index.js",
@@ -36,12 +36,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/jjjjjjjjjjjjjjjjacob/no-mess.git",
+    "url": "git+https://github.com/jjjjjjjjjjjjjjjjacob/no-mess.git",
     "directory": "packages/no-mess-client"
   },
   "license": "MIT",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.0",

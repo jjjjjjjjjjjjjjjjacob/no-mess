@@ -105,7 +105,24 @@ export default function GettingStartedPage() {
         </p>
       </DocsStep>
 
-      <DocsStep number={5} title="Fetch content with the SDK">
+      <DocsStep number={5} title="Connect route-aware preview and Live Edit">
+        <p>
+          Set the site <strong>Preview URL</strong> to your site origin, then
+          add{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            NoMessLiveRouteProvider
+          </code>{" "}
+          and{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            useNoMessEditableEntry()
+          </code>{" "}
+          on the routes that render no-mess content. This is the recommended
+          integration path for Live Edit. Preview-only routes remain supported
+          as a fallback.
+        </p>
+      </DocsStep>
+
+      <DocsStep number={6} title="Fetch content with the SDK">
         <p>Install the no-mess client in your project:</p>
         <CodeBlock code="npm install @no-mess/client" language="bash" />
         <p className="mt-4">Then fetch your content:</p>
@@ -167,7 +184,7 @@ export default async function BlogPage() {
       <DocsCallout type="tip">
         Store your secret key in{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">
-          NO_MESS_SECRET_KEY
+          NO_MESS_API_KEY
         </code>
         . For client-side code, use the publishable key in{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">
@@ -221,7 +238,16 @@ export default async function BlogPage() {
           >
             Preview Mode
           </a>{" "}
-          &mdash; preview draft content on your site
+          &mdash; route-aware preview and the legacy fallback route
+        </li>
+        <li>
+          <a
+            href="/docs/live-edit"
+            className="font-medium text-primary underline"
+          >
+            Live Edit
+          </a>{" "}
+          &mdash; instant iframe-only edits, URL bar, and delivery URLs
         </li>
         <li>
           <a
@@ -230,8 +256,7 @@ export default async function BlogPage() {
           >
             Local Development
           </a>{" "}
-          &mdash; environment setup, localhost preview, and Shopify storefront
-          example
+          &mdash; localhost route-aware preview and Live Edit setup
         </li>
       </ul>
     </div>

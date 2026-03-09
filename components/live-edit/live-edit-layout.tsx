@@ -188,6 +188,7 @@ export function LiveEditLayout() {
           ref={previewPanelRef}
           entryId={entry._id as Id<"contentEntries">}
           previewUrl={site.previewUrl}
+          liveValues={{ title, ...formData }}
           onFieldMap={handleFieldMap}
           onFieldClicked={handleFieldClicked}
         />

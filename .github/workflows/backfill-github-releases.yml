@@ -1,0 +1,29 @@
+name: Backfill GitHub Releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_pattern:
+        description: Git tag glob to scan for missing releases
+        required: false
+        default: "@no-mess/*"
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    name: Backfill Missing Releases
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch tags
+        run: git fetch --force --tags origin
+
+      - name: Create missing GitHub releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/ensure-github-releases.sh --all-tags --pattern "${{ inputs.tag_pattern }}" --latest=false

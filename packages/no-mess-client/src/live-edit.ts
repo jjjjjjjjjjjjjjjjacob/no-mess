@@ -1,3 +1,5 @@
+import { normalizeNoMessError } from "./error-utils.js";
+import { createSdkLogger } from "./logging.js";
 import type { LiveEditConfig, LiveEditHandle } from "./types.js";
 
 const OVERLAY_CONTAINER_ID = "no-mess-live-edit-overlays";
@@ -13,6 +15,9 @@ const OVERLAY_CSS = `
   width: 100%;
   height: 100%;
   z-index: 2147483646;
+}
+#${OVERLAY_CONTAINER_ID}[data-select-mode="false"] {
+  opacity: 0;
 }
 .no-mess-overlay {
   position: absolute;
@@ -55,6 +60,38 @@ interface OverlayEntry {
   fieldName: string;
 }
 
+interface SerializableRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+function serializeRect(rect: DOMRect): SerializableRect {
+  const rectWithJson = rect as DOMRect & {
+    toJSON?: () => SerializableRect;
+  };
+
+  if (typeof rectWithJson.toJSON === "function") {
+    return rectWithJson.toJSON();
+  }
+
+  return {
+    x: rect.x,
+    y: rect.y,
+    width: rect.width,
+    height: rect.height,
+    top: rect.top,
+    right: rect.right,
+    bottom: rect.bottom,
+    left: rect.left,
+  };
+}
+
 /**
  * Create a live edit handler that manages overlay highlights on annotated DOM
  * elements and communicates with the admin dashboard via postMessage.
@@ -68,6 +105,7 @@ interface OverlayEntry {
  * ```
  */
 export function createLiveEditHandler(config: LiveEditConfig): LiveEditHandle {
+  const logger = createSdkLogger(config.logger);
   let active = false;
   let container: HTMLDivElement | null = null;
   let styleEl: HTMLStyleElement | null = null;
@@ -76,6 +114,80 @@ export function createLiveEditHandler(config: LiveEditConfig): LiveEditHandle {
   let mutationObserver: MutationObserver | null = null;
   let scrollListener: (() => void) | null = null;
   let rafId: number | null = null;
+  let selectModeEnabled = true;
+
+  const emitLog = (
+    level: "debug" | "warn" | "error",
+    message: string,
+    context: Record<string, unknown>,
+    error?: Error,
+  ) => {
+    logger({
+      level,
+      code: "live_edit_runtime_failed",
+      message,
+      scope: "live-edit",
+      operation: "createLiveEditHandler",
+      error: error instanceof Error ? (error as never) : undefined,
+      timestamp: new Date().toISOString(),
+      context,
+    });
+  };
+
+  const reportRuntimeError = (
+    error: unknown,
+    context: Record<string, unknown>,
+    message = "Live edit runtime failure",
+  ) => {
+    const normalized = normalizeNoMessError(error, {
+      kind: "runtime",
+      code: "live_edit_runtime_failed",
+      operation: "live-edit",
+      details: context,
+    });
+
+    try {
+      config.onError?.(normalized);
+    } catch (callbackError) {
+      emitLog(
+        "error",
+        "Live edit onError callback threw unexpectedly",
+        context,
+        normalizeNoMessError(callbackError, {
+          kind: "runtime",
+          code: "live_edit_runtime_failed",
+          operation: "live-edit.onError",
+        }),
+      );
+    }
+
+    emitLog("error", message, context, normalized);
+  };
+
+  const safeInvoke = (
+    callback: (() => void) | undefined,
+    context: Record<string, unknown>,
+    message: string,
+  ) => {
+    if (!callback) return;
+
+    try {
+      callback();
+    } catch (error) {
+      reportRuntimeError(error, context, message);
+    }
+  };
+
+  const safePostMessage = (
+    message: Record<string, unknown>,
+    context: Record<string, unknown>,
+  ) => {
+    try {
+      window.parent.postMessage(message, config.adminOrigin);
+    } catch (error) {
+      reportRuntimeError(error, context, "Failed to post live edit message");
+    }
+  };
 
   function injectStyles() {
     if (document.getElementById("no-mess-live-edit-styles")) return;
@@ -88,7 +200,15 @@ export function createLiveEditHandler(config: LiveEditConfig): LiveEditHandle {
   function createContainer() {
     container = document.createElement("div");
     container.id = OVERLAY_CONTAINER_ID;
+    container.dataset.selectMode = String(selectModeEnabled);
     document.body.appendChild(container);
+  }
+
+  function applySelectMode(enabled: boolean) {
+    selectModeEnabled = enabled;
+    if (container) {
+      container.dataset.selectMode = String(enabled);
+    }
   }
 
   function getFieldElements(): Map<string, HTMLElement[]> {
@@ -125,134 +245,174 @@ export function createLiveEditHandler(config: LiveEditConfig): LiveEditHandle {
     if (rafId !== null) return;
     rafId = requestAnimationFrame(() => {
       rafId = null;
-      updateAllPositions();
+      try {
+        updateAllPositions();
+      } catch (error) {
+        reportRuntimeError(error, { phase: "updateAllPositions" });
+      }
     });
   }
 
   function buildOverlays() {
-    // Clear existing overlays
-    for (const entry of overlays) {
-      entry.overlay.remove();
-    }
-    overlays = [];
-
-    if (!container) return;
-
-    const fieldElements = getFieldElements();
-    const fieldRects: { fieldName: string; rect: DOMRect }[] = [];
-
-    for (const [fieldName, elements] of fieldElements) {
-      for (const element of elements) {
-        const overlay = document.createElement("div");
-        overlay.className = "no-mess-overlay";
-        overlay.setAttribute(OVERLAY_ATTR, fieldName);
-
-        const label = document.createElement("span");
-        label.className = "no-mess-overlay-label";
-        label.textContent = fieldName;
-        overlay.appendChild(label);
-
-        positionOverlay(overlay, element);
-
-        overlay.addEventListener("click", () => {
-          window.parent.postMessage(
-            { type: "no-mess:field-clicked", fieldName },
-            config.adminOrigin,
-          );
-          config.onFieldClicked?.(fieldName);
-        });
-
-        container.appendChild(overlay);
-        overlays.push({ element, overlay, fieldName });
-
-        const rect = element.getBoundingClientRect();
-        fieldRects.push({ fieldName, rect: rect.toJSON() });
-
-        // Observe element for size changes
-        resizeObserver?.observe(element);
+    try {
+      for (const entry of overlays) {
+        entry.overlay.remove();
       }
-    }
+      overlays = [];
 
-    // Send field map to admin
-    const uniqueFields = [...new Set(fieldRects.map((f) => f.fieldName))];
-    window.parent.postMessage(
-      {
-        type: "no-mess:field-map",
-        fields: uniqueFields.map((fieldName) => {
-          const match = fieldRects.find((f) => f.fieldName === fieldName);
-          return { fieldName, rect: match?.rect };
-        }),
-      },
-      config.adminOrigin,
-    );
+      if (!container) return;
+
+      const fieldElements = getFieldElements();
+      const fieldRects: { fieldName: string; rect: SerializableRect }[] = [];
+
+      for (const [fieldName, elements] of fieldElements) {
+        for (const element of elements) {
+          const overlay = document.createElement("div");
+          overlay.className = "no-mess-overlay";
+          overlay.setAttribute(OVERLAY_ATTR, fieldName);
+
+          const label = document.createElement("span");
+          label.className = "no-mess-overlay-label";
+          label.textContent = fieldName;
+          overlay.appendChild(label);
+
+          positionOverlay(overlay, element);
+
+          overlay.addEventListener("click", () => {
+            safePostMessage(
+              { type: "no-mess:field-clicked", fieldName },
+              { phase: "field-clicked", fieldName },
+            );
+
+            try {
+              config.onFieldClicked?.(fieldName);
+            } catch (error) {
+              reportRuntimeError(error, { phase: "field-clicked", fieldName });
+            }
+          });
+
+          container.appendChild(overlay);
+          overlays.push({ element, overlay, fieldName });
+
+          const rect = element.getBoundingClientRect();
+          fieldRects.push({ fieldName, rect: serializeRect(rect) });
+
+          resizeObserver?.observe(element);
+        }
+      }
+
+      const uniqueFields = [...new Set(fieldRects.map((field) => field.fieldName))];
+      safePostMessage(
+        {
+          type: "no-mess:field-map",
+          fields: uniqueFields.map((fieldName) => {
+            const match = fieldRects.find((field) => field.fieldName === fieldName);
+            return { fieldName, rect: match?.rect };
+          }),
+        },
+        { phase: "field-map", count: uniqueFields.length },
+      );
+    } catch (error) {
+      reportRuntimeError(error, { phase: "buildOverlays" }, "Failed to build live edit overlays");
+    }
   }
 
   function enterLiveEdit() {
     if (active) return;
     active = true;
 
-    injectStyles();
-    createContainer();
+    try {
+      injectStyles();
+      createContainer();
+      applySelectMode(selectModeEnabled);
 
-    resizeObserver = new ResizeObserver(() => {
-      schedulePositionUpdate();
-    });
+      if (typeof ResizeObserver !== "undefined") {
+        resizeObserver = new ResizeObserver(() => {
+          try {
+            schedulePositionUpdate();
+          } catch (error) {
+            reportRuntimeError(error, { phase: "resizeObserver" });
+          }
+        });
+      } else {
+        emitLog("warn", "ResizeObserver is not available; live edit overlays will fall back to scroll/resize updates only", {
+          feature: "ResizeObserver",
+        });
+      }
 
-    buildOverlays();
+      buildOverlays();
 
-    // Track scroll for repositioning
-    scrollListener = () => schedulePositionUpdate();
-    window.addEventListener("scroll", scrollListener, { passive: true });
-    window.addEventListener("resize", scrollListener, { passive: true });
+      scrollListener = () => {
+        try {
+          schedulePositionUpdate();
+        } catch (error) {
+          reportRuntimeError(error, { phase: "scrollListener" });
+        }
+      };
+      window.addEventListener("scroll", scrollListener, { passive: true });
+      window.addEventListener("resize", scrollListener, { passive: true });
 
-    // Track DOM mutations for SPA navigation
-    mutationObserver = new MutationObserver(() => {
-      // Debounce rescan slightly for batch mutations
-      setTimeout(() => {
-        if (active) buildOverlays();
-      }, 100);
-    });
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+      if (typeof MutationObserver !== "undefined") {
+        mutationObserver = new MutationObserver(() => {
+          setTimeout(() => {
+            if (!active) return;
+            buildOverlays();
+          }, 100);
+        });
+        mutationObserver.observe(document.body, {
+          childList: true,
+          subtree: true,
+        });
+      } else {
+        emitLog("warn", "MutationObserver is not available; live edit overlays will not auto-refresh for DOM changes", {
+          feature: "MutationObserver",
+        });
+      }
 
-    config.onEnter?.();
+      safeInvoke(config.onEnter, { phase: "enter" }, "Live edit onEnter callback threw unexpectedly");
+    } catch (error) {
+      reportRuntimeError(error, { phase: "enterLiveEdit" });
+    }
   }
 
   function exitLiveEdit() {
     if (!active) return;
     active = false;
+    selectModeEnabled = true;
 
-    if (rafId !== null) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
+    try {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+
+      resizeObserver?.disconnect();
+      resizeObserver = null;
+
+      mutationObserver?.disconnect();
+      mutationObserver = null;
+
+      if (scrollListener) {
+        window.removeEventListener("scroll", scrollListener);
+        window.removeEventListener("resize", scrollListener);
+        scrollListener = null;
+      }
+
+      for (const entry of overlays) {
+        entry.overlay.remove();
+      }
+      overlays = [];
+
+      container?.remove();
+      container = null;
+
+      styleEl?.remove();
+      styleEl = null;
+
+      safeInvoke(config.onExit, { phase: "exit" }, "Live edit onExit callback threw unexpectedly");
+    } catch (error) {
+      reportRuntimeError(error, { phase: "exitLiveEdit" });
     }
-
-    resizeObserver?.disconnect();
-    resizeObserver = null;
-
-    mutationObserver?.disconnect();
-    mutationObserver = null;
-
-    if (scrollListener) {
-      window.removeEventListener("scroll", scrollListener);
-      window.removeEventListener("resize", scrollListener);
-      scrollListener = null;
-    }
-
-    for (const entry of overlays) {
-      entry.overlay.remove();
-    }
-    overlays = [];
-
-    container?.remove();
-    container = null;
-
-    styleEl?.remove();
-    styleEl = null;
-
-    config.onExit?.();
   }
 
   function handleFieldUpdate(fieldName: string, value: unknown) {
@@ -299,32 +459,62 @@ export function createLiveEditHandler(config: LiveEditConfig): LiveEditHandle {
     const data = event.data;
     if (!data || typeof data.type !== "string") return;
 
-    switch (data.type) {
-      case "no-mess:live-edit-enter":
-        enterLiveEdit();
-        break;
-      case "no-mess:live-edit-exit":
-        exitLiveEdit();
-        break;
-      case "no-mess:field-updated":
-        if (data.fieldName && active) {
+    try {
+      switch (data.type) {
+        case "no-mess:live-edit-enter":
+          enterLiveEdit();
+          break;
+        case "no-mess:live-edit-exit":
+          exitLiveEdit();
+          break;
+        case "no-mess:select-mode":
+          if (typeof data.enabled !== "boolean") {
+            emitLog("debug", "Ignored malformed live edit select mode message", {
+              type: data.type,
+            });
+            break;
+          }
+          applySelectMode(data.enabled);
+          break;
+        case "no-mess:field-updated":
+          if (!active) break;
+          if (typeof data.fieldName !== "string") {
+            emitLog("debug", "Ignored malformed live edit field update message", {
+              type: data.type,
+            });
+            break;
+          }
           handleFieldUpdate(data.fieldName, data.value);
-        }
-        break;
-      case "no-mess:field-focus":
-        if (data.fieldName && active) {
+          break;
+        case "no-mess:field-focus":
+          if (!active) break;
+          if (typeof data.fieldName !== "string") {
+            emitLog("debug", "Ignored malformed live edit focus message", {
+              type: data.type,
+            });
+            break;
+          }
           handleFieldFocus(data.fieldName);
-        }
-        break;
-      case "no-mess:field-blur":
-        if (data.fieldName && active) {
+          break;
+        case "no-mess:field-blur":
+          if (!active) break;
+          if (typeof data.fieldName !== "string") {
+            emitLog("debug", "Ignored malformed live edit blur message", {
+              type: data.type,
+            });
+            break;
+          }
           handleFieldBlur(data.fieldName);
-        }
-        break;
+          break;
+      }
+    } catch (error) {
+      reportRuntimeError(error, {
+        phase: "handleMessage",
+        type: data.type,
+      });
     }
   }
 
-  // Start listening immediately
   window.addEventListener("message", handleMessage);
 
   return {

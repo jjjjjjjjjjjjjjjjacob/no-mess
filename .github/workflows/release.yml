@@ -18,10 +18,27 @@ jobs:
     name: CI
     uses: ./.github/workflows/ci.yml
 
+  deploy-convex:
+    name: Deploy Convex Production
+    needs: ci
+    if: "${{ github.event.head_commit.message != 'chore(release): version packages [skip ci]' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Deploy Convex
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PRODUCTION }}
+        run: bunx convex deploy -y
+
   release:
     name: Release Packages
     needs: ci
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - name: Generate App Token
         id: app-token
@@ -39,24 +56,99 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
 
       - run: bun install --frozen-lockfile
 
+      - name: Check for changesets
+        id: changesets
+        run: |
+          COUNT=$(find .changeset -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')
+          if [ "$COUNT" -eq 0 ]; then
+            echo "has_changesets=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changesets=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Version packages
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: bun run version
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
       - name: Build packages
+        if: steps.changesets.outputs.has_changesets == 'true'
         run: |
           cd packages/no-mess-client && bun run build && cd ../..
           cd packages/no-mess-mcp && bun run build && cd ../..
           cd packages/no-mess-cli && bun run build && cd ../..
 
-      - name: Create Release PR or Publish
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          publish: bun run release
-          version: bun run version
-          title: "chore(release): version packages"
-          commit: "chore(release): version packages"
+      # Changesets doesn't replace workspace:* protocol references when publishing
+      # with bun/npm (only pnpm does this automatically). This step resolves them
+      # to real version ranges (e.g. workspace:* -> ^0.1.1) so npm consumers can
+      # install the packages without being inside the monorepo workspace.
+      - name: Replace workspace protocol references
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: |
+          for pkg_json in packages/*/package.json; do
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('$pkg_json', 'utf8'));
+              let changed = false;
+              // Check all dependency groups for workspace: references
+              for (const depType of ['dependencies', 'devDependencies', 'peerDependencies']) {
+                if (!pkg[depType]) continue;
+                for (const [name, version] of Object.entries(pkg[depType])) {
+                  if (version.startsWith('workspace:')) {
+                    // Find the referenced package in the monorepo to read its version
+                    const depPkgPath = 'packages/' + fs.readdirSync('packages').find(d => {
+                      try {
+                        const p = JSON.parse(fs.readFileSync('packages/' + d + '/package.json', 'utf8'));
+                        return p.name === name;
+                      } catch { return false; }
+                    }) + '/package.json';
+                    const depPkg = JSON.parse(fs.readFileSync(depPkgPath, 'utf8'));
+                    // workspace:* -> ^version, workspace:^x -> ^version, etc.
+                    const suffix = version.replace('workspace:', '');
+                    pkg[depType][name] = suffix === '*' ? '^' + depPkg.version : suffix.replace('*', depPkg.version);
+                    changed = true;
+                  }
+                }
+              }
+              if (changed) fs.writeFileSync('$pkg_json', JSON.stringify(pkg, null, 2) + '\n');
+            "
+          done
+
+      - name: Publish to npm
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: bun run release
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Commit version changes
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(release): version packages [skip ci]"
+
+      - name: Push to main
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: git push origin main --follow-tags
+
+      - name: Create GitHub Releases
+        if: steps.changesets.outputs.has_changesets == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: ./scripts/ensure-github-releases.sh --points-at-ref HEAD --pattern '@no-mess/*'
+
+      - name: Sync versions to dev
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: |
+          git fetch origin dev
+          git checkout dev
+          git merge main -m "chore(release): sync versions from main [skip ci]" --no-edit
+          git push origin dev
