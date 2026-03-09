@@ -1,5 +1,12 @@
 # no-mess
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`bf7e392`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/bf7e392f45095a2bcfd5cff6ccc24f72e36b2b58)]:
+  - @no-mess/client@0.4.0
+
 ## 0.1.1
 
 ### Patch Changes
