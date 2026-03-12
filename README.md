@@ -129,7 +129,7 @@ Use the manual `Backfill GitHub Releases` workflow if older tags are missing Git
 Required GitHub Actions secrets:
 - `AUTO_APPROVE_APP_ID`
 - `AUTO_APPROVE_PRIVATE_KEY`
-- `CONVEX_DEPLOY_KEY_PRODUCTION`
+- `CONVEX_DEPLOY_KEY_PRODUCTION` in the GitHub `production` environment
 
 ### CI Pipeline
 
