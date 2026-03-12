@@ -3,6 +3,8 @@
 import { useQuery } from "convex/react";
 import { ArrowLeft, FileText, MousePointerClick } from "lucide-react";
 import Link from "next/link";
+import { useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +16,12 @@ export default function LiveEditIndexPage() {
   const contentTypes = useQuery(
     api.contentTypes.listBySite,
     site ? { siteId: site._id } : "skip",
+  );
+  const templates = useMemo(
+    () =>
+      contentTypes?.filter((contentType) => contentType.kind === "template") ??
+      [],
+    [contentTypes],
   );
 
   if (!site) return null;
@@ -68,24 +76,34 @@ export default function LiveEditIndexPage() {
               <Skeleton key={String(i)} className="h-24 rounded-lg" />
             ))}
           </div>
-        ) : contentTypes.length === 0 ? (
+        ) : templates.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No content types yet. Create schemas first.
+            No editable templates yet. Create a template schema first.
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {contentTypes.map((ct) => (
+            {templates.map((ct) => (
               <Link
                 key={ct._id}
                 href={`/sites/${siteSlug}/live-edit/${ct.slug}`}
               >
                 <Card className="h-full flex-row items-center gap-3 p-4 py-4 transition-colors hover:bg-accent">
                   <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">{ct.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium">{ct.name}</p>
+                      <Badge variant="outline">
+                        {ct.mode === "singleton" ? "Singleton" : "Collection"}
+                      </Badge>
+                    </div>
                     {ct.description && (
                       <p className="text-xs text-muted-foreground">
                         {ct.description}
+                      </p>
+                    )}
+                    {ct.route && (
+                      <p className="text-xs text-muted-foreground">
+                        {ct.route}
                       </p>
                     )}
                   </div>

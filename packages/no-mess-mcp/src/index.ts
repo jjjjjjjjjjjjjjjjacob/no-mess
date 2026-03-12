@@ -12,6 +12,11 @@ function getClient(): NoMessClient {
         "Set it to your site's API key (starts with nm_).",
     );
   }
+  if (apiKey.startsWith("nm_pub_")) {
+    throw new Error(
+      "NO_MESS_API_KEY must be a secret key (nm_). Publishable keys (nm_pub_) do not expose the full schema and content tools used by the MCP server.",
+    );
+  }
 
   return createNoMessClient({
     apiKey,
@@ -22,13 +27,13 @@ function getClient(): NoMessClient {
 export function createServer(): McpServer {
   const server = new McpServer({
     name: "no-mess",
-    version: "0.1.0",
+    version: process.env.NO_MESS_MCP_VERSION ?? "1.0.2",
   });
 
-  // get_schemas -- List all content type schemas
+  // get_schemas -- List all template/fragment schemas
   server.tool(
     "get_schemas",
-    "List all content type schemas with TypeScript interfaces, field definitions, and entry counts",
+    "List all template and fragment schemas with field definitions and metadata",
     {},
     async () => {
       const client = getClient();
@@ -39,11 +44,11 @@ export function createServer(): McpServer {
     },
   );
 
-  // get_schema -- Get a single content type schema
+  // get_schema -- Get a single template/fragment schema
   server.tool(
     "get_schema",
-    "Get a single content type schema with TypeScript interface and field definitions",
-    { typeSlug: z.string().describe("The slug of the content type") },
+    "Get a single template or fragment schema with field definitions and metadata",
+    { typeSlug: z.string().describe("The slug of the schema") },
     async ({ typeSlug }) => {
       const client = getClient();
       const result = await client.getSchema(typeSlug);
@@ -53,11 +58,11 @@ export function createServer(): McpServer {
     },
   );
 
-  // get_entries -- Fetch published entries of a content type
+  // get_entries -- Fetch published entries of a collection or singleton template
   server.tool(
     "get_entries",
-    "Fetch all published entries of a content type",
-    { typeSlug: z.string().describe("The slug of the content type") },
+    "Fetch all published entries of a template schema",
+    { typeSlug: z.string().describe("The slug of the template schema") },
     async ({ typeSlug }) => {
       const client = getClient();
       const entries = await client.getEntries(typeSlug);
@@ -70,9 +75,9 @@ export function createServer(): McpServer {
   // get_entry -- Get a single entry by type + slug
   server.tool(
     "get_entry",
-    "Get a single content entry by content type slug and entry slug",
+    "Get a single content entry by template slug and entry slug",
     {
-      typeSlug: z.string().describe("The slug of the content type"),
+      typeSlug: z.string().describe("The slug of the template schema"),
       entrySlug: z.string().describe("The slug of the entry"),
     },
     async ({ typeSlug, entrySlug }) => {
@@ -122,6 +127,20 @@ export function createServer(): McpServer {
       const collections = await client.getCollections();
       return {
         content: [{ type: "text", text: JSON.stringify(collections, null, 2) }],
+      };
+    },
+  );
+
+  // get_collection -- Get a single Shopify collection by handle
+  server.tool(
+    "get_collection",
+    "Get a single synced Shopify collection by handle",
+    { handle: z.string().describe("The Shopify collection handle") },
+    async ({ handle }) => {
+      const client = getClient();
+      const collection = await client.getCollection(handle);
+      return {
+        content: [{ type: "text", text: JSON.stringify(collection, null, 2) }],
       };
     },
   );

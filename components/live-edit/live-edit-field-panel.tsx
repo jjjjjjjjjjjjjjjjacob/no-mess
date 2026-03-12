@@ -1,21 +1,30 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, ChevronDown, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FieldWrapper } from "@/components/dynamic-form/field-wrapper";
 import { FormProvider } from "@/components/dynamic-form/form-context";
-import {
-  type FieldDefinition,
-  renderField,
-} from "@/components/dynamic-form/render-field";
+import { renderField } from "@/components/dynamic-form/render-field";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
+import {
+  createEmptyValueForField,
+  type FieldDefinition,
+  type FragmentDefinition,
+  getFieldDisplayName,
+  getValueAtPath,
+  joinFieldPath,
+  type NamedFieldDefinition,
+  resolveFragmentFields,
+} from "@/packages/no-mess-client/src/schema";
 
 interface LiveEditFieldPanelProps {
-  fields: FieldDefinition[];
+  fields: NamedFieldDefinition[];
+  fragments?: FragmentDefinition[];
   mappedFieldNames: string[];
   title: string;
   values: Record<string, unknown>;
@@ -28,8 +37,23 @@ interface LiveEditFieldPanelProps {
   onFieldBlur: (fieldName: string) => void;
 }
 
+type ArrayFieldDefinition = Extract<FieldDefinition, { type: "array" }>;
+
+function moveItem<T>(items: T[], index: number, delta: number) {
+  const nextIndex = index + delta;
+  if (nextIndex < 0 || nextIndex >= items.length) {
+    return items;
+  }
+
+  const next = [...items];
+  const [item] = next.splice(index, 1);
+  next.splice(nextIndex, 0, item);
+  return next;
+}
+
 export function LiveEditFieldPanel({
   fields,
+  fragments = [],
   mappedFieldNames,
   title,
   values,
@@ -43,36 +67,327 @@ export function LiveEditFieldPanel({
 }: LiveEditFieldPanelProps) {
   const [showUnmapped, setShowUnmapped] = useState(false);
   const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
-
-  const mappedFields = fields.filter((f) => mappedFieldNames.includes(f.name));
-  const unmappedFields = fields.filter(
-    (f) => !mappedFieldNames.includes(f.name),
+  const fragmentsMap = useMemo(
+    () => new Map(fragments.map((fragment) => [fragment.slug, fragment])),
+    [fragments],
+  );
+  const mappedSet = useMemo(
+    () => new Set(mappedFieldNames),
+    [mappedFieldNames],
   );
 
-  // If no field map received yet, show all fields as mapped
-  const displayMapped = mappedFieldNames.length > 0 ? mappedFields : fields;
-  const displayUnmapped = mappedFieldNames.length > 0 ? unmappedFields : [];
-
-  // Scroll to focused field when it changes
   useEffect(() => {
     if (!focusedField) return;
-    const el = fieldRefs.current[focusedField];
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const element = fieldRefs.current[focusedField];
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [focusedField]);
 
   const setFieldRef = useCallback(
-    (fieldName: string) => (el: HTMLElement | null) => {
-      fieldRefs.current[fieldName] = el;
+    (fieldName: string) => (element: HTMLElement | null) => {
+      fieldRefs.current[fieldName] = element;
     },
     [],
   );
 
+  const renderArrayField = (
+    field: ArrayFieldDefinition,
+    path: string,
+    label: string,
+    value: unknown,
+  ) => {
+    const items = Array.isArray(value) ? value : [];
+    return (
+      <div key={path} className="space-y-3 rounded-lg border p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">{label}</p>
+            {field.description && (
+              <p className="text-xs text-muted-foreground">
+                {field.description}
+              </p>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              onFieldChange(path, [
+                ...items,
+                createEmptyValueForField(field.of),
+              ])
+            }
+            disabled={disabled}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Item
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          {items.length === 0 && (
+            <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+              No items yet.
+            </div>
+          )}
+
+          {items.map((_, index) => {
+            const itemPath = joinFieldPath(path, index);
+            return (
+              <div key={itemPath} className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Item {index + 1}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        onFieldChange(path, moveItem(items, index, -1))
+                      }
+                      disabled={disabled || index === 0}
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        onFieldChange(path, moveItem(items, index, 1))
+                      }
+                      disabled={disabled || index === items.length - 1}
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        onFieldChange(
+                          path,
+                          items.filter((_, itemIndex) => itemIndex !== index),
+                        )
+                      }
+                      disabled={disabled}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {renderArrayItem(field.of, itemPath)}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const fieldHasMappedDescendant = useCallback(
+    (field: NamedFieldDefinition, path: string): boolean => {
+      if (mappedSet.has(path)) {
+        return true;
+      }
+
+      if (field.type === "object") {
+        return field.fields.some((child) =>
+          fieldHasMappedDescendant(child, joinFieldPath(path, child.name)),
+        );
+      }
+
+      if (field.type === "fragment") {
+        const fragmentFields = resolveFragmentFields(field, fragmentsMap);
+        return (
+          fragmentFields?.some((child) =>
+            fieldHasMappedDescendant(child, joinFieldPath(path, child.name)),
+          ) ?? false
+        );
+      }
+
+      if (field.type === "array") {
+        return mappedFieldNames.some((mappedPath) =>
+          mappedPath.startsWith(`${path}[`),
+        );
+      }
+
+      return false;
+    },
+    [fragmentsMap, mappedFieldNames, mappedSet],
+  );
+
+  const mappedFields = fields.filter((field) =>
+    fieldHasMappedDescendant(field, field.name),
+  );
+  const unmappedFields = fields.filter(
+    (field) => !fieldHasMappedDescendant(field, field.name),
+  );
+
+  const displayMapped = mappedFieldNames.length > 0 ? mappedFields : fields;
+  const displayUnmapped = mappedFieldNames.length > 0 ? unmappedFields : [];
+
+  const renderArrayItem = (field: FieldDefinition, itemPath: string) => {
+    if (field.type === "object") {
+      return (
+        <div className="space-y-4">
+          {field.fields.map((childField) =>
+            renderNamedField(childField, itemPath),
+          )}
+        </div>
+      );
+    }
+
+    if (field.type === "fragment") {
+      const fragmentFields = resolveFragmentFields(field, fragmentsMap);
+      if (!fragmentFields) {
+        return (
+          <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+            Missing fragment: {field.fragment}
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-4">
+          {fragmentFields.map((childField) =>
+            renderNamedField(childField, itemPath),
+          )}
+        </div>
+      );
+    }
+
+    if (field.type === "array") {
+      return renderArrayField(
+        field,
+        itemPath,
+        field.label ?? "Items",
+        getValueAtPath(values, itemPath),
+      );
+    }
+
+    return (
+      <fieldset
+        ref={setFieldRef(itemPath)}
+        className={cn(
+          "rounded-md border-0 p-3 transition-colors",
+          focusedField === itemPath && "bg-accent",
+        )}
+        onFocus={() => onFieldFocus(itemPath)}
+        onBlur={() => onFieldBlur(itemPath)}
+      >
+        <FieldWrapper
+          label={getFieldDisplayName(field)}
+          description={field.description}
+          required={field.required}
+        >
+          {renderField(
+            field,
+            getValueAtPath(values, itemPath),
+            (nextValue) => onFieldChange(itemPath, nextValue),
+            disabled,
+          )}
+        </FieldWrapper>
+      </fieldset>
+    );
+  };
+
+  const renderNamedField = (field: NamedFieldDefinition, parentPath = "") => {
+    const path = joinFieldPath(parentPath, field.name);
+    const label = getFieldDisplayName(field);
+    const value = getValueAtPath(values, path);
+
+    if (field.type === "object") {
+      return (
+        <div key={path} className="space-y-4 rounded-lg border p-4">
+          <div>
+            <p className="text-sm font-medium">{label}</p>
+            {field.description && (
+              <p className="text-xs text-muted-foreground">
+                {field.description}
+              </p>
+            )}
+          </div>
+          <div className="space-y-4">
+            {field.fields.map((childField) =>
+              renderNamedField(childField, path),
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (field.type === "fragment") {
+      const fragmentFields = resolveFragmentFields(field, fragmentsMap);
+      if (!fragmentFields) {
+        return (
+          <div
+            key={path}
+            className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
+          >
+            Missing fragment: {field.fragment}
+          </div>
+        );
+      }
+
+      return (
+        <div key={path} className="space-y-4 rounded-lg border p-4">
+          <div>
+            <p className="text-sm font-medium">{label}</p>
+            {field.description && (
+              <p className="text-xs text-muted-foreground">
+                {field.description}
+              </p>
+            )}
+          </div>
+          <div className="space-y-4">
+            {fragmentFields.map((childField) =>
+              renderNamedField(childField, path),
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (field.type === "array") {
+      return renderArrayField(field, path, label, value);
+    }
+
+    return (
+      <fieldset
+        key={path}
+        ref={setFieldRef(path)}
+        className={cn(
+          "rounded-md border-0 p-3 transition-colors",
+          focusedField === path && "bg-accent",
+        )}
+        onFocus={() => onFieldFocus(path)}
+        onBlur={() => onFieldBlur(path)}
+      >
+        <FieldWrapper
+          label={label}
+          description={field.description}
+          required={field.required}
+        >
+          {renderField(
+            field,
+            value,
+            (nextValue) => onFieldChange(path, nextValue),
+            disabled,
+          )}
+        </FieldWrapper>
+      </fieldset>
+    );
+  };
+
   return (
     <ScrollArea className="h-full">
       <div className="space-y-5 p-4">
-        {/* Title field (always shown first) */}
         <fieldset
           ref={setFieldRef("title")}
           className={cn(
@@ -87,41 +402,15 @@ export function LiveEditFieldPanel({
             <Input
               id="live-edit-title"
               value={title}
-              onChange={(e) => onTitleChange(e.target.value)}
+              onChange={(event) => onTitleChange(event.target.value)}
               disabled={disabled}
             />
           </div>
         </fieldset>
 
-        {/* Mapped fields */}
         <FormProvider siteId={siteId}>
-          {displayMapped.map((field) => (
-            <fieldset
-              key={field.name}
-              ref={setFieldRef(field.name)}
-              className={cn(
-                "rounded-md border-0 p-3 transition-colors",
-                focusedField === field.name && "bg-accent",
-              )}
-              onFocus={() => onFieldFocus(field.name)}
-              onBlur={() => onFieldBlur(field.name)}
-            >
-              <FieldWrapper
-                label={field.name}
-                description={field.description}
-                required={field.required}
-              >
-                {renderField(
-                  field,
-                  values[field.name],
-                  (v) => onFieldChange(field.name, v),
-                  disabled,
-                )}
-              </FieldWrapper>
-            </fieldset>
-          ))}
+          {displayMapped.map((field) => renderNamedField(field))}
 
-          {/* Unmapped fields (collapsible) */}
           {displayUnmapped.length > 0 && (
             <div className="border-t pt-3">
               <button
@@ -139,26 +428,7 @@ export function LiveEditFieldPanel({
               </button>
               {showUnmapped && (
                 <div className="space-y-4 pt-2">
-                  {displayUnmapped.map((field) => (
-                    <div
-                      key={field.name}
-                      ref={setFieldRef(field.name)}
-                      className="rounded-md p-3"
-                    >
-                      <FieldWrapper
-                        label={field.name}
-                        description={field.description}
-                        required={field.required}
-                      >
-                        {renderField(
-                          field,
-                          values[field.name],
-                          (v) => onFieldChange(field.name, v),
-                          disabled,
-                        )}
-                      </FieldWrapper>
-                    </div>
-                  ))}
+                  {displayUnmapped.map((field) => renderNamedField(field))}
                 </div>
               )}
             </div>

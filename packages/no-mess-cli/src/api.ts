@@ -1,21 +1,12 @@
+import type { ContentTypeDefinition } from "@no-mess/client/schema";
+
 export interface SyncResult {
   synced: { slug: string; action: "created" | "updated" }[];
   errors: string[];
 }
 
 export interface SchemaResponse {
-  contentTypes: {
-    slug: string;
-    name: string;
-    description?: string;
-    fields: {
-      name: string;
-      type: string;
-      required: boolean;
-      description?: string;
-      options?: { choices?: { label: string; value: string }[] };
-    }[];
-  }[];
+  contentTypes: ContentTypeDefinition[];
 }
 
 /**
@@ -24,7 +15,7 @@ export interface SchemaResponse {
 export async function pushSchema(
   apiUrl: string,
   apiKey: string,
-  contentTypes: SchemaResponse["contentTypes"],
+  contentTypes: ContentTypeDefinition[],
 ): Promise<SyncResult> {
   const response = await fetch(`${apiUrl}/api/schema/sync`, {
     method: "POST",

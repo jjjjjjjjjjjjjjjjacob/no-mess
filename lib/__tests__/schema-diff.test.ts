@@ -1,34 +1,89 @@
 import { describe, expect, it } from "vitest";
 import type {
   ContentTypeDefinition,
-  FieldDefinition,
+  NamedFieldDefinition,
+  TemplateDefinition,
 } from "@/packages/no-mess-client/src/schema/schema-types";
 import { computeSchemaDiff } from "../schema-diff";
 
-function makeField(
-  overrides: Partial<FieldDefinition> & { name: string },
-): FieldDefinition {
+interface PrimitiveFieldOverrides {
+  description?: string;
+  label?: string;
+  required?: boolean;
+}
+
+function makeTextField(
+  name: string,
+  overrides: PrimitiveFieldOverrides = {},
+): NamedFieldDefinition {
   return {
+    name,
     type: "text",
     required: false,
     ...overrides,
   };
 }
 
+function makeTextareaField(
+  name: string,
+  overrides: PrimitiveFieldOverrides = {},
+): NamedFieldDefinition {
+  return {
+    name,
+    type: "textarea",
+    required: false,
+    ...overrides,
+  };
+}
+
+function makeNumberField(
+  name: string,
+  overrides: PrimitiveFieldOverrides = {},
+): NamedFieldDefinition {
+  return {
+    name,
+    type: "number",
+    required: false,
+    ...overrides,
+  };
+}
+
+function makeObjectField(
+  name: string,
+  fields: NamedFieldDefinition[],
+  overrides: Omit<PrimitiveFieldOverrides, never> = {},
+): NamedFieldDefinition {
+  return {
+    name,
+    type: "object",
+    required: false,
+    fields,
+    ...overrides,
+  };
+}
+
 function makeCt(
   slug: string,
-  fields: FieldDefinition[],
+  fields: NamedFieldDefinition[],
   name?: string,
+  overrides: Partial<TemplateDefinition> = {},
 ): ContentTypeDefinition {
-  return { slug, name: name ?? slug, fields };
+  return {
+    kind: "template",
+    mode: "collection",
+    slug,
+    name: name ?? slug,
+    fields,
+    ...overrides,
+  };
 }
 
 describe("computeSchemaDiff", () => {
   describe("content type level", () => {
     it("marks all as added when no existing types", () => {
       const incoming = [
-        makeCt("blog-post", [makeField({ name: "title" })]),
-        makeCt("page", [makeField({ name: "heading" })]),
+        makeCt("blog-post", [makeTextField("title")]),
+        makeCt("page", [makeTextField("heading")]),
       ];
       const diff = computeSchemaDiff([], incoming);
 
@@ -39,8 +94,8 @@ describe("computeSchemaDiff", () => {
 
     it("marks all as unchanged when identical", () => {
       const types = [
-        makeCt("blog-post", [makeField({ name: "title" })]),
-        makeCt("page", [makeField({ name: "heading" })]),
+        makeCt("blog-post", [makeTextField("title")]),
+        makeCt("page", [makeTextField("heading")]),
       ];
       const diff = computeSchemaDiff(types, types);
 
@@ -50,11 +105,11 @@ describe("computeSchemaDiff", () => {
     });
 
     it("marks as modified when same slugs but different fields", () => {
-      const existing = [makeCt("blog-post", [makeField({ name: "title" })])];
+      const existing = [makeCt("blog-post", [makeTextField("title")])];
       const incoming = [
         makeCt("blog-post", [
-          makeField({ name: "title" }),
-          makeField({ name: "body", type: "textarea" }),
+          makeTextField("title"),
+          makeTextareaField("body"),
         ]),
       ];
       const diff = computeSchemaDiff(existing, incoming);
@@ -67,16 +122,13 @@ describe("computeSchemaDiff", () => {
 
     it("handles mixed: some added, modified, and unchanged", () => {
       const existing = [
-        makeCt("blog-post", [makeField({ name: "title" })]),
-        makeCt("page", [makeField({ name: "heading" })]),
+        makeCt("blog-post", [makeTextField("title")]),
+        makeCt("page", [makeTextField("heading")]),
       ];
       const incoming = [
-        makeCt("blog-post", [makeField({ name: "title" })]), // unchanged
-        makeCt("page", [
-          makeField({ name: "heading" }),
-          makeField({ name: "body", type: "textarea" }),
-        ]), // modified (new field)
-        makeCt("faq", [makeField({ name: "question" })]), // added
+        makeCt("blog-post", [makeTextField("title")]), // unchanged
+        makeCt("page", [makeTextField("heading"), makeTextareaField("body")]), // modified (new field)
+        makeCt("faq", [makeTextField("question")]), // added
       ];
       const diff = computeSchemaDiff(existing, incoming);
 
@@ -89,26 +141,40 @@ describe("computeSchemaDiff", () => {
 
     it("marks as modified when name changes", () => {
       const existing = [
-        makeCt("blog-post", [makeField({ name: "title" })], "Blog Post"),
+        makeCt("blog-post", [makeTextField("title")], "Blog Post"),
       ];
       const incoming = [
-        makeCt("blog-post", [makeField({ name: "title" })], "Article"),
+        makeCt("blog-post", [makeTextField("title")], "Article"),
       ];
       const diff = computeSchemaDiff(existing, incoming);
 
       expect(diff.modified).toHaveLength(1);
       expect(diff.modified[0].name).toBe("Article");
     });
+
+    it("marks as modified when template mode changes", () => {
+      const existing = [
+        makeCt("settings", [makeTextField("title")], "Settings", {
+          mode: "collection",
+        }),
+      ];
+      const incoming = [
+        makeCt("settings", [makeTextField("title")], "Settings", {
+          mode: "singleton",
+        }),
+      ];
+      const diff = computeSchemaDiff(existing, incoming);
+
+      expect(diff.modified).toHaveLength(1);
+      expect(diff.modified[0].slug).toBe("settings");
+    });
   });
 
   describe("field level changes", () => {
     it("detects added fields", () => {
-      const existing = [makeCt("test", [makeField({ name: "title" })])];
+      const existing = [makeCt("test", [makeTextField("title")])];
       const incoming = [
-        makeCt("test", [
-          makeField({ name: "title" }),
-          makeField({ name: "body", type: "textarea" }),
-        ]),
+        makeCt("test", [makeTextField("title"), makeTextareaField("body")]),
       ];
       const diff = computeSchemaDiff(existing, incoming);
 
@@ -124,10 +190,10 @@ describe("computeSchemaDiff", () => {
 
     it("detects modified fields", () => {
       const existing = [
-        makeCt("test", [makeField({ name: "title", required: false })]),
+        makeCt("test", [makeTextField("title", { required: false })]),
       ];
       const incoming = [
-        makeCt("test", [makeField({ name: "title", required: true })]),
+        makeCt("test", [makeTextField("title", { required: true })]),
       ];
       const diff = computeSchemaDiff(existing, incoming);
 
@@ -137,7 +203,7 @@ describe("computeSchemaDiff", () => {
     });
 
     it("detects unchanged fields", () => {
-      const field1 = makeField({ name: "title", type: "text", required: true });
+      const field1 = makeTextField("title", { required: true });
       const existing = [makeCt("test", [field1])];
       const incoming = [makeCt("test", [{ ...field1 }])];
       // Need something different at content type level to trigger modified
@@ -152,16 +218,10 @@ describe("computeSchemaDiff", () => {
 
     it("keeps existing fields not in incoming as unchanged", () => {
       const existing = [
-        makeCt("test", [
-          makeField({ name: "title" }),
-          makeField({ name: "legacyField" }),
-        ]),
+        makeCt("test", [makeTextField("title"), makeTextField("legacyField")]),
       ];
       const incoming = [
-        makeCt("test", [
-          makeField({ name: "title" }),
-          makeField({ name: "newField", type: "number" }),
-        ]),
+        makeCt("test", [makeTextField("title"), makeNumberField("newField")]),
       ];
       const diff = computeSchemaDiff(existing, incoming);
 
@@ -170,6 +230,30 @@ describe("computeSchemaDiff", () => {
         (fc) => fc.fieldName === "legacyField",
       );
       expect(legacyChange?.action).toBe("unchanged");
+    });
+
+    it("detects nested object field changes using dotted paths", () => {
+      const existing = [
+        makeCt("page", [makeObjectField("hero", [makeTextField("title")])]),
+      ];
+      const incoming = [
+        makeCt("page", [
+          makeObjectField("hero", [
+            makeTextField("title"),
+            makeTextareaField("eyebrow"),
+          ]),
+        ]),
+      ];
+      const diff = computeSchemaDiff(existing, incoming);
+
+      expect(diff.modified).toHaveLength(1);
+      expect(
+        diff.modified[0].fieldChanges.find(
+          (fc) => fc.fieldName === "hero.eyebrow",
+        ),
+      ).toEqual(
+        expect.objectContaining({ action: "added", fieldName: "hero.eyebrow" }),
+      );
     });
   });
 
@@ -182,7 +266,7 @@ describe("computeSchemaDiff", () => {
     });
 
     it("handles empty incoming (nothing changes)", () => {
-      const existing = [makeCt("blog-post", [makeField({ name: "title" })])];
+      const existing = [makeCt("blog-post", [makeTextField("title")])];
       const diff = computeSchemaDiff(existing, []);
       expect(diff.added).toHaveLength(0);
       expect(diff.modified).toHaveLength(0);

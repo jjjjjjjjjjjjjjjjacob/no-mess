@@ -228,20 +228,30 @@ export default function MediaPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            <div className="grid auto-rows-fr grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {filteredAssets.map((asset) => {
                 const isImage = asset.mimeType.startsWith("image/");
+                const isVideo = asset.mimeType.startsWith("video/");
                 return (
                   <div
                     key={asset._id}
-                    className="group relative flex flex-col overflow-hidden rounded-lg border transition-colors"
+                    className="group relative flex h-full flex-col overflow-hidden rounded-lg border transition-colors"
                   >
-                    <div className="flex aspect-square items-center justify-center bg-muted/30">
+                    <div className="flex aspect-[4/5] items-center justify-center overflow-hidden bg-muted/30">
                       {isImage ? (
                         <img
                           src={asset.url}
                           alt={asset.filename}
                           className="h-full w-full object-cover"
+                        />
+                      ) : isVideo ? (
+                        <video
+                          src={asset.url}
+                          aria-label={asset.filename}
+                          className="h-full w-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
                         />
                       ) : (
                         <FileText className="h-10 w-10 text-muted-foreground" />
@@ -271,7 +281,7 @@ export default function MediaPage() {
                       </Button>
                     </div>
 
-                    <div className="p-2">
+                    <div className="flex min-h-[72px] flex-col justify-center p-2">
                       <p className="truncate text-xs font-medium">
                         {asset.filename}
                       </p>

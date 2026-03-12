@@ -65,7 +65,7 @@ describe("parseSchemaSource", () => {
   });
 
   describe("all field types", () => {
-    it("parses all 10 field types", () => {
+    it("parses all 11 field types", () => {
       const source = `
         defineContentType("all-fields", {
           name: "All Fields",
@@ -77,9 +77,10 @@ describe("parseSchemaSource", () => {
             e: field.datetime(),
             f: field.url(),
             g: field.image(),
-            h: field.select({ choices: [{ label: "A", value: "a" }] }),
-            i: field.shopifyProduct(),
-            j: field.shopifyCollection(),
+            h: field.gallery(),
+            i: field.select({ choices: [{ label: "A", value: "a" }] }),
+            j: field.shopifyProduct(),
+            k: field.shopifyCollection(),
           },
         });
       `;
@@ -94,6 +95,7 @@ describe("parseSchemaSource", () => {
         "datetime",
         "url",
         "image",
+        "gallery",
         "select",
         "shopifyProduct",
         "shopifyCollection",
@@ -153,6 +155,9 @@ describe("parseSchemaSource", () => {
       expect(result.success).toBe(true);
       const field = result.contentTypes[0].fields[0];
       expect(field.type).toBe("select");
+      if (field.type !== "select") {
+        throw new Error("Expected select field");
+      }
       expect(field.options?.choices).toEqual([
         { label: "Draft", value: "draft" },
         { label: "Published", value: "published" },

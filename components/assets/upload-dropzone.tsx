@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "convex/react";
+import { useConvex, useMutation } from "convex/react";
 import { Upload } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -8,15 +8,26 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 
+const checksumCache = new WeakMap<File, Promise<string | undefined>>();
+
 interface UploadDropzoneProps {
   siteId: Id<"sites">;
   onUploadComplete?: (assetId: Id<"assets">) => void;
+  accept?: string;
+  multiple?: boolean;
+  label?: string;
+  description?: string;
 }
 
 export function UploadDropzone({
   siteId,
   onUploadComplete,
+  accept,
+  multiple = true,
+  label,
+  description,
 }: UploadDropzoneProps) {
+  const convex = useConvex();
   const generateUploadUrl = useMutation(api.assets.generateUploadUrl);
   const createAsset = useMutation(api.assets.create);
   const [isDragging, setIsDragging] = useState(false);
@@ -26,6 +37,21 @@ export function UploadDropzone({
 
   const uploadFile = useCallback(
     async (file: File) => {
+      const checksum = await getCachedFileChecksum(file);
+      if (checksum) {
+        const existingAsset = await convex.query(api.assets.findByChecksum, {
+          siteId,
+          checksum,
+        });
+
+        if (existingAsset) {
+          return {
+            assetId: existingAsset._id as Id<"assets">,
+            reused: true,
+          };
+        }
+      }
+
       // Step 1: Get upload URL
       const uploadUrl = await generateUploadUrl();
 
@@ -50,6 +76,7 @@ export function UploadDropzone({
       const assetId = await createAsset({
         siteId,
         storageId,
+        checksum,
         filename: file.name,
         mimeType: file.type,
         size: file.size,
@@ -57,25 +84,45 @@ export function UploadDropzone({
         height,
       });
 
-      return assetId;
+      return {
+        assetId: assetId as Id<"assets">,
+        reused: false,
+      };
     },
-    [generateUploadUrl, createAsset, siteId],
+    [convex, createAsset, generateUploadUrl, siteId],
   );
 
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
       const fileArray = Array.from(files);
       if (fileArray.length === 0) return;
+      if (!multiple && fileArray.length > 1) {
+        toast.error("Upload one file at a time here.");
+        return;
+      }
+
+      const acceptedFiles = fileArray.filter((file) =>
+        isFileAccepted(file, accept),
+      );
+      const skippedCount = fileArray.length - acceptedFiles.length;
+      if (acceptedFiles.length === 0) {
+        toast.error("That file type is not supported here.");
+        return;
+      }
 
       setIsUploading(true);
-      setUploadCount(fileArray.length);
+      setUploadCount(acceptedFiles.length);
 
       let failedCount = 0;
-      for (const file of fileArray) {
+      let reusedCount = 0;
+      for (const file of acceptedFiles) {
         try {
-          const assetId = await uploadFile(file);
+          const result = await uploadFile(file);
+          if (result.reused) {
+            reusedCount += 1;
+          }
           if (onUploadComplete) {
-            onUploadComplete(assetId as Id<"assets">);
+            onUploadComplete(result.assetId);
           }
         } catch {
           failedCount += 1;
@@ -85,20 +132,35 @@ export function UploadDropzone({
       setIsUploading(false);
       setUploadCount(0);
 
-      const successCount = fileArray.length - failedCount;
+      const successCount = acceptedFiles.length - failedCount;
       if (failedCount > 0 && successCount > 0) {
         toast.error(
-          `${failedCount} of ${fileArray.length} file${fileArray.length > 1 ? "s" : ""} failed to upload`,
+          `${failedCount} of ${acceptedFiles.length} file${acceptedFiles.length > 1 ? "s" : ""} failed to upload`,
         );
       } else if (failedCount > 0) {
         toast.error("Upload failed. Please try again.");
+      } else if (reusedCount === successCount && successCount > 1) {
+        toast.success(`${successCount} files already in your library`);
+      } else if (reusedCount === successCount) {
+        toast.success("File already in your library");
+      } else if (successCount > 1 && reusedCount > 0) {
+        const createdCount = successCount - reusedCount;
+        toast.success(
+          `${createdCount} file${createdCount > 1 ? "s" : ""} uploaded, ${reusedCount} already in your library`,
+        );
       } else if (successCount > 1) {
         toast.success(`${successCount} files uploaded`);
       } else {
         toast.success("File uploaded");
       }
+
+      if (skippedCount > 0) {
+        toast.error(
+          `${skippedCount} file${skippedCount > 1 ? "s were" : " was"} skipped because ${skippedCount > 1 ? "they are" : "it is"} not supported here.`,
+        );
+      }
     },
-    [uploadFile, onUploadComplete],
+    [accept, multiple, onUploadComplete, uploadFile],
   );
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -140,20 +202,74 @@ export function UploadDropzone({
       <p className="mt-2 text-sm font-medium">
         {isUploading
           ? `Uploading ${uploadCount} file${uploadCount > 1 ? "s" : ""}...`
-          : "Drop files here or click to upload"}
+          : (label ?? "Drop files here or click to upload")}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
-        Images, documents, and other files up to 20MB
+        {description ?? "Images, documents, and other files up to 20MB"}
       </p>
       <input
         ref={inputRef}
         type="file"
-        multiple
+        multiple={multiple}
+        accept={accept}
         className="hidden"
         onChange={(e) => e.target.files && handleFiles(e.target.files)}
       />
     </div>
   );
+}
+
+async function getCachedFileChecksum(file: File) {
+  if (!checksumCache.has(file)) {
+    checksumCache.set(file, createFileChecksum(file));
+  }
+
+  return checksumCache.get(file);
+}
+
+async function createFileChecksum(file: File) {
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    return undefined;
+  }
+
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    await readFileBuffer(file),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+async function readFileBuffer(file: File) {
+  if (typeof file.arrayBuffer === "function") {
+    return await file.arrayBuffer();
+  }
+
+  return await new Response(file).arrayBuffer();
+}
+
+function isFileAccepted(file: File, accept?: string) {
+  if (!accept) return true;
+
+  const fileType = file.type.toLowerCase();
+  const fileName = file.name.toLowerCase();
+
+  return accept
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+    .some((rule) => {
+      if (rule.endsWith("/*")) {
+        return fileType.startsWith(rule.slice(0, -1));
+      }
+
+      if (rule.startsWith(".")) {
+        return fileName.endsWith(rule);
+      }
+
+      return fileType === rule;
+    });
 }
 
 function getImageDimensions(

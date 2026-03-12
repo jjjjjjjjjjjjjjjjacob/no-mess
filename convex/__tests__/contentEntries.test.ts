@@ -47,6 +47,27 @@ const mockContentType = {
   fields: [{ name: "title", type: "text", required: true }],
 };
 
+const mockAssetContentType = {
+  ...mockContentType,
+  fields: [
+    { name: "title", type: "text", required: true },
+    { name: "heroImage", type: "image", required: false },
+    { name: "gallery", type: "gallery", required: false },
+  ],
+};
+
+const mockHeroAsset = {
+  _id: "asset_hero_1" as any,
+  siteId: "site_1" as any,
+  url: "https://assets.nomess.xyz/hero-1.jpg",
+};
+
+const mockGalleryAsset = {
+  _id: "asset_gallery_1" as any,
+  siteId: "site_1" as any,
+  url: "https://assets.nomess.xyz/gallery-1.jpg",
+};
+
 const mockEntry = {
   _id: "entry_1" as any,
   siteId: "site_1",
@@ -64,6 +85,22 @@ const mockEntry = {
   publishedBy: "user_1",
 };
 
+const mockAssetEntry = {
+  ...mockEntry,
+  draft: {
+    title: "My Post",
+    body: "Draft content",
+    heroImage: "asset_hero_1",
+    gallery: ["asset_hero_1", "asset_gallery_1"],
+  },
+  published: {
+    title: "My Post",
+    body: "Published content",
+    heroImage: "asset_hero_1",
+    gallery: ["asset_hero_1", "asset_gallery_1"],
+  },
+};
+
 const mockDraftEntry = {
   ...mockEntry,
   _id: "entry_2" as any,
@@ -75,6 +112,16 @@ const mockDraftEntry = {
   publishedAt: undefined,
   publishedBy: undefined,
 };
+
+function mockAssetLookups(ctx: ReturnType<typeof createMockQueryCtx>) {
+  ctx.db.get.mockImplementation(async (id) => {
+    if (id === "ct_1") return mockAssetContentType;
+    if (id === "asset_hero_1") return mockHeroAsset;
+    if (id === "asset_gallery_1") return mockGalleryAsset;
+    if (id === "entry_1") return mockAssetEntry;
+    return null;
+  });
+}
 
 describe("contentEntries.create", () => {
   beforeEach(() => {
@@ -524,6 +571,25 @@ describe("contentEntries.listPublishedByType", () => {
 
     expect(result).toEqual([]);
   });
+
+  it("resolves image and gallery asset IDs to delivery URLs", async () => {
+    const ctx = createMockQueryCtx();
+    ctx._mocks.collect.mockResolvedValue([mockAssetEntry]);
+    mockAssetLookups(ctx);
+
+    const handler = getHandler(contentEntries.listPublishedByType);
+    const result = await handler(ctx, {
+      contentTypeId: "ct_1",
+      siteId: "site_1",
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].heroImage).toBe(mockHeroAsset.url);
+    expect(result[0].gallery).toEqual([
+      mockHeroAsset.url,
+      mockGalleryAsset.url,
+    ]);
+  });
 });
 
 describe("contentEntries.getBySlugInternal", () => {
@@ -607,6 +673,23 @@ describe("contentEntries.getBySlugInternal", () => {
     expect(result.body).toBe("Draft only");
     expect(result._status).toBe("draft");
   });
+
+  it("resolves asset-backed fields for published content", async () => {
+    const ctx = createMockQueryCtx();
+    ctx._mocks.first.mockResolvedValue(mockAssetEntry);
+    mockAssetLookups(ctx);
+
+    const handler = getHandler(contentEntries.getBySlugInternal);
+    const result = await handler(ctx, {
+      siteId: "site_1",
+      contentTypeId: "ct_1",
+      slug: "my-post",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.heroImage).toBe(mockHeroAsset.url);
+    expect(result.gallery).toEqual([mockHeroAsset.url, mockGalleryAsset.url]);
+  });
 });
 
 describe("contentEntries.getByIdInternal", () => {
@@ -636,5 +719,17 @@ describe("contentEntries.getByIdInternal", () => {
     const result = await handler(ctx, { entryId: "entry_missing" });
 
     expect(result).toBeNull();
+  });
+
+  it("resolves asset-backed fields for draft content", async () => {
+    const ctx = createMockQueryCtx();
+    mockAssetLookups(ctx);
+
+    const handler = getHandler(contentEntries.getByIdInternal);
+    const result = await handler(ctx, { entryId: "entry_1" });
+
+    expect(result).not.toBeNull();
+    expect(result.heroImage).toBe(mockHeroAsset.url);
+    expect(result.gallery).toEqual([mockHeroAsset.url, mockGalleryAsset.url]);
   });
 });
