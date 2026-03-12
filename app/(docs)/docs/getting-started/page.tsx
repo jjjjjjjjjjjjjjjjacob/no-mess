@@ -59,31 +59,35 @@ export default function GettingStartedPage() {
         </ul>
       </DocsStep>
 
-      <DocsStep number={3} title="Define a content type">
+      <DocsStep number={3} title="Define a template">
         <p>
-          Navigate to <strong>Schemas</strong> and create a content type. For
-          example, a &quot;Blog Post&quot; with fields like:
+          Navigate to <strong>Schemas</strong> and create a template. Use{" "}
+          <strong>singleton</strong> for a route-bound page like the homepage
+          and <strong>collection</strong> for repeatable entries like blog
+          posts. Add fragments when you want reusable nested groups.
         </p>
         <ul className="mt-2 list-inside list-disc space-y-1">
           <li>
             <code className="rounded bg-muted px-1 font-mono text-xs">
-              body
+              hero.slides[]
             </code>{" "}
-            (Textarea)
+            (Repeater)
           </li>
           <li>
             <code className="rounded bg-muted px-1 font-mono text-xs">
               coverImage
             </code>{" "}
-            (Image)
+            (Fragment reference or Image)
           </li>
           <li>
-            <code className="rounded bg-muted px-1 font-mono text-xs">
-              publishedAt
-            </code>{" "}
-            (Date/Time)
+            <code className="rounded bg-muted px-1 font-mono text-xs">seo</code>{" "}
+            (Object group)
           </li>
         </ul>
+        <DocsCallout type="info" title="Templates vs fragments">
+          Templates are the real authoring surfaces. Fragments are reusable
+          nested field groups and do not get standalone content entries.
+        </DocsCallout>
         <DocsCallout type="tip" title="Prefer code?">
           You can also define schemas in TypeScript using the{" "}
           <a href="/docs/cli" className="font-medium text-primary underline">
@@ -99,9 +103,11 @@ export default function GettingStartedPage() {
 
       <DocsStep number={4} title="Create content entries">
         <p>
-          Go to <strong>Content</strong>, pick your content type, and create
-          entries. Each entry starts as a draft. Click <strong>Publish</strong>{" "}
-          when it&apos;s ready.
+          Go to <strong>Content</strong>, pick a collection template, and create
+          entries. Singleton templates open directly into their authoring
+          screen, and fragments are excluded because they are embedded inside
+          other templates. Each entry starts as a draft. Click{" "}
+          <strong>Publish</strong> when it&apos;s ready.
         </p>
       </DocsStep>
 
@@ -202,7 +208,8 @@ export default async function BlogPage() {
           >
             Field Types Reference
           </a>{" "}
-          &mdash; learn about all 9 field types
+          &mdash; learn about primitive fields plus object, array, and fragment
+          containers
         </li>
         <li>
           <a href="/docs/cli" className="font-medium text-primary underline">

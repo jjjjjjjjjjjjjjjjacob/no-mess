@@ -15,9 +15,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Field, FieldType } from "@/convex/lib/validators";
+import type { PrimitiveFieldType } from "@/packages/no-mess-client/src/schema";
 
-const FIELD_TYPES: { value: FieldType; label: string }[] = [
+type FlatField = {
+  name: string;
+  type: PrimitiveFieldType;
+  required: boolean;
+  label?: string;
+  description?: string;
+};
+
+const FIELD_TYPES: { value: PrimitiveFieldType; label: string }[] = [
   { value: "text", label: "Text" },
   { value: "textarea", label: "Textarea" },
   { value: "number", label: "Number" },
@@ -25,16 +33,17 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: "datetime", label: "Date/Time" },
   { value: "url", label: "URL" },
   { value: "image", label: "Image" },
+  { value: "gallery", label: "Gallery" },
   { value: "select", label: "Select" },
   { value: "shopifyProduct", label: "Shopify Product" },
   { value: "shopifyCollection", label: "Shopify Collection" },
 ];
 
-type FieldWithKey = Field & { _key: number };
+type FieldWithKey = FlatField & { _key: number };
 
 interface SortableFieldCardProps {
   field: FieldWithKey;
-  onUpdate: (key: number, updates: Partial<Field>) => void;
+  onUpdate: (key: number, updates: Partial<FlatField>) => void;
   onDuplicate: (key: number) => void;
   onRemove: (key: number) => void;
   isSubmitting: boolean;
@@ -96,7 +105,7 @@ export function SortableFieldCard({
                 value={field.type}
                 onValueChange={(val) =>
                   onUpdate(field._key, {
-                    type: val as FieldType,
+                    type: val as PrimitiveFieldType,
                   })
                 }
               >

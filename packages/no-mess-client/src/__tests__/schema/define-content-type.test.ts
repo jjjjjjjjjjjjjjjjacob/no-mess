@@ -14,6 +14,11 @@ describe("defineContentType", () => {
 
     expect(ct.slug).toBe("blog-post");
     expect(ct.name).toBe("Blog Post");
+    expect(ct.kind).toBe("template");
+    if (ct.kind !== "template") {
+      throw new Error("Expected template definition");
+    }
+    expect(ct.mode).toBe("collection");
     expect(ct.fields).toHaveLength(2);
     expect(ct.fields[0]).toEqual({
       name: "title",
@@ -82,7 +87,11 @@ describe("defineContentType", () => {
 
     expect(ct.fields[0].required).toBe(true);
     expect(ct.fields[0].description).toBe("Page title");
+    expect(ct.fields[1].type).toBe("select");
     expect(ct.fields[1].required).toBe(true);
+    if (ct.fields[1].type !== "select") {
+      throw new Error("Expected select field");
+    }
     expect(ct.fields[1].options?.choices).toEqual([
       { label: "Draft", value: "draft" },
       { label: "Live", value: "live" },

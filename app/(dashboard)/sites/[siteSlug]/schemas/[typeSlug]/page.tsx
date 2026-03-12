@@ -86,6 +86,15 @@ export default function EditSchemaPage() {
     if (contentType.draft) {
       const draft = contentType.draft as ContentTypeFormData;
       return {
+        kind: draft.kind ?? contentType.kind,
+        mode:
+          (draft.kind ?? contentType.kind) === "template"
+            ? (draft.mode ?? contentType.mode ?? "collection")
+            : undefined,
+        route:
+          (draft.kind ?? contentType.kind) === "template"
+            ? (draft.route ?? contentType.route)
+            : undefined,
         name: draft.name ?? contentType.name,
         slug: draft.slug ?? contentType.slug,
         description: draft.description ?? contentType.description,
@@ -93,6 +102,9 @@ export default function EditSchemaPage() {
       };
     }
     return {
+      kind: contentType.kind,
+      mode: contentType.kind === "template" ? contentType.mode : undefined,
+      route: contentType.kind === "template" ? contentType.route : undefined,
       name: contentType.name,
       slug: contentType.slug,
       description: contentType.description,
@@ -104,12 +116,25 @@ export default function EditSchemaPage() {
   const exportCode = useMemo(() => {
     if (!contentType) return "";
     const source = formDataRef.current ?? contentType;
-    return generateContentTypeSource({
-      slug: source.slug,
-      name: source.name,
-      description: source.description,
-      fields: source.fields,
-    });
+    return generateContentTypeSource(
+      source.kind === "fragment"
+        ? {
+            kind: "fragment",
+            slug: source.slug,
+            name: source.name,
+            description: source.description,
+            fields: source.fields,
+          }
+        : {
+            kind: "template",
+            slug: source.slug,
+            name: source.name,
+            mode: source.mode === "singleton" ? "singleton" : "collection",
+            route: source.route,
+            description: source.description,
+            fields: source.fields,
+          },
+    );
   }, [contentType, isDirty]);
 
   // Track form changes
@@ -118,6 +143,11 @@ export default function EditSchemaPage() {
       formDataRef.current = data;
       if (!initialData) return;
       const changed =
+        data.kind !== initialData.kind ||
+        (data.kind === "template" ? data.mode : undefined) !==
+          (initialData.kind === "template" ? initialData.mode : undefined) ||
+        (data.kind === "template" ? (data.route ?? "") : "") !==
+          (initialData.kind === "template" ? (initialData.route ?? "") : "") ||
         data.name !== initialData.name ||
         data.slug !== initialData.slug ||
         (data.description ?? "") !== (initialData.description ?? "") ||
@@ -136,6 +166,15 @@ export default function EditSchemaPage() {
         contentTypeId: contentType._id,
         name: formDataRef.current.name,
         slug: formDataRef.current.slug,
+        kind: formDataRef.current.kind,
+        mode:
+          formDataRef.current.kind === "template"
+            ? formDataRef.current.mode
+            : undefined,
+        route:
+          formDataRef.current.kind === "template"
+            ? formDataRef.current.route
+            : undefined,
         description: formDataRef.current.description,
         fields: formDataRef.current.fields,
       });
@@ -161,6 +200,15 @@ export default function EditSchemaPage() {
         contentTypeId: contentType._id,
         name: formDataRef.current.name,
         slug: formDataRef.current.slug,
+        kind: formDataRef.current.kind,
+        mode:
+          formDataRef.current.kind === "template"
+            ? formDataRef.current.mode
+            : undefined,
+        route:
+          formDataRef.current.kind === "template"
+            ? formDataRef.current.route
+            : undefined,
         description: formDataRef.current.description,
         fields: formDataRef.current.fields,
       });
@@ -184,6 +232,15 @@ export default function EditSchemaPage() {
         contentTypeId: contentType._id,
         name: formDataRef.current.name,
         slug: formDataRef.current.slug,
+        kind: formDataRef.current.kind,
+        mode:
+          formDataRef.current.kind === "template"
+            ? formDataRef.current.mode
+            : undefined,
+        route:
+          formDataRef.current.kind === "template"
+            ? formDataRef.current.route
+            : undefined,
         description: formDataRef.current.description,
         fields: formDataRef.current.fields,
       });
@@ -284,6 +341,16 @@ export default function EditSchemaPage() {
               <p className="text-sm text-muted-foreground">
                 {contentType.slug}
               </p>
+              <Badge variant="outline">
+                {contentType.kind === "fragment"
+                  ? "Fragment"
+                  : contentType.mode === "singleton"
+                    ? "Singleton Template"
+                    : "Collection Template"}
+              </Badge>
+              {contentType.kind === "template" && contentType.route && (
+                <Badge variant="outline">{contentType.route}</Badge>
+              )}
               {lastSavedAt && (
                 <p className="text-xs text-muted-foreground">
                   Draft saved {formatTimeAgo(lastSavedAt)}
@@ -374,8 +441,9 @@ export default function EditSchemaPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete schema</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this schema and all its entries. This
-              action cannot be undone.
+              This will permanently delete this schema
+              {contentType.kind === "template" ? " and all its entries" : ""}.
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

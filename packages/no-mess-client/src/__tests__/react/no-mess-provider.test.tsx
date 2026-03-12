@@ -50,6 +50,23 @@ const entry: NoMessEntry = {
   body: "Published body",
 };
 
+const nestedEntry: NoMessEntry = {
+  _id: "entry_nested",
+  _createdAt: 1000,
+  _updatedAt: 2000,
+  slug: "home",
+  title: "Home",
+  hero: {
+    slides: [
+      {
+        label: "Published slide",
+        image: "/published.jpg",
+      },
+    ],
+  },
+  summary: "Published summary",
+};
+
 function wrapper({ children }: { children: ReactNode }) {
   return (
     <NoMessLiveRouteProvider apiKey="nm_pub_test">
@@ -151,5 +168,76 @@ describe("NoMessLiveRouteProvider", () => {
       { type: "no-mess:entry-bound", entryId: "entry_1" },
       "https://admin.no-mess.xyz",
     );
+  });
+
+  it("keeps nested live overrides applied across preview refreshes", async () => {
+    Object.defineProperty(window, "top", {
+      value: {},
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => useNoMessEditableEntry(nestedEntry), {
+      wrapper,
+    });
+
+    act(() => {
+      capturedPreviewConfig?.onEntry({
+        ...nestedEntry,
+        hero: {
+          slides: [
+            {
+              label: "Draft slide",
+              image: "/draft.jpg",
+            },
+          ],
+        },
+        summary: "Draft summary",
+      });
+    });
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          origin: "https://admin.no-mess.xyz",
+          data: {
+            type: "no-mess:field-updated",
+            fieldName: "hero.slides[0].label",
+            value: "Unsaved slide label",
+          },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        ((result.current.hero as { slides: { label: string }[] }).slides[0] as {
+          label: string;
+        }).label,
+      ).toBe("Unsaved slide label");
+    });
+
+    act(() => {
+      capturedPreviewConfig?.onEntry({
+        ...nestedEntry,
+        hero: {
+          slides: [
+            {
+              label: "Refreshed draft slide",
+              image: "/refreshed.jpg",
+            },
+          ],
+        },
+        summary: "Refreshed summary",
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        ((result.current.hero as { slides: { label: string }[] }).slides[0] as {
+          label: string;
+        }).label,
+      ).toBe("Unsaved slide label");
+      expect(result.current.summary).toBe("Refreshed summary");
+    });
   });
 });

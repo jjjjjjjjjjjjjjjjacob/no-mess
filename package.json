@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "biome check",
     "format": "biome format --write",
-    "static-checks": "biome check && tsc --noEmit && tsc -p packages/no-mess-client && tsc --noEmit -p packages/no-mess-cli && bun run test",
+    "static-checks": "biome check && tsc --noEmit && tsc -p packages/no-mess-client && tsc --noEmit -p packages/no-mess-cli && tsc --noEmit -p packages/no-mess-mcp && bun run test",
     "test": "vitest run",
     "test:watch": "vitest",
     "version": "changeset version",

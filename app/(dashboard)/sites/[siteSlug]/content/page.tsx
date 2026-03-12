@@ -28,6 +28,10 @@ export default function ContentPage() {
     api.contentEntries.listBySite,
     site ? { siteId: site._id } : "skip",
   );
+  const entryContentTypes = useMemo(
+    () => (contentTypes ?? []).filter((type) => type.kind !== "fragment"),
+    [contentTypes],
+  );
 
   const entryCounts = useMemo(() => {
     if (!entries)
@@ -89,7 +93,7 @@ export default function ContentPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {contentTypes.map((type) => (
+          {entryContentTypes.map((type) => (
             <ContentTypeContextMenu
               key={type._id}
               siteId={site._id}

@@ -63,13 +63,24 @@ export function SchemaImportDialog({
       });
 
       if (result.contentTypes.length > 0 && contentTypes) {
-        const existingDefs: ContentTypeDefinition[] = contentTypes.map(
-          (ct) => ({
-            slug: ct.slug,
-            name: ct.name,
-            description: ct.description,
-            fields: ct.fields,
-          }),
+        const existingDefs: ContentTypeDefinition[] = contentTypes.map((ct) =>
+          ct.kind === "fragment"
+            ? {
+                kind: "fragment",
+                slug: ct.slug,
+                name: ct.name,
+                description: ct.description,
+                fields: ct.fields,
+              }
+            : {
+                kind: "template",
+                slug: ct.slug,
+                name: ct.name,
+                mode: ct.mode === "singleton" ? "singleton" : "collection",
+                route: ct.route,
+                description: ct.description,
+                fields: ct.fields,
+              },
         );
         const schemaDiff = computeSchemaDiff(existingDefs, result.contentTypes);
         setDiff(schemaDiff);
@@ -110,27 +121,24 @@ export function SchemaImportDialog({
       for (const ct of parseResult.contentTypes) {
         const existing = existingMap.get(ct.slug);
         if (existing) {
-          // Merge: keep existing fields not in import
-          const existingFieldMap = new Map(
-            existing.fields.map((f) => [f.name, f]),
-          );
-          for (const f of ct.fields) {
-            existingFieldMap.set(f.name, f);
-          }
-          const mergedFields = Array.from(existingFieldMap.values());
-
           await saveDraft({
             contentTypeId: existing._id,
             name: ct.name,
             slug: ct.slug,
+            kind: ct.kind,
+            mode: ct.kind === "template" ? ct.mode : undefined,
+            route: ct.kind === "template" ? ct.route : undefined,
             description: ct.description,
-            fields: mergedFields,
+            fields: ct.fields,
           });
         } else {
           await createDraft({
             siteId,
             name: ct.name,
             slug: ct.slug,
+            kind: ct.kind,
+            mode: ct.kind === "template" ? ct.mode : undefined,
+            route: ct.kind === "template" ? ct.route : undefined,
             description: ct.description,
             fields: ct.fields,
           });
@@ -210,7 +218,7 @@ export function SchemaImportDialog({
               <Textarea
                 value={codeText}
                 onChange={(e) => setCodeText(e.target.value)}
-                placeholder={`import { defineSchema, defineContentType, field } from "@no-mess/client/schema";\n\nconst blogPost = defineContentType("blog-post", {\n  name: "Blog Post",\n  fields: {\n    body: field.textarea({ required: true }),\n  },\n});\n\nexport default defineSchema({ contentTypes: [blogPost] });`}
+                placeholder={`import { defineFragment, defineSchema, defineTemplate, field } from "@no-mess/client/schema";\n\nconst imageWithAlt = defineFragment("image-with-alt", {\n  name: "Image With Alt",\n  fields: {\n    image: field.image({ required: true }),\n    alt: field.text(),\n  },\n});\n\nconst homePage = defineTemplate("home-page", {\n  name: "Home Page",\n  mode: "singleton",\n  route: "/",\n  fields: {\n    hero: field.object({\n      fields: {\n        slides: field.array({ of: field.fragment(imageWithAlt) }),\n      },\n    }),\n  },\n});\n\nexport default defineSchema({ contentTypes: [imageWithAlt, homePage] });`}
                 className="min-h-[200px] font-mono text-xs"
               />
               {parseResult && parseResult.errors.length > 0 && (

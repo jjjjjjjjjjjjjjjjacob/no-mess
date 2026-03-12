@@ -1,5 +1,6 @@
 import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
@@ -706,6 +707,7 @@ http.route({
     if (!body.entryId) {
       return corsJsonError("Missing required field: entryId", 400);
     }
+    const entryId = body.entryId as Id<"contentEntries">;
 
     const sitePreviewUrl =
       typeof site.previewUrl === "string" ? site.previewUrl : null;
@@ -738,8 +740,8 @@ http.route({
       await ctx.runMutation(
         internal.contentEntryRoutes.reportDiscoveredInternal,
         {
-          siteId: site._id as any,
-          entryId: body.entryId as any,
+          siteId: site._id as Id<"sites">,
+          entryId,
           url: resolvedUrl.toString(),
         },
       );

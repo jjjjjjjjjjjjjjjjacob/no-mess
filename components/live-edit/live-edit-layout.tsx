@@ -4,12 +4,16 @@ import { useMutation, useQuery } from "convex/react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { FieldDefinition } from "@/components/dynamic-form/render-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useSite } from "@/hooks/use-site";
 import { useBeforeUnload, useKeyboardSave } from "@/hooks/use-unsaved-changes";
+import type {
+  FragmentDefinition,
+  NamedFieldDefinition,
+} from "@/packages/no-mess-client/src/schema";
+import { setValueAtPath } from "@/packages/no-mess-client/src/schema";
 import { LiveEditFieldPanel } from "./live-edit-field-panel";
 import {
   LiveEditPreviewPanel,
@@ -28,6 +32,10 @@ export function LiveEditLayout() {
   const entries = useQuery(
     api.contentEntries.listByType,
     contentType ? { contentTypeId: contentType._id } : "skip",
+  );
+  const contentDefinitions = useQuery(
+    api.contentTypes.listBySite,
+    site ? { siteId: site._id } : "skip",
   );
 
   const entry = entries?.find((e) => e.slug === params.entrySlug);
@@ -96,7 +104,7 @@ export function LiveEditLayout() {
   useKeyboardSave(handleSave);
 
   const handleFieldChange = useCallback((fieldName: string, value: unknown) => {
-    setFormData((prev) => ({ ...prev, [fieldName]: value }));
+    setFormData((prev) => setValueAtPath(prev, fieldName, value));
     // Send update to iframe for live preview
     previewPanelRef.current?.sendFieldUpdate(fieldName, value);
   }, []);
@@ -170,7 +178,12 @@ export function LiveEditLayout() {
       <div className="grid flex-1 grid-cols-[400px_1fr] overflow-hidden">
         {/* Field editor */}
         <LiveEditFieldPanel
-          fields={contentType.fields as FieldDefinition[]}
+          fields={contentType.fields as NamedFieldDefinition[]}
+          fragments={
+            (contentDefinitions?.filter(
+              (definition) => definition.kind === "fragment",
+            ) as FragmentDefinition[] | undefined) ?? []
+          }
           mappedFieldNames={mappedFieldNames}
           title={title}
           values={formData}

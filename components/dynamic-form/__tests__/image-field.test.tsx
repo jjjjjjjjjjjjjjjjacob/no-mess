@@ -56,14 +56,28 @@ describe("ImageField", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows 'Select Image' button when no value", () => {
+  it("shows 'Add Image' button when no value", () => {
     mockUseFormContext.mockReturnValue({
       siteId: "site123" as Id<"sites">,
     });
     render(<ImageField value="" onChange={() => {}} />);
     expect(
-      screen.getByRole("button", { name: /select image/i }),
+      screen.getByRole("button", { name: /add image/i }),
     ).toBeInTheDocument();
+  });
+
+  it("opens the picker and updates the field when an image is selected", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    mockUseFormContext.mockReturnValue({
+      siteId: "site123" as Id<"sites">,
+    });
+
+    render(<ImageField value="" onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: /add image/i }));
+    await user.click(screen.getByRole("button", { name: /pick asset/i }));
+
+    expect(onChange).toHaveBeenCalledWith("asset-picked");
   });
 
   it("renders image preview when value and asset are loaded", () => {
@@ -83,6 +97,7 @@ describe("ImageField", () => {
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute("src", "https://example.com/img.png");
     expect(screen.getByText("photo.png")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /change/i })).toBeInTheDocument();
   });
 
   it("clear button resets value", async () => {
@@ -100,14 +115,7 @@ describe("ImageField", () => {
       height: null,
     });
     render(<ImageField value={"asset456" as string} onChange={onChange} />);
-    // The clear button is the one with the X icon
-    const buttons = screen.getAllByRole("button");
-    // The last button in the asset preview row is the clear/X button
-    const clearButton = buttons.find(
-      (btn) => !btn.textContent?.includes("Select Image"),
-    );
-    expect(clearButton).toBeDefined();
-    await user.click(clearButton as HTMLElement);
+    await user.click(screen.getByRole("button", { name: /clear image/i }));
     expect(onChange).toHaveBeenCalledWith("");
   });
 });

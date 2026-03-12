@@ -41,12 +41,12 @@ export async function pushCommand(args: string[]): Promise<void> {
   }
 
   if (result.contentTypes.length === 0) {
-    console.error("No content types found in schema file.");
+    console.error("No schemas found in schema file.");
     process.exit(1);
   }
 
   console.log(
-    `Found ${result.contentTypes.length} content type${result.contentTypes.length !== 1 ? "s" : ""}. Pushing to ${config.apiUrl}...`,
+    `Found ${result.contentTypes.length} schema${result.contentTypes.length !== 1 ? "s" : ""}. Pushing to ${config.apiUrl}...`,
   );
 
   try {

@@ -19,6 +19,11 @@ const booleanField: Field = {
 };
 const urlField: Field = { name: "link", type: "url", required: true };
 const imageField: Field = { name: "thumbnail", type: "image", required: false };
+const galleryField: Field = {
+  name: "gallery",
+  type: "gallery",
+  required: false,
+};
 const datetimeField: Field = {
   name: "publishDate",
   type: "datetime",
@@ -63,6 +68,11 @@ describe("generateFieldTypeMap", () => {
     for (const entry of result) {
       expect(entry.tsType).toBe("string");
     }
+  });
+
+  it("maps gallery to string[]", () => {
+    const [entry] = generateFieldTypeMap([galleryField]);
+    expect(entry.tsType).toBe("string[]");
   });
 
   it("maps number to number", () => {

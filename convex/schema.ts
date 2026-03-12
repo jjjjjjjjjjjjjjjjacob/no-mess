@@ -49,38 +49,11 @@ export default defineSchema({
     siteId: v.id("sites"),
     name: v.string(),
     slug: v.string(),
+    kind: v.optional(v.union(v.literal("template"), v.literal("fragment"))),
+    mode: v.optional(v.union(v.literal("singleton"), v.literal("collection"))),
+    route: v.optional(v.string()),
     description: v.optional(v.string()),
-    fields: v.array(
-      v.object({
-        name: v.string(),
-        type: v.union(
-          v.literal("text"),
-          v.literal("textarea"),
-          v.literal("number"),
-          v.literal("boolean"),
-          v.literal("datetime"),
-          v.literal("url"),
-          v.literal("image"),
-          v.literal("select"),
-          v.literal("shopifyProduct"),
-          v.literal("shopifyCollection"),
-        ),
-        required: v.boolean(),
-        description: v.optional(v.string()),
-        options: v.optional(
-          v.object({
-            choices: v.optional(
-              v.array(
-                v.object({
-                  label: v.string(),
-                  value: v.string(),
-                }),
-              ),
-            ),
-          }),
-        ),
-      }),
-    ),
+    fields: v.any(),
     status: v.optional(v.union(v.literal("draft"), v.literal("published"))),
     draft: v.optional(v.any()),
     publishedAt: v.optional(v.number()),
@@ -130,6 +103,7 @@ export default defineSchema({
   assets: defineTable({
     siteId: v.id("sites"),
     storageId: v.id("_storage"),
+    checksum: v.optional(v.string()),
     filename: v.string(),
     mimeType: v.string(),
     size: v.number(),
@@ -138,7 +112,9 @@ export default defineSchema({
     url: v.string(),
     uploadedAt: v.number(),
     uploadedBy: v.id("users"),
-  }).index("by_site", ["siteId"]),
+  })
+    .index("by_site", ["siteId"])
+    .index("by_site_checksum", ["siteId", "checksum"]),
 
   shopifyProducts: defineTable({
     siteId: v.id("sites"),

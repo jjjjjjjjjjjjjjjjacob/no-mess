@@ -48,6 +48,14 @@ const mockContentType = {
   updatedAt: 1000,
 };
 
+const normalizedMockContentType = {
+  ...mockContentType,
+  kind: "template",
+  mode: "collection",
+  route: undefined,
+  draft: undefined,
+};
+
 describe("contentTypes.create", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -127,7 +135,7 @@ describe("contentTypes.create", () => {
         slug: "blog-post",
         fields: duplicateFields,
       }),
-    ).rejects.toThrow("Field names must be unique within a content type");
+    ).rejects.toThrow("must be unique within its group");
   });
 
   it("checks site access before creating", async () => {
@@ -261,7 +269,7 @@ describe("contentTypes.update", () => {
     const handler = getHandler(contentTypes.update);
     await expect(
       handler(ctx, { contentTypeId: "ct_1", fields: duplicateFields }),
-    ).rejects.toThrow("Field names must be unique within a content type");
+    ).rejects.toThrow("must be unique within its group");
   });
 });
 
@@ -334,7 +342,7 @@ describe("contentTypes.get", () => {
     const handler = getHandler(contentTypes.get);
     const result = await handler(ctx, { contentTypeId: "ct_1" });
 
-    expect(result).toEqual(mockContentType);
+    expect(result).toEqual(normalizedMockContentType);
   });
 
   it("throws when not found", async () => {
@@ -368,7 +376,7 @@ describe("contentTypes.listBySite", () => {
     // listBySite maps results to add status and hasDraft
     expect(result).toEqual([
       {
-        ...mockContentType,
+        ...normalizedMockContentType,
         status: "published",
         hasDraft: false,
       },
@@ -398,7 +406,7 @@ describe("contentTypes.getBySlug", () => {
     const handler = getHandler(contentTypes.getBySlug);
     const result = await handler(ctx, { siteId: "site_1", slug: "blog-post" });
 
-    expect(result).toEqual(mockContentType);
+    expect(result).toEqual(normalizedMockContentType);
     expect(ctx._mocks.withIndex).toHaveBeenCalledWith(
       "by_slug",
       expect.any(Function),
@@ -436,8 +444,139 @@ describe("contentTypes.getBySlugInternal", () => {
     const handler = getHandler(contentTypes.getBySlugInternal);
     const result = await handler(ctx, { siteId: "site_1", slug: "blog-post" });
 
-    expect(result).toEqual(mockContentType);
+    expect(result).toEqual(normalizedMockContentType);
     // No access check should be called
     expect(requireSiteAccess).not.toHaveBeenCalled();
+  });
+});
+
+describe("contentTypes.runSchemaModelBackfill", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("normalizes legacy published and draft schema records for a site", async () => {
+    const legacyContentType = {
+      _id: "ct_legacy" as any,
+      siteId: "site_1",
+      name: "Legacy Post",
+      slug: "legacy-post",
+      description: "Legacy description",
+      fields: mockFields,
+      createdAt: 1000,
+      updatedAt: 1000,
+      draft: {
+        name: "Legacy Draft",
+        slug: "legacy-post",
+        description: "Draft description",
+        fields: mockFields,
+      },
+    };
+
+    const ctx = createMockMutationCtx();
+    mockRequireSiteOwner.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+    ctx._mocks.collect.mockResolvedValue([legacyContentType]);
+
+    const handler = getHandler(contentTypes.runSchemaModelBackfill);
+    const result = await handler(ctx, { siteId: "site_1" });
+
+    expect(result).toEqual({ updated: 1 });
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "ct_legacy",
+      expect.objectContaining({
+        kind: "template",
+        mode: "collection",
+        route: undefined,
+        fields: mockFields,
+        draft: {
+          name: "Legacy Draft",
+          slug: "legacy-post",
+          kind: "template",
+          mode: "collection",
+          route: undefined,
+          description: "Draft description",
+          fields: mockFields,
+        },
+      }),
+    );
+  });
+});
+
+describe("contentTypes.runTemplateMigration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("updates the template schema and transforms existing entry content", async () => {
+    const ctx = createMockMutationCtx();
+    mockRequireSiteOwner.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+    ctx._mocks.first.mockResolvedValue({
+      ...mockContentType,
+      slug: "homepage",
+    });
+    ctx._mocks.collect.mockResolvedValue([
+      {
+        _id: "entry_1",
+        draft: {
+          headline: "Welcome",
+          image1: "asset-1",
+          image1Alt: "Slide 1",
+          image1Label: "One",
+        },
+        published: {
+          headline: "Welcome",
+          image1: "asset-1",
+          image1Alt: "Slide 1",
+        },
+      },
+    ]);
+
+    const handler = getHandler(contentTypes.runTemplateMigration);
+    const result = await handler(ctx, {
+      siteId: "site_1",
+      migrationName: "mershy-homepage-hero-slides",
+    });
+
+    expect(result).toEqual({
+      migration: "mershy-homepage-hero-slides",
+      contentTypeId: mockContentType._id,
+      updatedEntries: 1,
+    });
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "entry_1",
+      expect.objectContaining({
+        draft: {
+          headline: "Welcome",
+          hero: {
+            slides: [{ image: "asset-1", alt: "Slide 1", label: "One" }],
+          },
+        },
+        published: {
+          headline: "Welcome",
+          hero: {
+            slides: [{ image: "asset-1", alt: "Slide 1" }],
+          },
+        },
+      }),
+    );
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      mockContentType._id,
+      expect.objectContaining({
+        fields: [
+          expect.objectContaining({
+            name: "hero",
+            type: "object",
+          }),
+        ],
+      }),
+    );
   });
 });

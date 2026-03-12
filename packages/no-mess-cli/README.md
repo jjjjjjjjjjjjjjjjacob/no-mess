@@ -1,6 +1,6 @@
 # no-mess
 
-CLI for the [no-mess](https://no-mess.xyz) headless CMS. Manage content type schemas from your codebase.
+CLI for the [no-mess](https://no-mess.xyz) headless CMS. Manage template and fragment schemas from your codebase.
 
 ## Install
 
@@ -38,7 +38,7 @@ no-mess init
 no-mess init --schema content/schema.ts
 ```
 
-- Creates `schema.ts` with an example content type if the file doesn't exist
+- Creates `schema.ts` with an example template + fragment schema if the file doesn't exist
 - Creates `.env` with a `NO_MESS_API_KEY` placeholder if the file doesn't exist
 - The CLI also reads `.env.local` if you prefer not to store local secrets in `.env`
 
@@ -51,7 +51,7 @@ no-mess push
 no-mess push --schema content/schema.ts
 ```
 
-Returns a list of synced content types with their action (`created` or `updated`).
+Returns a list of synced schemas with their action (`created` or `updated`).
 
 ### `no-mess pull`
 
@@ -140,23 +140,36 @@ Notes:
 The CLI works with schema files that use `@no-mess/client/schema`:
 
 ```ts
-import { defineSchema, defineContentType, field } from "@no-mess/client/schema";
+import {
+  defineFragment,
+  defineSchema,
+  defineTemplate,
+  field,
+} from "@no-mess/client/schema";
 
 export default defineSchema({
   contentTypes: [
-    defineContentType("blog-post", {
-      name: "Blog Post",
-      description: "Articles for the blog",
+    defineFragment("image-with-alt", {
+      name: "Image With Alt",
+      fields: {
+        image: field.image({ required: true }),
+        alt: field.text(),
+      },
+    }),
+    defineTemplate("blog-posts", {
+      name: "Blog Posts",
+      mode: "collection",
       fields: {
         title: field.text({ required: true }),
         body: field.textarea({ required: true }),
-        publishedAt: field.datetime(),
-        featured: field.boolean(),
-        category: field.select({
-          choices: [
-            { label: "Tech", value: "tech" },
-            { label: "Design", value: "design" },
-          ],
+        coverImage: field.fragment("image-with-alt"),
+        featuredProducts: field.array({
+          of: field.object({
+            fields: {
+              name: field.text({ required: true }),
+              href: field.url(),
+            },
+          }),
         }),
       },
     }),
@@ -164,7 +177,11 @@ export default defineSchema({
 });
 ```
 
-See the [`@no-mess/client` schema docs](../no-mess-client#schema-builder) for the full field builder API.
+`defineContentType()` still works as a compatibility alias for templates, but
+new code should prefer `defineTemplate()` and `defineFragment()`.
+
+See the [`@no-mess/client` schema docs](../no-mess-client#schema-builder) for
+the full field builder API.
 
 ## Development
 

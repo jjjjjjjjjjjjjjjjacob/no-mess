@@ -35,9 +35,9 @@ export function ImageField({ value, onChange, disabled }: ImageFieldProps) {
 
   return (
     <div className="space-y-2">
-      {value && asset ? (
+      {value ? (
         <div className="flex items-center gap-3 rounded-lg border p-3">
-          {asset.mimeType.startsWith("image/") ? (
+          {asset?.mimeType.startsWith("image/") ? (
             <img
               src={asset.url}
               alt={asset.filename}
@@ -48,21 +48,37 @@ export function ImageField({ value, onChange, disabled }: ImageFieldProps) {
               <ImageIcon className="h-6 w-6 text-muted-foreground" />
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium">{asset.filename}</p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">
+              {asset?.filename ?? "Loading image..."}
+            </p>
             <p className="text-xs text-muted-foreground">
-              {asset.width && asset.height
-                ? `${asset.width}x${asset.height} \u00b7 `
+              {asset
+                ? asset.width && asset.height
+                  ? `${asset.width}x${asset.height} \u00b7 `
+                  : ""
                 : ""}
-              {(asset.size / 1024).toFixed(1)} KB
+              {asset
+                ? `${(asset.size / 1024).toFixed(1)} KB`
+                : "Fetching image details..."}
             </p>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPickerOpen(true)}
+            disabled={disabled}
+          >
+            Change
+          </Button>
           <Button
             type="button"
             variant="ghost"
             size="icon"
             onClick={() => onChange("")}
             disabled={disabled}
+            aria-label="Clear image"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -75,7 +91,7 @@ export function ImageField({ value, onChange, disabled }: ImageFieldProps) {
           disabled={disabled}
         >
           <ImageIcon className="mr-2 h-4 w-4" />
-          Select Image
+          Add Image
         </Button>
       )}
 

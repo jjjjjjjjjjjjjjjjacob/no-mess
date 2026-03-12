@@ -224,6 +224,7 @@ vi.mock("@/convex/_generated/api", () => ({
       listBySite: "assets:listBySite",
       generateUploadUrl: "assets:generateUploadUrl",
       create: "assets:create",
+      findByChecksum: "assets:findByChecksum",
     },
     shopify: {
       listProducts: "shopify:listProducts",
@@ -641,6 +642,38 @@ describe("ContentPage (app/(dashboard)/sites/[siteSlug]/content)", () => {
     const featuredCard = featuredLink.querySelector('[data-slot="card"]');
     expect(featuredCard).toHaveClass("h-[15rem]");
   });
+
+  it("does not render fragment-only schemas in the content grid", async () => {
+    const { default: ContentPage } = await import(
+      "@/app/(dashboard)/sites/[siteSlug]/content/page"
+    );
+
+    mockUseQuery
+      .mockReturnValueOnce(mockSite)
+      .mockReturnValueOnce([
+        {
+          _id: "fragment-1",
+          name: "Shared Hero",
+          slug: "shared-hero",
+          kind: "fragment",
+          fields: [],
+        },
+        {
+          _id: "template-1",
+          name: "Homepage",
+          slug: "homepage",
+          kind: "template",
+          mode: "collection",
+          fields: [],
+        },
+      ])
+      .mockReturnValueOnce([]);
+
+    render(<ContentPage />);
+
+    expect(screen.getByText("Homepage")).toBeInTheDocument();
+    expect(screen.queryByText("Shared Hero")).not.toBeInTheDocument();
+  });
 });
 
 // ===========================================================================
@@ -694,6 +727,39 @@ describe("EntriesListPage (content/[typeSlug])", () => {
     expect(screen.getByText("Blog Posts")).toBeInTheDocument();
     expect(screen.getAllByText("New Entry").length).toBeGreaterThan(0);
   });
+
+  it("redirects singleton templates to the direct authoring view", async () => {
+    const { default: EntriesListPage } = await import(
+      "@/app/(dashboard)/sites/[siteSlug]/content/[typeSlug]/page"
+    );
+    const singletonTemplate = {
+      _id: "ct1",
+      name: "Site Settings",
+      slug: "site-settings",
+      kind: "template",
+      mode: "singleton",
+      fields: [],
+    };
+
+    mockUseQuery
+      .mockReturnValueOnce(mockSite)
+      .mockReturnValueOnce(singletonTemplate)
+      .mockReturnValueOnce([
+        {
+          _id: "entry-1",
+          slug: "site-settings",
+          title: "Site Settings",
+          status: "draft",
+          updatedAt: Date.now(),
+        },
+      ]);
+
+    render(<EntriesListPage />);
+
+    expect(mockRouterInstance.replace).toHaveBeenCalledWith(
+      "/sites/test-site/content/blog-posts/site-settings",
+    );
+  });
 });
 
 // ===========================================================================
@@ -731,6 +797,7 @@ describe("EditEntryPage (content/[typeSlug]/[entrySlug])", () => {
     mockUseQuery
       .mockReturnValueOnce(mockSite) // useSite
       .mockReturnValueOnce(mockContentType) // contentType
+      .mockReturnValueOnce([]) // schema definitions
       .mockReturnValueOnce([]); // entries (empty = no matching entry)
     render(<EditEntryPage />);
     expect(screen.getByText("Entry not found")).toBeInTheDocument();
