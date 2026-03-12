@@ -135,15 +135,30 @@ jobs:
           git add -A
           git commit -m "chore(release): version packages [skip ci]"
 
+      - name: Recreate release tags at version commit
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: |
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            git tag -d "$tag" >/dev/null 2>&1 || true
+            git tag -a "$tag" -m "$tag" HEAD
+          done < <(node ./scripts/package-release-tags.mjs)
+
       - name: Push to main
         if: steps.changesets.outputs.has_changesets == 'true'
-        run: git push origin main --follow-tags
+        run: git push origin main --tags
 
       - name: Create GitHub Releases
         if: steps.changesets.outputs.has_changesets == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: ./scripts/ensure-github-releases.sh --points-at-ref HEAD --pattern '@no-mess/*'
+        run: |
+          mapfile -t tags < <(node ./scripts/package-release-tags.mjs)
+          if [ "${#tags[@]}" -eq 0 ]; then
+            echo "No publishable package tags found."
+            exit 0
+          fi
+          ./scripts/ensure-github-releases.sh "${tags[@]}"
 
       - name: Sync versions to dev
         if: steps.changesets.outputs.has_changesets == 'true'

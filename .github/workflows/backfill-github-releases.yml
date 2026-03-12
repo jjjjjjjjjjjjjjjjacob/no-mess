@@ -6,7 +6,7 @@ on:
       tag_pattern:
         description: Git tag glob to scan for missing releases
         required: false
-        default: "@no-mess/*"
+        default: "*"
 
 permissions:
   contents: write

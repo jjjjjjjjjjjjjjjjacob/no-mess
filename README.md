@@ -111,7 +111,7 @@ bunx changeset
 # On merge to main:
 # - CI runs
 # - Convex deploys to production automatically
-# - If changesets are present, packages are versioned, published to npm, tagged, and released on GitHub automatically
+# - If changesets are present, packages are versioned, published to npm, re-tagged at the version commit, and released on GitHub automatically
 ```
 
 The `@no-mess/api-gateway` package is excluded from releases (it's private and deployed via Wrangler).
@@ -123,7 +123,7 @@ Use the manual `Backfill GitHub Releases` workflow if older tags are missing Git
 |----------|---------|---------|
 | `ci.yml` | Push/PR to `main`/`dev` | Static checks, tests, build verification |
 | `release.yml` | Push to `main` | Convex production deploy, npm publish, GitHub release creation |
-| `backfill-github-releases.yml` | Manual (`workflow_dispatch`) | Create missing GitHub releases for existing tags |
+| `backfill-github-releases.yml` | Manual (`workflow_dispatch`) | Create missing GitHub releases for existing tags (defaults to all tags) |
 | `auto-approve.yml` | PR to `main` | Auto-approve PRs from repo owner |
 
 Required GitHub Actions secrets:
