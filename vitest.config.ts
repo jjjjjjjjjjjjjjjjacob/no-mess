@@ -21,8 +21,32 @@ export default defineConfig({
     ],
   },
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./"),
-    },
+    alias: [
+      {
+        find: "@no-mess/client/schema",
+        replacement: path.resolve(
+          __dirname,
+          "./packages/no-mess-client/src/schema/index.ts",
+        ),
+      },
+      {
+        find: "@no-mess/client/react",
+        replacement: path.resolve(
+          __dirname,
+          "./packages/no-mess-client/src/react/index.ts",
+        ),
+      },
+      {
+        find: "@no-mess/client",
+        replacement: path.resolve(
+          __dirname,
+          "./packages/no-mess-client/src/index.ts",
+        ),
+      },
+      {
+        find: "@",
+        replacement: path.resolve(__dirname, "./"),
+      },
+    ],
   },
 });

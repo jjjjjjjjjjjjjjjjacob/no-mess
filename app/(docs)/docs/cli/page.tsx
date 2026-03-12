@@ -18,10 +18,11 @@ export default function CliPage() {
 
       <DocsHeading>Overview</DocsHeading>
       <p className="text-muted-foreground">
-        no-mess supports two ways to manage schemas: the dashboard UI
-        (drag-and-drop fields) and a code-first CLI. Both are two-way &mdash;
-        you can push schemas from code to the dashboard, or pull from the
-        dashboard into code. Use whichever fits your workflow.
+        no-mess supports two ways to manage schemas: the dashboard UI and a
+        code-first CLI. Both understand templates, fragments, singleton versus
+        collection mode, route binding, and recursive fields. You can push
+        schemas from code to the dashboard or pull the current dashboard schema
+        back into code.
       </p>
 
       <DocsHeading>Installation</DocsHeading>
@@ -61,31 +62,75 @@ export default function CliPage() {
           using the TypeScript DSL:
         </p>
         <CodeBlock
-          code={`import { defineSchema, defineContentType, field } from "@no-mess/client/schema";
+          code={`import {
+  defineFragment,
+  defineSchema,
+  defineTemplate,
+  field,
+} from "@no-mess/client/schema";
 
-const blogPost = defineContentType("blog-post", {
-  name: "Blog Post",
-  description: "Articles for the blog",
+const imageWithAlt = defineFragment("image-with-alt", {
+  name: "Image With Alt",
+  fields: {
+    image: field.image({ required: true }),
+    alt: field.text(),
+  },
+});
+
+const labeledImage = defineFragment("labeled-image", {
+  name: "Labeled Image",
+  fields: {
+    media: field.fragment(imageWithAlt),
+    label: field.text(),
+  },
+});
+
+const homePage = defineTemplate("home-page", {
+  name: "Home Page",
+  mode: "singleton",
+  route: "/",
+  fields: {
+    hero: field.object({
+      fields: {
+        headline: field.text({ required: true }),
+        slides: field.array({
+          of: field.fragment(labeledImage),
+          minItems: 1,
+        }),
+      },
+    }),
+    gallery: field.gallery(),
+  },
+});
+
+const blogPosts = defineTemplate("blog-posts", {
+  name: "Blog Posts",
+  mode: "collection",
   fields: {
     title: field.text({ required: true }),
     body: field.textarea(),
-    coverImage: field.image(),
-    publishedAt: field.datetime(),
-    featured: field.boolean(),
-    status: field.select({
-      required: true,
-      choices: [
-        { label: "Draft", value: "draft" },
-        { label: "Published", value: "published" },
-      ],
+    coverImage: field.fragment(imageWithAlt),
+    featuredProducts: field.array({
+      of: field.object({
+        fields: {
+          name: field.text({ required: true }),
+          href: field.url(),
+        },
+      }),
     }),
   },
 });
 
-export default defineSchema({ contentTypes: [blogPost] });`}
+export default defineSchema({
+  contentTypes: [imageWithAlt, labeledImage, homePage, blogPosts],
+});`}
           language="typescript"
           filename="no-mess.schema.ts"
         />
+        <p className="mt-4 text-sm text-muted-foreground">
+          This example covers reusable fragments, a singleton route template, a
+          collection template, gallery sugar, and nested array/object fields.
+        </p>
       </DocsStep>
 
       <DocsStep number={3} title="Push to the dashboard">
@@ -115,8 +160,9 @@ export default defineSchema({ contentTypes: [blogPost] });`}
 
       <DocsHeading as="h3">push</DocsHeading>
       <p className="text-muted-foreground">
-        Parses the local schema file and pushes content type definitions to the
-        dashboard. Shows a diff preview and prompts for confirmation.
+        Parses the local schema file and pushes template and fragment
+        definitions to the dashboard. Shows a diff preview and prompts for
+        confirmation.
       </p>
       <CodeBlock
         code={`no-mess push                     # uses default no-mess.schema.ts
@@ -178,8 +224,9 @@ no-mess pull --stdout              # print to stdout instead of file`}
         <code className="rounded bg-muted px-1 font-mono text-xs">
           no-mess.schema.ts
         </code>{" "}
-        file you can save to your project. Import accepts a schema file and
-        shows a diff preview before applying.
+        file you can save to your project. Import accepts a schema file with
+        templates, fragments, nested fields, template modes, and route binding,
+        then shows a diff preview before applying.
       </p>
 
       <DocsHeading>Field Types</DocsHeading>
@@ -232,6 +279,28 @@ no-mess pull --stdout              # print to stdout instead of file`}
               <td className="py-2 pr-4 font-mono text-xs">field.image()</td>
               <td className="py-2 pr-4">Image asset</td>
               <td className="py-2">required, description</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2 pr-4 font-mono text-xs">field.gallery()</td>
+              <td className="py-2 pr-4">Image/video gallery</td>
+              <td className="py-2">required, description</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2 pr-4 font-mono text-xs">field.object()</td>
+              <td className="py-2 pr-4">Nested object group</td>
+              <td className="py-2">required, description, fields</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2 pr-4 font-mono text-xs">field.array()</td>
+              <td className="py-2 pr-4">Repeater array</td>
+              <td className="py-2">
+                required, description, of, minItems, maxItems
+              </td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2 pr-4 font-mono text-xs">field.fragment()</td>
+              <td className="py-2 pr-4">Fragment reference</td>
+              <td className="py-2">required, description, fragment</td>
             </tr>
             <tr className="border-b">
               <td className="py-2 pr-4 font-mono text-xs">field.select()</td>

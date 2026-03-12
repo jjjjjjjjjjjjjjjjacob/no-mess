@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { FIELD_TYPES, type Field, type FieldType } from "../lib/validators";
 
 describe("FIELD_TYPES", () => {
-  it("contains exactly 10 field types", () => {
-    expect(FIELD_TYPES).toHaveLength(10);
+  it("contains primitive and composite field types", () => {
+    expect(FIELD_TYPES).toHaveLength(14);
   });
 
   it("includes text", () => {
@@ -34,6 +34,10 @@ describe("FIELD_TYPES", () => {
     expect(FIELD_TYPES).toContain("image");
   });
 
+  it("includes gallery", () => {
+    expect(FIELD_TYPES).toContain("gallery");
+  });
+
   it("includes select", () => {
     expect(FIELD_TYPES).toContain("select");
   });
@@ -44,6 +48,18 @@ describe("FIELD_TYPES", () => {
 
   it("includes shopifyCollection", () => {
     expect(FIELD_TYPES).toContain("shopifyCollection");
+  });
+
+  it("includes object", () => {
+    expect(FIELD_TYPES).toContain("object");
+  });
+
+  it("includes array", () => {
+    expect(FIELD_TYPES).toContain("array");
+  });
+
+  it("includes fragment", () => {
+    expect(FIELD_TYPES).toContain("fragment");
   });
 });
 
@@ -57,11 +73,15 @@ describe("FieldType", () => {
       "datetime",
       "url",
       "image",
+      "gallery",
       "select",
       "shopifyProduct",
       "shopifyCollection",
+      "object",
+      "array",
+      "fragment",
     ];
-    expect(types).toHaveLength(10);
+    expect(types).toHaveLength(14);
   });
 });
 
@@ -104,5 +124,52 @@ describe("Field type shape", () => {
       label: "News",
       value: "news",
     });
+  });
+
+  it("accepts an object field", () => {
+    const field: Field = {
+      name: "hero",
+      type: "object",
+      required: false,
+      fields: [
+        {
+          name: "headline",
+          type: "text",
+          required: true,
+        },
+      ],
+    };
+    expect(field.fields).toHaveLength(1);
+    expect(field.fields[0]?.name).toBe("headline");
+  });
+
+  it("accepts an array field", () => {
+    const field: Field = {
+      name: "sections",
+      type: "array",
+      required: false,
+      of: {
+        type: "object",
+        required: true,
+        fields: [
+          {
+            name: "title",
+            type: "text",
+            required: true,
+          },
+        ],
+      },
+    };
+    expect(field.of.type).toBe("object");
+  });
+
+  it("accepts a fragment field", () => {
+    const field: Field = {
+      name: "seo",
+      type: "fragment",
+      required: false,
+      fragment: "seo",
+    };
+    expect(field.fragment).toBe("seo");
   });
 });

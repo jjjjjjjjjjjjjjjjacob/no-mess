@@ -7,8 +7,12 @@ import userEvent from "@testing-library/user-event";
 
 const mockGenerateUploadUrl = vi.fn();
 const mockCreateAsset = vi.fn();
+const mockFindByChecksum = vi.fn();
 
 vi.mock("convex/react", () => ({
+  useConvex: vi.fn(() => ({
+    query: mockFindByChecksum,
+  })),
   useMutation: vi.fn((ref: string) => {
     if (ref === "assets:generateUploadUrl") return mockGenerateUploadUrl;
     if (ref === "assets:create") return mockCreateAsset;
@@ -21,6 +25,7 @@ vi.mock("@/convex/_generated/api", () => ({
     assets: {
       generateUploadUrl: "assets:generateUploadUrl",
       create: "assets:create",
+      findByChecksum: "assets:findByChecksum",
     },
   },
 }));
@@ -58,13 +63,26 @@ function createMockFile(name: string, type: string, size = 1024): File {
 }
 
 function renderDropzone(
-  overrides: { onUploadComplete?: (assetId: any) => void } = {},
+  overrides: {
+    onUploadComplete?: (assetId: any) => void;
+    accept?: string;
+    multiple?: boolean;
+    label?: string;
+    description?: string;
+  } = {},
 ) {
   const onUploadComplete = overrides.onUploadComplete ?? vi.fn();
   return {
     onUploadComplete,
     ...render(
-      <UploadDropzone siteId={siteId} onUploadComplete={onUploadComplete} />,
+      <UploadDropzone
+        siteId={siteId}
+        onUploadComplete={onUploadComplete}
+        accept={overrides.accept}
+        multiple={overrides.multiple}
+        label={overrides.label}
+        description={overrides.description}
+      />,
     ),
   };
 }
@@ -76,9 +94,11 @@ function renderDropzone(
 beforeEach(() => {
   mockGenerateUploadUrl.mockReset();
   mockCreateAsset.mockReset();
+  mockFindByChecksum.mockReset();
   // Default: successful upload flow
   mockGenerateUploadUrl.mockResolvedValue("https://upload.example.com/url");
   mockCreateAsset.mockResolvedValue("new-asset-id");
+  mockFindByChecksum.mockResolvedValue(null);
 
   // Mock global fetch for the upload step
   vi.stubGlobal(
@@ -93,6 +113,12 @@ beforeEach(() => {
     ...globalThis.URL,
     createObjectURL: vi.fn(() => "blob:mock-url"),
     revokeObjectURL: vi.fn(),
+  });
+
+  vi.stubGlobal("crypto", {
+    subtle: {
+      digest: vi.fn().mockResolvedValue(Uint8Array.from([1, 2, 3, 4]).buffer),
+    },
   });
 });
 
@@ -132,6 +158,25 @@ describe("UploadDropzone", () => {
       const { container } = renderDropzone();
       const input = container.querySelector('input[type="file"]');
       expect(input).toHaveAttribute("multiple");
+    });
+
+    it("supports configuring single-file image uploads", () => {
+      const { container } = renderDropzone({
+        accept: "image/*",
+        multiple: false,
+        label: "Drop an image here or click to upload",
+        description: "PNG, JPG, WebP, GIF, and SVG up to 20MB",
+      });
+      const input = container.querySelector('input[type="file"]');
+
+      expect(input).toHaveAttribute("accept", "image/*");
+      expect(input).not.toHaveAttribute("multiple");
+      expect(
+        screen.getByText("Drop an image here or click to upload"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("PNG, JPG, WebP, GIF, and SVG up to 20MB"),
+      ).toBeInTheDocument();
     });
 
     it("has role=button and is focusable", () => {
@@ -227,6 +272,7 @@ describe("UploadDropzone", () => {
           expect.objectContaining({
             siteId,
             storageId: "storage-abc",
+            checksum: "01020304",
             filename: "doc.pdf",
             mimeType: "application/pdf",
           }),
@@ -265,6 +311,7 @@ describe("UploadDropzone", () => {
         expect(mockCreateAsset).toHaveBeenCalledWith({
           siteId,
           storageId: "storage-abc",
+          checksum: "01020304",
           filename: "readme.txt",
           mimeType: "text/plain",
           size: 512,
@@ -445,6 +492,82 @@ describe("UploadDropzone", () => {
       fireEvent.change(input, { target: { files: [] } });
 
       expect(mockGenerateUploadUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("validation", () => {
+    it("rejects unsupported file types when accept is provided", async () => {
+      const { container } = renderDropzone({ accept: "image/*" });
+      const input = container.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+
+      fireEvent.change(input, {
+        target: { files: [createMockFile("doc.pdf", "application/pdf")] },
+      });
+
+      await waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith(
+          "That file type is not supported here.",
+        );
+      });
+      expect(mockGenerateUploadUrl).not.toHaveBeenCalled();
+    });
+
+    it("rejects multiple files when configured for single upload", async () => {
+      const { container } = renderDropzone({ multiple: false });
+      const input = container.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+
+      fireEvent.change(input, {
+        target: {
+          files: [
+            createMockFile("a.png", "image/png"),
+            createMockFile("b.png", "image/png"),
+          ],
+        },
+      });
+
+      await waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith(
+          "Upload one file at a time here.",
+        );
+      });
+      expect(mockGenerateUploadUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("dedupe", () => {
+    it("reuses an existing asset when the checksum already exists", async () => {
+      mockFindByChecksum.mockResolvedValue({ _id: "existing-asset" });
+
+      const onUploadComplete = vi.fn();
+      const { container } = renderDropzone({ onUploadComplete });
+      const input = container.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+
+      fireEvent.change(input, {
+        target: { files: [createMockFile("photo.png", "image/png")] },
+      });
+
+      await waitFor(() => {
+        expect(mockFindByChecksum).toHaveBeenCalledWith(
+          "assets:findByChecksum",
+          {
+            siteId,
+            checksum: "01020304",
+          },
+        );
+      });
+      expect(mockGenerateUploadUrl).not.toHaveBeenCalled();
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(mockCreateAsset).not.toHaveBeenCalled();
+      expect(onUploadComplete).toHaveBeenCalledWith("existing-asset");
+      expect(mockToast.success).toHaveBeenCalledWith(
+        "File already in your library",
+      );
     });
   });
 });

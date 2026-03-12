@@ -54,8 +54,13 @@ const FIELD_TYPE_LABELS = [
   "Date/Time",
   "URL",
   "Image",
+  "Gallery",
   "Select",
   "Shopify Product",
+  "Shopify Collection",
+  "Object Group",
+  "Repeater",
+  "Fragment Reference",
 ];
 
 describe("ContentTypeForm", () => {
@@ -104,6 +109,7 @@ describe("ContentTypeForm", () => {
         {...defaultProps}
         isEditing
         initialData={{
+          kind: "template",
           name: "Blog",
           slug: "blog",
           fields: [{ name: "title", type: "text", required: false }],
@@ -157,6 +163,7 @@ describe("ContentTypeForm", () => {
         {...defaultProps}
         isEditing
         initialData={{
+          kind: "template",
           name: "Blog",
           slug: "blog",
           fields: [{ name: "title", type: "text", required: false }],
@@ -246,6 +253,8 @@ describe("ContentTypeForm", () => {
     const submittedData = onSubmit.mock.calls[0][0];
     expect(submittedData.name).toBe("Blog Post");
     expect(submittedData.slug).toBe("blog-post");
+    expect(submittedData.kind).toBe("template");
+    expect(submittedData.mode).toBe("collection");
     expect(submittedData.description).toBe("A blog post type");
     expect(submittedData.fields).toHaveLength(1);
     expect(submittedData.fields[0]).toEqual(
@@ -264,6 +273,7 @@ describe("ContentTypeForm", () => {
       <ContentTypeForm
         {...defaultProps}
         initialData={{
+          kind: "template",
           name: "Article",
           slug: "article",
           description: "An article type",
@@ -291,9 +301,7 @@ describe("ContentTypeForm", () => {
     const user = userEvent.setup();
     render(<ContentTypeForm {...defaultProps} />);
 
-    // There is one field row by default, get its select trigger
-    const triggers = screen.getAllByRole("combobox");
-    const typeSelect = triggers[0];
+    const typeSelect = screen.getAllByRole("combobox")[2];
 
     // Open the select dropdown
     await user.click(typeSelect);

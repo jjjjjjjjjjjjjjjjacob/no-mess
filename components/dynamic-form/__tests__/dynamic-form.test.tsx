@@ -70,6 +70,14 @@ vi.mock("../fields/image-field", () => ({
   ),
 }));
 
+vi.mock("../fields/gallery-field", () => ({
+  GalleryField: ({ value, disabled }: any) => (
+    <div data-testid="gallery-field" data-disabled={disabled}>
+      {JSON.stringify(value)}
+    </div>
+  ),
+}));
+
 vi.mock("../fields/shopify-product-field", () => ({
   ShopifyProductField: ({ value, disabled }: any) => (
     <div data-testid="shopify-product-field" data-disabled={disabled}>
@@ -203,6 +211,17 @@ describe("DynamicForm", () => {
     expect(screen.getByTestId("image-field")).toBeInTheDocument();
   });
 
+  it("renders GalleryField for type 'gallery'", () => {
+    render(
+      <DynamicForm
+        fields={[{ name: "gallery", type: "gallery", required: false }]}
+        values={{ gallery: ["asset-1", "asset-2"] }}
+        onChange={defaultOnChange}
+      />,
+    );
+    expect(screen.getByTestId("gallery-field")).toBeInTheDocument();
+  });
+
   it("renders ShopifyProductField for type 'shopifyProduct'", () => {
     render(
       <DynamicForm
@@ -214,15 +233,27 @@ describe("DynamicForm", () => {
     expect(screen.getByTestId("shopify-product-field")).toBeInTheDocument();
   });
 
-  it("falls back to TextField for unknown field type", () => {
+  it("renders nested array items inline", () => {
     render(
       <DynamicForm
-        fields={[{ name: "custom", type: "unknownType", required: false }]}
-        values={{ custom: "fallback" }}
+        fields={[
+          {
+            name: "groups",
+            type: "array",
+            required: false,
+            of: {
+              type: "array",
+              required: false,
+              of: { type: "text", required: false },
+            },
+          },
+        ]}
+        values={{ groups: [["hello"]] }}
         onChange={defaultOnChange}
       />,
     );
     expect(screen.getByTestId("text-field")).toBeInTheDocument();
+    expect(screen.getAllByText("Add Item")).toHaveLength(2);
   });
 
   it("passes disabled prop to fields", () => {

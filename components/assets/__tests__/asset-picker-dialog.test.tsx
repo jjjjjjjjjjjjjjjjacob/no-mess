@@ -25,6 +25,34 @@ vi.mock("lucide-react", () => ({
   ),
 }));
 
+vi.mock("@/components/assets/upload-dropzone", () => ({
+  UploadDropzone: ({
+    accept,
+    label,
+    multiple,
+    onUploadComplete,
+  }: {
+    accept?: string;
+    label?: string;
+    multiple?: boolean;
+    onUploadComplete?: (assetId: string) => void;
+  }) => (
+    <div
+      data-testid="upload-dropzone"
+      data-accept={accept}
+      data-multiple={String(multiple)}
+    >
+      <span>{label}</span>
+      <button
+        type="button"
+        onClick={() => onUploadComplete?.("asset-uploaded")}
+      >
+        Upload Image
+      </button>
+    </div>
+  ),
+}));
+
 // Stub icon libraries used by Dialog
 vi.mock("@hugeicons/core-free-icons", () => ({
   Cancel01Icon: "Cancel01Icon",
@@ -76,6 +104,8 @@ const mixedAssets = [
   },
 ];
 
+const nonImageAssets = [mixedAssets[2]];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -116,7 +146,7 @@ describe("AssetPickerDialog", () => {
     it("shows loading message when assets are undefined", () => {
       mockUseQuery.mockReturnValue(undefined);
       renderDialog();
-      expect(screen.getByText("Loading assets...")).toBeInTheDocument();
+      expect(screen.getByText("Loading images...")).toBeInTheDocument();
     });
   });
 
@@ -125,9 +155,7 @@ describe("AssetPickerDialog", () => {
       mockUseQuery.mockReturnValue([]);
       renderDialog();
       expect(
-        screen.getByText(
-          "No assets uploaded yet. Upload images in the Assets section first.",
-        ),
+        screen.getByText("Upload your first image above."),
       ).toBeInTheDocument();
     });
 
@@ -136,13 +164,32 @@ describe("AssetPickerDialog", () => {
       renderDialog();
       expect(screen.getByTestId("image-icon")).toBeInTheDocument();
     });
+
+    it("shows the same empty state when only non-image assets exist", () => {
+      mockUseQuery.mockReturnValue(nonImageAssets);
+      renderDialog();
+      expect(
+        screen.getByText("Upload your first image above."),
+      ).toBeInTheDocument();
+    });
   });
 
   describe("dialog header", () => {
     it("renders the dialog title", () => {
       mockUseQuery.mockReturnValue([]);
       renderDialog();
-      expect(screen.getByText("Select an Image")).toBeInTheDocument();
+      expect(screen.getByText("Choose or Upload Image")).toBeInTheDocument();
+    });
+
+    it("renders the upload dropzone with image-only settings", () => {
+      mockUseQuery.mockReturnValue([]);
+      renderDialog();
+      const dropzone = screen.getByTestId("upload-dropzone");
+      expect(dropzone).toHaveAttribute("data-accept", "image/*");
+      expect(dropzone).toHaveAttribute("data-multiple", "false");
+      expect(
+        screen.getByText("Drop an image here or click to upload"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -166,76 +213,31 @@ describe("AssetPickerDialog", () => {
   });
 
   describe("selection behavior", () => {
-    it("Select button is disabled when no asset is selected", () => {
-      mockUseQuery.mockReturnValue(imageAssets);
-      renderDialog();
-      const selectButton = screen.getByRole("button", { name: "Select" });
-      expect(selectButton).toBeDisabled();
-    });
-
-    it("highlights the clicked asset and enables Select button", async () => {
-      const user = userEvent.setup();
-      mockUseQuery.mockReturnValue(imageAssets);
-      renderDialog();
-
-      // Click the first image asset button
-      const assetButtons = screen
-        .getAllByRole("button")
-        .filter(
-          (btn) =>
-            btn.textContent === "banner.png" ||
-            btn.querySelector("img[alt='banner.png']"),
-        );
-      await user.click(assetButtons[0]);
-
-      // Select button should now be enabled
-      const selectButton = screen.getByRole("button", { name: "Select" });
-      expect(selectButton).not.toBeDisabled();
-    });
-
-    it("calls onSelect with the selected asset id on confirm", async () => {
+    it("calls onSelect and closes when an image is clicked", async () => {
       const user = userEvent.setup();
       mockUseQuery.mockReturnValue(imageAssets);
       const onSelect = vi.fn();
       const onOpenChange = vi.fn();
       renderDialog({ onSelect, onOpenChange });
 
-      // Click the first image asset
-      const assetButtons = screen
-        .getAllByRole("button")
-        .filter((btn) => btn.querySelector("img[alt='banner.png']"));
-      await user.click(assetButtons[0]);
-
-      // Click Select
-      const selectButton = screen.getByRole("button", { name: "Select" });
-      await user.click(selectButton);
+      await user.click(
+        screen.getByRole("button", { name: "Select banner.png" }),
+      );
 
       expect(onSelect).toHaveBeenCalledWith("asset-img-1");
+      expect(onOpenChange).toHaveBeenCalledWith(false);
     });
 
-    it("allows changing selection before confirming", async () => {
+    it("calls onSelect and closes when upload completes", async () => {
       const user = userEvent.setup();
-      mockUseQuery.mockReturnValue(imageAssets);
       const onSelect = vi.fn();
-      renderDialog({ onSelect });
+      const onOpenChange = vi.fn();
+      renderDialog({ onSelect, onOpenChange });
 
-      // Click the first image
-      const firstBtn = screen
-        .getAllByRole("button")
-        .filter((btn) => btn.querySelector("img[alt='banner.png']"));
-      await user.click(firstBtn[0]);
+      await user.click(screen.getByRole("button", { name: "Upload Image" }));
 
-      // Click the second image
-      const secondBtn = screen
-        .getAllByRole("button")
-        .filter((btn) => btn.querySelector("img[alt='logo.jpg']"));
-      await user.click(secondBtn[0]);
-
-      // Confirm
-      const selectButton = screen.getByRole("button", { name: "Select" });
-      await user.click(selectButton);
-
-      expect(onSelect).toHaveBeenCalledWith("asset-img-2");
+      expect(onSelect).toHaveBeenCalledWith("asset-uploaded");
+      expect(onOpenChange).toHaveBeenCalledWith(false);
     });
   });
 
@@ -245,12 +247,6 @@ describe("AssetPickerDialog", () => {
       mockUseQuery.mockReturnValue(imageAssets);
       const onOpenChange = vi.fn();
       renderDialog({ onOpenChange });
-
-      // Select an asset first
-      const assetButtons = screen
-        .getAllByRole("button")
-        .filter((btn) => btn.querySelector("img[alt='banner.png']"));
-      await user.click(assetButtons[0]);
 
       // Click Cancel
       const cancelButton = screen.getByRole("button", { name: "Cancel" });

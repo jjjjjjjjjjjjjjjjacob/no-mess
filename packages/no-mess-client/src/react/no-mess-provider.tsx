@@ -12,6 +12,7 @@ import { NoMessClient } from "../client.js";
 import { normalizeNoMessError } from "../error-utils.js";
 import { createPreviewHandler } from "../index.js";
 import { createLiveEditHandler } from "../live-edit.js";
+import { setValueAtPath } from "../schema/tree-utils.js";
 import type {
   NoMessContextValue,
   NoMessEntry,
@@ -91,6 +92,17 @@ function defaultLiveEditState(): UseNoMessLiveEditResult {
     error: null,
     errorDetails: null,
   };
+}
+
+function applyFieldOverrides<T extends Record<string, unknown>>(
+  entry: T,
+  overrides: Record<string, unknown>,
+) {
+  let nextEntry = { ...entry };
+  for (const [path, value] of Object.entries(overrides)) {
+    nextEntry = setValueAtPath(nextEntry, path, value);
+  }
+  return nextEntry;
 }
 
 /**
@@ -352,8 +364,12 @@ export function useNoMessEditableEntry<T extends NoMessEntry>(
   }
 
   return {
-    ...entry,
-    ...(ctx.preview.entry as T),
-    ...ctx.liveEdit.fieldOverrides,
+    ...applyFieldOverrides(
+      {
+        ...entry,
+        ...(ctx.preview.entry as T),
+      },
+      ctx.liveEdit.fieldOverrides,
+    ),
   };
 }

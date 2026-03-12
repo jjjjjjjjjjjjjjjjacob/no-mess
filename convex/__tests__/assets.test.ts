@@ -41,6 +41,7 @@ const mockAsset = {
   _id: "asset_1" as any,
   siteId: "site_1",
   storageId: "storage_1",
+  checksum: "checksum_1",
   filename: "image.png",
   mimeType: "image/png",
   size: 1024,
@@ -102,6 +103,7 @@ describe("assets.create", () => {
     const result = await handler(ctx, {
       siteId: "site_1",
       storageId: "storage_1",
+      checksum: "checksum_1",
       filename: "image.png",
       mimeType: "image/png",
       size: 1024,
@@ -115,6 +117,7 @@ describe("assets.create", () => {
       expect.objectContaining({
         siteId: "site_1",
         storageId: "storage_1",
+        checksum: "checksum_1",
         filename: "image.png",
         mimeType: "image/png",
         size: 1024,
@@ -143,6 +146,7 @@ describe("assets.create", () => {
       handler(ctx, {
         siteId: "site_1",
         storageId: "storage_1",
+        checksum: "checksum_1",
         filename: "image.png",
         mimeType: "image/png",
         size: 1024,
@@ -161,6 +165,7 @@ describe("assets.create", () => {
       handler(ctx, {
         siteId: "site_1",
         storageId: "storage_1",
+        checksum: "checksum_1",
         filename: "image.png",
         mimeType: "image/png",
         size: 1024,
@@ -186,6 +191,7 @@ describe("assets.create", () => {
     await handler(ctx, {
       siteId: "site_1",
       storageId: "storage_1",
+      checksum: "checksum_1",
       filename: "image.png",
       mimeType: "image/png",
       size: 1024,
@@ -198,6 +204,66 @@ describe("assets.create", () => {
     >;
     expect(insertData.uploadedAt).toBeGreaterThanOrEqual(before);
     expect(insertData.uploadedAt).toBeLessThanOrEqual(after);
+    expect(insertData.checksum).toBe("checksum_1");
+  });
+
+  it("reuses the existing asset when the checksum already exists", async () => {
+    const ctx = createMockMutationCtx();
+    const mockStorageDelete = vi.fn().mockResolvedValue(undefined);
+    (ctx as any).storage = {
+      ...((ctx as any).storage || {}),
+      delete: mockStorageDelete,
+      getUrl: vi.fn(),
+    };
+    mockRequireSiteAccess.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+    ctx._mocks.first.mockResolvedValue(mockAsset);
+
+    const handler = getHandler(assets.create);
+    const result = await handler(ctx, {
+      siteId: "site_1",
+      storageId: "storage_duplicate",
+      checksum: "checksum_1",
+      filename: "image-copy.png",
+      mimeType: "image/png",
+      size: 1024,
+    });
+
+    expect(result).toBe("asset_1");
+    expect(mockStorageDelete).toHaveBeenCalledWith("storage_duplicate");
+    expect(ctx.db.insert).not.toHaveBeenCalled();
+    expect((ctx as any).storage.getUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe("assets.findByChecksum", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns the matching asset for the site", async () => {
+    const ctx = createMockQueryCtx();
+    mockRequireSiteAccess.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+    ctx._mocks.first.mockResolvedValue(mockAsset);
+
+    const handler = getHandler(assets.findByChecksum);
+    const result = await handler(ctx, {
+      siteId: "site_1",
+      checksum: "checksum_1",
+    });
+
+    expect(result).toEqual(mockAsset);
+    expect(ctx._mocks.withIndex).toHaveBeenCalledWith(
+      "by_site_checksum",
+      expect.any(Function),
+    );
   });
 });
 

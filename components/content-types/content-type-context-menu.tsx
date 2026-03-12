@@ -43,8 +43,9 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import {
-  type FieldDefinition,
+  type ContentTypeDefinition,
   generateContentTypeSource,
+  type NamedFieldDefinition,
 } from "@/packages/no-mess-client/src/schema";
 
 interface ContentTypeContextMenuProps {
@@ -55,11 +56,46 @@ interface ContentTypeContextMenuProps {
   type: {
     _id: Id<"contentTypes">;
     description?: string;
-    fields: FieldDefinition[];
+    fields: NamedFieldDefinition[];
     hasDraft: boolean;
+    kind?: ContentTypeDefinition["kind"];
+    mode?: "singleton" | "collection";
     name: string;
+    route?: string;
     slug: string;
     status: "draft" | "published";
+  };
+}
+
+function normalizeContentTypeSource(source: {
+  description?: string;
+  fields: NamedFieldDefinition[];
+  kind?: ContentTypeDefinition["kind"];
+  mode?: "singleton" | "collection";
+  name: string;
+  route?: string;
+  slug: string;
+}): ContentTypeDefinition {
+  const kind = source.kind === "fragment" ? "fragment" : "template";
+
+  if (kind === "fragment") {
+    return {
+      kind,
+      slug: source.slug,
+      name: source.name,
+      description: source.description,
+      fields: source.fields,
+    };
+  }
+
+  return {
+    kind,
+    slug: source.slug,
+    name: source.name,
+    mode: source.mode === "singleton" ? "singleton" : "collection",
+    route: source.route,
+    description: source.description,
+    fields: source.fields,
   };
 }
 
@@ -84,28 +120,49 @@ export function ContentTypeContextMenu({
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
 
-  const source = useMemo(() => {
-    if (!contentType) return type;
-    if (!contentType.draft) return contentType;
+  const source = useMemo<ContentTypeDefinition>(() => {
+    if (!contentType) {
+      return normalizeContentTypeSource(type);
+    }
 
-    return {
+    if (!contentType.draft) {
+      return normalizeContentTypeSource(contentType);
+    }
+
+    return normalizeContentTypeSource({
       ...contentType,
       name: contentType.draft.name ?? contentType.name,
       slug: contentType.draft.slug ?? contentType.slug,
+      kind: contentType.draft.kind ?? contentType.kind,
+      mode: contentType.draft.mode ?? contentType.mode,
+      route: contentType.draft.route ?? contentType.route,
       description: contentType.draft.description ?? contentType.description,
       fields: contentType.draft.fields ?? contentType.fields,
-    };
+    });
   }, [contentType, type]);
 
   const exportCode = useMemo(
     () =>
-      generateContentTypeSource({
-        slug: source.slug,
-        name: source.name,
-        description: source.description,
-        fields: source.fields,
-      }),
-    [source.description, source.fields, source.name, source.slug],
+      generateContentTypeSource(
+        source.kind === "fragment"
+          ? {
+              kind: "fragment",
+              slug: source.slug,
+              name: source.name,
+              description: source.description,
+              fields: source.fields,
+            }
+          : {
+              kind: "template",
+              slug: source.slug,
+              name: source.name,
+              mode: source.mode === "singleton" ? "singleton" : "collection",
+              route: source.route,
+              description: source.description,
+              fields: source.fields,
+            },
+      ),
+    [source],
   );
 
   const openSchema = () => {
@@ -140,7 +197,7 @@ export function ContentTypeContextMenu({
       analytics.trackSchemaPublished({
         site_id: siteId,
         field_count: source.fields.length,
-        field_types: source.fields.map((field: FieldDefinition) => field.type),
+        field_types: source.fields.map((field) => field.type),
       });
       toast.success("Schema published");
     } catch (error) {
@@ -178,23 +235,31 @@ export function ContentTypeContextMenu({
     }
   };
 
+  const isEntryBearing = source.kind === "template";
+  const isSingletonTemplate =
+    source.kind === "template" && source.mode === "singleton";
+
   return (
     <>
       <ContextMenu>
         <ContextMenuTrigger className="block">{children}</ContextMenuTrigger>
         <ContextMenuContent className="w-56">
-          <ContextMenuItem onClick={openEntries}>
-            <ArrowRight className="h-4 w-4" />
-            Open Entries
-          </ContextMenuItem>
+          {isEntryBearing && (
+            <ContextMenuItem onClick={openEntries}>
+              <ArrowRight className="h-4 w-4" />
+              {isSingletonTemplate ? "Open Entry" : "Open Entries"}
+            </ContextMenuItem>
+          )}
           <ContextMenuItem onClick={openSchema}>
             <FileText className="h-4 w-4" />
             Edit Schema
           </ContextMenuItem>
-          <ContextMenuItem onClick={createEntry}>
-            <Plus className="h-4 w-4" />
-            New Entry
-          </ContextMenuItem>
+          {isEntryBearing && !isSingletonTemplate && (
+            <ContextMenuItem onClick={createEntry}>
+              <Plus className="h-4 w-4" />
+              New Entry
+            </ContextMenuItem>
+          )}
 
           {(type.status === "draft" || type.hasDraft || onImportFromCode) && (
             <ContextMenuSeparator />
@@ -253,8 +318,9 @@ export function ContentTypeContextMenu({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete schema</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete {type.name} and all of its entries.
-              This action cannot be undone.
+              This will permanently delete {type.name}
+              {isEntryBearing ? " and all of its entries" : ""}. This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

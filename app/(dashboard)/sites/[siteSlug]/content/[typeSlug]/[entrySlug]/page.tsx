@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { Eye, EyeOff, MousePointerClick, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { DeliveryUrlsCard } from "@/components/content-entries/delivery-urls-card";
 import {
@@ -37,6 +37,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { usePreviewRefresh } from "@/hooks/use-preview-refresh";
 import { useSite } from "@/hooks/use-site";
 import { useBeforeUnload, useKeyboardSave } from "@/hooks/use-unsaved-changes";
+import type { FragmentDefinition } from "@/packages/no-mess-client/src/schema";
 
 export default function EditEntryPage() {
   const router = useRouter();
@@ -46,6 +47,10 @@ export default function EditEntryPage() {
   const contentType = useQuery(
     api.contentTypes.getBySlug,
     site ? { siteId: site._id, slug: params.typeSlug } : "skip",
+  );
+  const schemaDefinitions = useQuery(
+    api.contentTypes.listBySite,
+    site ? { siteId: site._id } : "skip",
   );
   const entries = useQuery(
     api.contentEntries.listByType,
@@ -66,20 +71,39 @@ export default function EditEntryPage() {
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const fragments = useMemo(
+    () =>
+      (schemaDefinitions ?? [])
+        .filter((definition) => definition.kind === "fragment")
+        .map(
+          (definition): FragmentDefinition => ({
+            kind: "fragment",
+            slug: definition.slug,
+            name: definition.name,
+            description: definition.description,
+            fields: definition.fields,
+          }),
+        ),
+    [schemaDefinitions],
+  );
 
   const savedTitle = useRef("");
   const savedFormData = useRef<Record<string, unknown>>({});
   const previewRef = useRef<PreviewPanelRef>(null);
 
   useEffect(() => {
-    if (entry && !initialized) {
-      setTitle(entry.title);
+    if (entry && contentType && !initialized) {
+      const initialTitle =
+        contentType.kind === "template" && contentType.mode === "singleton"
+          ? contentType.name
+          : entry.title;
+      setTitle(initialTitle);
       setFormData((entry.draft as Record<string, unknown>) ?? {});
-      savedTitle.current = entry.title;
+      savedTitle.current = initialTitle;
       savedFormData.current = (entry.draft as Record<string, unknown>) ?? {};
       setInitialized(true);
     }
-  }, [entry, initialized]);
+  }, [contentType, entry, initialized]);
 
   const isDirty =
     initialized &&
@@ -91,16 +115,21 @@ export default function EditEntryPage() {
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (!entry) return;
+    if (!entry || !contentType) return;
+    const nextTitle =
+      contentType.kind === "template" && contentType.mode === "singleton"
+        ? contentType.name
+        : title.trim();
+    if (!nextTitle) return;
     setIsSaving(true);
     setError(null);
     try {
       await updateEntry({
         entryId: entry._id as Id<"contentEntries">,
-        title: title.trim(),
+        title: nextTitle,
         draft: formData,
       });
-      savedTitle.current = title.trim();
+      savedTitle.current = nextTitle;
       savedFormData.current = { ...formData };
       toast.success("Draft saved");
       // Refresh preview after save to reflect persisted state
@@ -112,7 +141,7 @@ export default function EditEntryPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [entry, title, formData, updateEntry]);
+  }, [contentType, entry, formData, title, updateEntry]);
 
   usePreviewRefresh({
     formData,
@@ -142,6 +171,20 @@ export default function EditEntryPage() {
       </div>
     );
   }
+
+  if (contentType.kind === "fragment") {
+    return (
+      <div className="py-12 text-center">
+        <h2 className="text-lg font-medium">Fragments do not have entries</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          This schema is a reusable fragment and can only be edited through
+          templates that reference it.
+        </p>
+      </div>
+    );
+  }
+
+  const isSingletonTemplate = contentType.mode === "singleton";
 
   const handlePublish = async () => {
     try {
@@ -245,15 +288,21 @@ export default function EditEntryPage() {
       </div>
 
       <div className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="edit-title">Title</Label>
-          <Input
-            id="edit-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            disabled={isSaving}
-          />
-        </div>
+        {isSingletonTemplate ? (
+          <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+            Singleton templates use the template name as the entry title.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="edit-title">Title</Label>
+            <Input
+              id="edit-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={isSaving}
+            />
+          </div>
+        )}
 
         <DynamicForm
           fields={contentType.fields}
@@ -261,6 +310,7 @@ export default function EditEntryPage() {
           onChange={setFormData}
           disabled={isSaving}
           siteId={site._id}
+          fragments={fragments}
         />
 
         {error && <p className="text-sm text-destructive">{error}</p>}

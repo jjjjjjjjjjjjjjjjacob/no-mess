@@ -59,12 +59,25 @@ export default function SchemasPage() {
 
   const exportCode = useMemo(() => {
     if (!contentTypes || contentTypes.length === 0) return "";
-    const defs: ContentTypeDefinition[] = contentTypes.map((ct) => ({
-      slug: ct.slug,
-      name: ct.name,
-      description: ct.description,
-      fields: ct.fields,
-    }));
+    const defs: ContentTypeDefinition[] = contentTypes.map((ct) =>
+      ct.kind === "fragment"
+        ? {
+            kind: "fragment",
+            slug: ct.slug,
+            name: ct.name,
+            description: ct.description,
+            fields: ct.fields,
+          }
+        : {
+            kind: "template",
+            slug: ct.slug,
+            name: ct.name,
+            mode: ct.mode === "singleton" ? "singleton" : "collection",
+            route: ct.route,
+            description: ct.description,
+            fields: ct.fields,
+          },
+    );
     return generateSchemaSource({ contentTypes: defs });
   }, [contentTypes]);
 
@@ -232,6 +245,16 @@ export default function SchemasPage() {
                           <CardTitle className="text-base">
                             {type.name}
                           </CardTitle>
+                          <Badge variant="outline">
+                            {type.kind === "fragment"
+                              ? "Fragment"
+                              : type.mode === "singleton"
+                                ? "Singleton"
+                                : "Collection"}
+                          </Badge>
+                          {type.kind === "template" && type.route && (
+                            <Badge variant="outline">Route</Badge>
+                          )}
                           {type.status === "draft" && (
                             <Badge variant="secondary">Draft</Badge>
                           )}
@@ -242,6 +265,9 @@ export default function SchemasPage() {
                         <CardDescription>
                           {type.slug} · {type.fields.length} field
                           {type.fields.length !== 1 ? "s" : ""}
+                          {type.kind === "template" && type.route
+                            ? ` · ${type.route}`
+                            : ""}
                         </CardDescription>
                       </CardHeader>
                     </Card>
