@@ -171,16 +171,11 @@ export interface UseNoMessPreviewResult<T extends NoMessEntry = NoMessEntry> {
 export interface ContentTypeSchema {
   name: string;
   slug: string;
+  kind?: "template" | "fragment";
+  mode?: "singleton" | "collection";
+  route?: string;
   description?: string;
-  fields: {
-    name: string;
-    type: string;
-    required: boolean;
-    description?: string;
-    options?: {
-      choices?: { label: string; value: string }[];
-    };
-  }[];
+  fields: import("./schema/schema-types.js").NamedFieldDefinition[];
   fieldTypeMap: {
     name: string;
     type: string;

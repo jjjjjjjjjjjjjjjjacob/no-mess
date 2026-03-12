@@ -31,6 +31,8 @@ no-mess/
 ## Docs
 
 - [Getting Started](app/(docs)/docs/getting-started/page.tsx) for the core CMS flow
+- [Field Types](app/(docs)/docs/field-types/page.tsx) for primitive and recursive schema fields
+- [CLI & Schema as Code](app/(docs)/docs/cli/page.tsx) for `defineTemplate()`, `defineFragment()`, and schema sync
 - [Preview Mode](app/(docs)/docs/preview/page.tsx) for route-aware preview and the legacy fallback route
 - [Live Edit](app/(docs)/docs/live-edit/page.tsx) for URL-aware live editing on real site routes
 - [Local Development](app/(docs)/docs/local-dev/page.tsx) for localhost preview and Live Edit setup
@@ -78,6 +80,22 @@ The admin dashboard runs at [http://localhost:4567](http://localhost:4567).
 | `bun run test` | Run tests (Vitest) |
 | `bun run test:watch` | Run tests in watch mode |
 | `bun run static-checks` | Full CI suite locally (Biome + TypeScript + commitlint + tests) |
+
+## Schema Migration Utilities
+
+These repo-level scripts are for maintainers migrating existing sites from the
+legacy flat schema model to templates, fragments, and recursive fields:
+
+```bash
+# Backfill stored schema rows to default kind/mode/route fields
+scripts/backfill-schema-model.sh <site-id>
+
+# Preview a site-specific authored-shape migration against JSON input
+bun scripts/preview-template-migration.ts <migration-name> <input-json-path>
+
+# Apply a registered authored-shape migration to a site
+scripts/run-template-migration.sh <site-id> <migration-name>
+```
 
 ## Releasing with Changesets
 

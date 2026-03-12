@@ -41,6 +41,9 @@ export default function NewSchemaPage() {
         siteId: site._id,
         name: data.name,
         slug: data.slug,
+        kind: data.kind,
+        mode: data.kind === "template" ? data.mode : undefined,
+        route: data.kind === "template" ? data.route : undefined,
         description: data.description,
         fields: data.fields,
       });
@@ -70,6 +73,9 @@ export default function NewSchemaPage() {
         siteId: site._id,
         name: data.name,
         slug: data.slug,
+        kind: data.kind,
+        mode: data.kind === "template" ? data.mode : undefined,
+        route: data.kind === "template" ? data.route : undefined,
         description: data.description,
         fields: data.fields,
       });

@@ -1,12 +1,248 @@
 import { ConvexError, v } from "convex/values";
-import { internalQuery, mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import {
+  internalQuery,
+  mutation,
+  type QueryCtx,
+  query,
+} from "./_generated/server";
 import { requireSiteAccess } from "./lib/access";
 import { slugify } from "./lib/utils";
+import type { Field, FieldDefinition } from "./lib/validators";
 
-/**
- * Internal query: get an entry by ID and return draft content.
- * Used by the preview exchange endpoint.
- */
+type NormalizedContentType = {
+  siteId: Id<"sites">;
+  slug: string;
+  kind: "template" | "fragment";
+  mode?: "singleton" | "collection";
+  fields: Field[];
+};
+
+function normalizeFields(value: unknown): Field[] {
+  return Array.isArray(value) ? (value as Field[]) : [];
+}
+
+function normalizeContentType(
+  contentType:
+    | {
+        siteId: Id<"sites">;
+        slug: string;
+        kind?: string;
+        mode?: string;
+        fields?: unknown;
+      }
+    | null
+    | undefined,
+): NormalizedContentType | null {
+  if (!contentType) {
+    return null;
+  }
+
+  const kind = contentType.kind === "fragment" ? "fragment" : "template";
+  return {
+    siteId: contentType.siteId,
+    slug: contentType.slug,
+    kind,
+    mode:
+      kind === "template" && contentType.mode === "singleton"
+        ? "singleton"
+        : "collection",
+    fields: normalizeFields(contentType.fields),
+  };
+}
+
+function buildFragmentMap(
+  contentTypes: {
+    slug: string;
+    kind?: string;
+    mode?: string;
+    fields?: unknown;
+    siteId: Id<"sites">;
+  }[],
+) {
+  const fragments = contentTypes
+    .map((contentType) => normalizeContentType(contentType))
+    .filter(
+      (contentType): contentType is NormalizedContentType =>
+        !!contentType && contentType.kind === "fragment",
+    );
+
+  return new Map(fragments.map((fragment) => [fragment.slug, fragment]));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function isAssetReference(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    !value.startsWith("http://") &&
+    !value.startsWith("https://") &&
+    !value.startsWith("/")
+  );
+}
+
+function collectAssetIdsFromField(
+  field: Field,
+  value: unknown,
+  fragments: Map<string, NormalizedContentType>,
+): string[] {
+  switch (field.type) {
+    case "image":
+      return isAssetReference(value) ? [value] : [];
+    case "gallery":
+      return Array.isArray(value)
+        ? value.filter((item): item is string => isAssetReference(item))
+        : [];
+    case "object":
+      return isRecord(value)
+        ? collectAssetIds(field.fields, value, fragments)
+        : [];
+    case "array":
+      return Array.isArray(value)
+        ? value.flatMap((item) =>
+            collectAssetIdsFromAnonymousField(field.of, item, fragments),
+          )
+        : [];
+    case "fragment": {
+      const fragment = fragments.get(field.fragment);
+      return fragment && isRecord(value)
+        ? collectAssetIds(fragment.fields, value, fragments)
+        : [];
+    }
+    default:
+      return [];
+  }
+}
+
+function collectAssetIdsFromAnonymousField(
+  field: FieldDefinition,
+  value: unknown,
+  fragments: Map<string, NormalizedContentType>,
+): string[] {
+  return collectAssetIdsFromField(field as Field, value, fragments);
+}
+
+function collectAssetIds(
+  fields: Field[],
+  content: Record<string, unknown> | null | undefined,
+  fragments: Map<string, NormalizedContentType>,
+): string[] {
+  if (!content) {
+    return [];
+  }
+
+  return fields.flatMap((field) =>
+    collectAssetIdsFromField(field, content[field.name], fragments),
+  );
+}
+
+async function buildAssetUrlMap(
+  getAsset: (assetId: Id<"assets">) => Promise<{
+    siteId: Id<"sites">;
+    url: string;
+  } | null>,
+  siteId: Id<"sites">,
+  assetIds: Iterable<string>,
+) {
+  const uniqueAssetIds = [...new Set(assetIds)];
+  if (uniqueAssetIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const assets = await Promise.all(
+    uniqueAssetIds.map(async (assetId) => {
+      const asset = await getAsset(assetId as Id<"assets">);
+      return [assetId, asset] as const;
+    }),
+  );
+
+  const assetUrls = new Map<string, string>();
+  for (const [assetId, asset] of assets) {
+    if (asset?.siteId === siteId && asset.url) {
+      assetUrls.set(assetId, asset.url);
+    }
+  }
+
+  return assetUrls;
+}
+
+function resolveAnonymousFieldValue(
+  field: FieldDefinition,
+  value: unknown,
+  assetUrls: Map<string, string>,
+  fragments: Map<string, NormalizedContentType>,
+): unknown {
+  switch (field.type) {
+    case "image":
+      return typeof value === "string"
+        ? (assetUrls.get(value) ?? value)
+        : value;
+    case "gallery":
+      return Array.isArray(value)
+        ? value.map((item) =>
+            typeof item === "string" ? (assetUrls.get(item) ?? item) : item,
+          )
+        : value;
+    case "object":
+      return isRecord(value)
+        ? resolveAssetBackedContent(field.fields, value, assetUrls, fragments)
+        : value;
+    case "array":
+      return Array.isArray(value)
+        ? value.map((item) =>
+            resolveAnonymousFieldValue(field.of, item, assetUrls, fragments),
+          )
+        : value;
+    case "fragment": {
+      const fragment = fragments.get(field.fragment);
+      return fragment && isRecord(value)
+        ? resolveAssetBackedContent(
+            fragment.fields,
+            value,
+            assetUrls,
+            fragments,
+          )
+        : value;
+    }
+    default:
+      return value;
+  }
+}
+
+function resolveAssetBackedContent(
+  fields: Field[],
+  content: Record<string, unknown> | null | undefined,
+  assetUrls: Map<string, string>,
+  fragments: Map<string, NormalizedContentType>,
+): Record<string, unknown> {
+  if (!content) {
+    return {};
+  }
+
+  const resolvedContent: Record<string, unknown> = { ...content };
+  for (const field of fields) {
+    resolvedContent[field.name] = resolveAnonymousFieldValue(
+      field,
+      content[field.name],
+      assetUrls,
+      fragments,
+    );
+  }
+
+  return resolvedContent;
+}
+
+async function getSiteFragments(ctx: QueryCtx, siteId: Id<"sites">) {
+  const contentTypes = await ctx.db
+    .query("contentTypes")
+    .withIndex("by_site", (q) => q.eq("siteId", siteId))
+    .collect();
+
+  return buildFragmentMap(contentTypes);
+}
+
 export const getByIdInternal = internalQuery({
   args: {
     entryId: v.id("contentEntries"),
@@ -17,10 +253,26 @@ export const getByIdInternal = internalQuery({
       return null;
     }
 
+    const contentType = normalizeContentType(
+      await ctx.db.get(entry.contentTypeId),
+    );
+    const fragments = await getSiteFragments(ctx, entry.siteId);
+    const draftContent = (entry.draft as Record<string, unknown>) ?? {};
+    const assetUrls = await buildAssetUrlMap(
+      async (assetId) => await ctx.db.get(assetId),
+      entry.siteId,
+      collectAssetIds(contentType?.fields ?? [], draftContent, fragments),
+    );
+
     return {
       slug: entry.slug,
       title: entry.title,
-      ...((entry.draft as Record<string, unknown>) ?? {}),
+      ...resolveAssetBackedContent(
+        contentType?.fields ?? [],
+        draftContent,
+        assetUrls,
+        fragments,
+      ),
       _id: entry._id,
       _status: entry.status,
       _createdAt: entry.createdAt,
@@ -38,14 +290,33 @@ export const create = mutation({
     draft: v.any(),
   },
   handler: async (ctx, args) => {
-    const contentType = await ctx.db.get(args.contentTypeId);
+    const contentType = normalizeContentType(
+      await ctx.db.get(args.contentTypeId),
+    );
     if (!contentType) {
       throw new ConvexError("Content type not found");
     }
 
-    const { user } = await requireSiteAccess(ctx, contentType.siteId);
+    if (contentType.kind === "fragment") {
+      throw new ConvexError("Fragments cannot have content entries");
+    }
 
-    const entrySlug = args.slug ?? slugify(args.title);
+    const { user } = await requireSiteAccess(ctx, contentType.siteId);
+    const entrySlug =
+      args.slug ??
+      (contentType.mode === "singleton"
+        ? contentType.slug
+        : slugify(args.title));
+
+    if (contentType.mode === "singleton") {
+      const existingEntries = await ctx.db
+        .query("contentEntries")
+        .withIndex("by_type", (q) => q.eq("contentTypeId", args.contentTypeId))
+        .collect();
+      if (existingEntries.length > 0) {
+        throw new ConvexError("Singleton templates can only have one entry");
+      }
+    }
 
     const existing = await ctx.db
       .query("contentEntries")
@@ -62,8 +333,7 @@ export const create = mutation({
     }
 
     const now = Date.now();
-
-    const entryId = await ctx.db.insert("contentEntries", {
+    return await ctx.db.insert("contentEntries", {
       siteId: contentType.siteId,
       contentTypeId: args.contentTypeId,
       title: args.title,
@@ -75,8 +345,6 @@ export const create = mutation({
       updatedAt: now,
       updatedBy: user._id,
     });
-
-    return entryId;
   },
 });
 
@@ -93,10 +361,23 @@ export const update = mutation({
       throw new ConvexError("Content entry not found");
     }
 
+    const contentType = normalizeContentType(
+      await ctx.db.get(entry.contentTypeId),
+    );
+    if (!contentType) {
+      throw new ConvexError("Content type not found");
+    }
+
     const { user } = await requireSiteAccess(ctx, entry.siteId);
 
     if (args.slug !== undefined && args.slug !== entry.slug) {
       const slugToCheck = args.slug;
+      if (contentType.mode === "singleton") {
+        throw new ConvexError(
+          "Singleton entry slugs are fixed by their template",
+        );
+      }
+
       const existing = await ctx.db
         .query("contentEntries")
         .withIndex("by_slug", (q) =>
@@ -112,15 +393,13 @@ export const update = mutation({
       }
     }
 
-    const fields: Record<string, unknown> = {
+    await ctx.db.patch(args.entryId, {
       updatedAt: Date.now(),
       updatedBy: user._id,
-    };
-    if (args.title !== undefined) fields.title = args.title;
-    if (args.slug !== undefined) fields.slug = args.slug;
-    if (args.draft !== undefined) fields.draft = args.draft;
-
-    await ctx.db.patch(args.entryId, fields);
+      ...(args.title !== undefined ? { title: args.title } : {}),
+      ...(args.slug !== undefined ? { slug: args.slug } : {}),
+      ...(args.draft !== undefined ? { draft: args.draft } : {}),
+    });
   },
 });
 
@@ -135,7 +414,6 @@ export const publish = mutation({
     }
 
     const { user } = await requireSiteAccess(ctx, entry.siteId);
-
     const now = Date.now();
 
     await ctx.db.patch(args.entryId, {
@@ -181,7 +459,6 @@ export const remove = mutation({
     }
 
     await requireSiteAccess(ctx, entry.siteId);
-
     await ctx.db.delete(args.entryId);
   },
 });
@@ -197,7 +474,6 @@ export const get = query({
     }
 
     await requireSiteAccess(ctx, entry.siteId);
-
     return entry;
   },
 });
@@ -207,7 +483,9 @@ export const listByType = query({
     contentTypeId: v.id("contentTypes"),
   },
   handler: async (ctx, args) => {
-    const contentType = await ctx.db.get(args.contentTypeId);
+    const contentType = normalizeContentType(
+      await ctx.db.get(args.contentTypeId),
+    );
     if (!contentType) {
       throw new ConvexError("Content type not found");
     }
@@ -246,10 +524,6 @@ export const listBySite = query({
   },
 });
 
-/**
- * Internal query: count entries by content type, grouped by status.
- * Used by the schema introspection HTTP API.
- */
 export const countByTypeInternal = internalQuery({
   args: {
     siteId: v.id("sites"),
@@ -261,48 +535,63 @@ export const countByTypeInternal = internalQuery({
       .withIndex("by_type", (q) => q.eq("contentTypeId", args.contentTypeId))
       .collect();
 
-    const siteEntries = entries.filter((e) => e.siteId === args.siteId);
+    const siteEntries = entries.filter((entry) => entry.siteId === args.siteId);
     return {
-      published: siteEntries.filter((e) => e.status === "published").length,
-      draft: siteEntries.filter((e) => e.status === "draft").length,
+      published: siteEntries.filter((entry) => entry.status === "published")
+        .length,
+      draft: siteEntries.filter((entry) => entry.status === "draft").length,
       total: siteEntries.length,
     };
   },
 });
 
-/**
- * Internal query: list published entries by content type.
- * Used by the HTTP API.
- */
 export const listPublishedByType = internalQuery({
   args: {
     contentTypeId: v.id("contentTypes"),
     siteId: v.id("sites"),
   },
   handler: async (ctx, args) => {
+    const contentType = normalizeContentType(
+      await ctx.db.get(args.contentTypeId),
+    );
+    const fragments = await getSiteFragments(ctx, args.siteId);
     const entries = await ctx.db
       .query("contentEntries")
       .withIndex("by_type", (q) => q.eq("contentTypeId", args.contentTypeId))
       .collect();
 
-    return entries
-      .filter((e) => e.status === "published")
-      .map((e) => ({
-        slug: e.slug,
-        title: e.title,
-        ...((e.published as Record<string, unknown>) ?? {}),
-        _id: e._id,
-        _createdAt: e.createdAt,
-        _updatedAt: e.updatedAt,
-        _publishedAt: e.publishedAt,
-      }));
+    const publishedEntries = entries.filter(
+      (entry) => entry.status === "published",
+    );
+    const assetUrls = await buildAssetUrlMap(
+      async (assetId) => await ctx.db.get(assetId),
+      args.siteId,
+      publishedEntries.flatMap((entry) =>
+        collectAssetIds(
+          contentType?.fields ?? [],
+          (entry.published as Record<string, unknown>) ?? {},
+          fragments,
+        ),
+      ),
+    );
+
+    return publishedEntries.map((entry) => ({
+      slug: entry.slug,
+      title: entry.title,
+      ...resolveAssetBackedContent(
+        contentType?.fields ?? [],
+        (entry.published as Record<string, unknown>) ?? {},
+        assetUrls,
+        fragments,
+      ),
+      _id: entry._id,
+      _createdAt: entry.createdAt,
+      _updatedAt: entry.updatedAt,
+      _publishedAt: entry.publishedAt,
+    }));
   },
 });
 
-/**
- * Internal query: get a single entry by slug.
- * Used by the HTTP API. Returns draft content if preview mode.
- */
 export const getBySlugInternal = internalQuery({
   args: {
     siteId: v.id("sites"),
@@ -333,10 +622,25 @@ export const getBySlugInternal = internalQuery({
       return null;
     }
 
+    const contentType = normalizeContentType(
+      await ctx.db.get(args.contentTypeId),
+    );
+    const fragments = await getSiteFragments(ctx, args.siteId);
+    const assetUrls = await buildAssetUrlMap(
+      async (assetId) => await ctx.db.get(assetId),
+      args.siteId,
+      collectAssetIds(contentType?.fields ?? [], content, fragments),
+    );
+
     return {
       slug: entry.slug,
       title: entry.title,
-      ...(content ?? {}),
+      ...resolveAssetBackedContent(
+        contentType?.fields ?? [],
+        content,
+        assetUrls,
+        fragments,
+      ),
       _id: entry._id,
       _status: entry.status,
       _createdAt: entry.createdAt,

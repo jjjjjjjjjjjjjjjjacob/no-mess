@@ -2,7 +2,9 @@ import {
   FIELD_TYPES,
   type ContentTypeDefinition,
   type FieldDefinition,
-  type FieldType,
+  type NamedFieldDefinition,
+  type SchemaKind,
+  type TemplateMode,
 } from "./schema-types";
 
 export interface ParseError {
@@ -23,11 +25,24 @@ export interface ParseResult {
   warnings: ParseWarning[];
 }
 
+interface ObjectEntry {
+  key: string;
+  value: string;
+}
+
+interface DefineContentTypeResult {
+  contentType: ContentTypeDefinition | null;
+  errors: ParseError[];
+  warnings: ParseWarning[];
+}
+
 const FIELD_TYPE_SET = new Set<string>(FIELD_TYPES);
+const DEFINITION_CALL_PATTERN = /define(ContentType|Template|Fragment)\s*\(/g;
+const VARIABLE_DEFINITION_PATTERN =
+  /(?:const|let|var|export\s+const)\s+(\w+)\s*=\s*define(ContentType|Template|Fragment)\s*\(/g;
 
 /**
- * Parses schema DSL source text and extracts ContentTypeDefinition[].
- * Custom recursive-descent parser — no TS compiler, no eval.
+ * Parses schema DSL source text and extracts template/fragment definitions.
  * Never throws; returns partial results + errors.
  */
 export function parseSchemaSource(source: string): ParseResult {
@@ -35,19 +50,23 @@ export function parseSchemaSource(source: string): ParseResult {
   const warnings: ParseWarning[] = [];
   const contentTypes: ContentTypeDefinition[] = [];
 
-  // Strip comments (line and block) while preserving line positions
   const stripped = stripComments(source);
-
-  // Find all defineContentType( occurrences
-  const pattern = /defineContentType\s*\(/g;
+  const references = collectDefinitionReferences(stripped);
   let match: RegExpExecArray | null;
 
-  while ((match = pattern.exec(stripped)) !== null) {
+  while ((match = DEFINITION_CALL_PATTERN.exec(stripped)) !== null) {
+    const definitionName = match[1];
     const startIdx = match.index + match[0].length;
     const line = lineAt(source, match.index);
 
     try {
-      const result = parseDefineContentTypeArgs(stripped, startIdx, line);
+      const result = parseDefinitionArgs(
+        stripped,
+        startIdx,
+        line,
+        definitionName,
+        references,
+      );
       if (result.contentType) {
         contentTypes.push(result.contentType);
       }
@@ -61,13 +80,10 @@ export function parseSchemaSource(source: string): ParseResult {
       errors.push({
         line,
         column: 0,
-        message: "Failed to parse defineContentType call",
+        message: `Failed to parse define${definitionName} call`,
       });
     }
   }
-
-  // Also support standalone defineSchema({ contentTypes: [...] }) wrapping
-  // The individual defineContentType calls inside are already captured above
 
   return {
     success: errors.length === 0 && contentTypes.length > 0,
@@ -77,81 +93,627 @@ export function parseSchemaSource(source: string): ParseResult {
   };
 }
 
-/**
- * Strip line comments (//) and block comments while preserving newlines.
- */
-function stripComments(source: string): string {
-  let result = "";
-  let i = 0;
+function collectDefinitionReferences(source: string) {
+  const refs = new Map<string, { kind: SchemaKind; slug: string }>();
+  let match: RegExpExecArray | null;
+
+  while ((match = VARIABLE_DEFINITION_PATTERN.exec(source)) !== null) {
+    const variableName = match[1];
+    const definitionName = match[2];
+    const slugStart = skipWhitespace(source, match.index + match[0].length);
+    const slug = parseStringLiteral(source, slugStart)?.value;
+
+    if (!slug) {
+      continue;
+    }
+
+    refs.set(variableName, {
+      kind: definitionName === "Fragment" ? "fragment" : "template",
+      slug,
+    });
+  }
+
+  return refs;
+}
+
+function parseDefinitionArgs(
+  source: string,
+  startIdx: number,
+  baseLine: number,
+  definitionName: string,
+  references: Map<string, { kind: SchemaKind; slug: string }>,
+): DefineContentTypeResult {
+  const errors: ParseError[] = [];
+  const warnings: ParseWarning[] = [];
+
+  let index = skipWhitespace(source, startIdx);
+
+  const slugResult = parseStringLiteral(source, index);
+  if (!slugResult) {
+    errors.push({
+      line: baseLine,
+      column: columnAt(source, index),
+      message: "Expected string literal for schema slug",
+    });
+    return { contentType: null, errors, warnings };
+  }
+
+  const slug = slugResult.value;
+  index = skipWhitespace(source, slugResult.end);
+
+  if (source[index] !== ",") {
+    errors.push({
+      line: lineAt(source, index),
+      column: columnAt(source, index),
+      message: "Expected comma after slug",
+    });
+    return { contentType: null, errors, warnings };
+  }
+
+  index = skipWhitespace(source, index + 1);
+  if (source[index] !== "{") {
+    errors.push({
+      line: lineAt(source, index),
+      column: columnAt(source, index),
+      message: "Expected object literal for schema config",
+    });
+    return { contentType: null, errors, warnings };
+  }
+
+  const configBlock = extractBalanced(source, index, "{", "}");
+  if (!configBlock) {
+    errors.push({
+      line: lineAt(source, index),
+      column: columnAt(source, index),
+      message: "Unterminated config object",
+    });
+    return { contentType: null, errors, warnings };
+  }
+
+  const configEntries = parseObjectEntries(configBlock.inner);
+  const name = parseStringValue(findObjectEntry(configEntries, "name")?.value);
+  if (!name) {
+    warnings.push({
+      line: baseLine,
+      message: `Missing "name" for schema "${slug}"; using slug as name`,
+    });
+  }
+
+  const description = parseStringValue(
+    findObjectEntry(configEntries, "description")?.value,
+  );
+  const route = parseStringValue(findObjectEntry(configEntries, "route")?.value);
+  const rawMode = parseStringValue(findObjectEntry(configEntries, "mode")?.value);
+  const mode: TemplateMode = rawMode === "singleton" ? "singleton" : "collection";
+
+  const fieldsEntry = findObjectEntry(configEntries, "fields");
+  const fields = fieldsEntry
+    ? parseFieldEntries(
+        unwrapObjectLiteral(fieldsEntry.value),
+        baseLine,
+        errors,
+        warnings,
+        references,
+      )
+    : [];
+
+  if (!fieldsEntry) {
+    warnings.push({
+      line: baseLine,
+      message: `Schema "${slug}" is missing a fields object`,
+    });
+  }
+
+  if (definitionName === "Fragment") {
+    return {
+      contentType: {
+        kind: "fragment",
+        slug,
+        name: name || slug,
+        ...(description ? { description } : {}),
+        fields,
+      },
+      errors,
+      warnings,
+    };
+  }
+
+  return {
+    contentType: {
+      kind: "template",
+      slug,
+      name: name || slug,
+      ...(description ? { description } : {}),
+      ...(route ? { route } : {}),
+      mode,
+      fields,
+    },
+    errors,
+    warnings,
+  };
+}
+
+function parseFieldEntries(
+  body: string,
+  baseLine: number,
+  errors: ParseError[],
+  warnings: ParseWarning[],
+  references: Map<string, { kind: SchemaKind; slug: string }>,
+): NamedFieldDefinition[] {
+  const fields: NamedFieldDefinition[] = [];
+  const entries = parseObjectEntries(body);
+
+  for (const entry of entries) {
+    const definition = parseFieldExpression(
+      entry.value,
+      baseLine,
+      entry.key,
+      errors,
+      warnings,
+      references,
+    );
+
+    if (definition) {
+      fields.push({
+        name: entry.key,
+        ...definition,
+      });
+    }
+  }
+
+  return fields;
+}
+
+function parseFieldExpression(
+  expression: string,
+  baseLine: number,
+  fieldName: string,
+  errors: ParseError[],
+  warnings: ParseWarning[],
+  references: Map<string, { kind: SchemaKind; slug: string }>,
+): FieldDefinition | null {
+  const trimmed = expression.trim();
+  const match = /^field\s*\.\s*(\w+)\s*\(/.exec(trimmed);
+
+  if (!match) {
+    errors.push({
+      line: baseLine,
+      column: 0,
+      message: `Expected field builder for "${fieldName}"`,
+    });
+    return null;
+  }
+
+  const fieldType = match[1];
+  if (!FIELD_TYPE_SET.has(fieldType)) {
+    errors.push({
+      line: baseLine,
+      column: 0,
+      message: `Unknown field type "${fieldType}" for field "${fieldName}"`,
+    });
+    return null;
+  }
+
+  const argsBlock = extractBalancedFrom(trimmed, match[0].length - 1, "(", ")");
+  const rawArgs = argsBlock?.inner.trim() ?? "";
+
+  if (fieldType === "object") {
+    const options = parseFieldOptionsObject(rawArgs);
+    const nestedFieldsEntry = findObjectEntry(options, "fields");
+    if (!nestedFieldsEntry) {
+      warnings.push({
+        line: baseLine,
+        message: `Object field "${fieldName}" is missing nested fields`,
+      });
+    }
+
+    return {
+      type: "object",
+      required:
+        parseBooleanValue(findObjectEntry(options, "required")?.value) ?? false,
+      label: parseStringValue(findObjectEntry(options, "label")?.value),
+      description: parseStringValue(
+        findObjectEntry(options, "description")?.value,
+      ),
+      fields: nestedFieldsEntry
+        ? parseFieldEntries(
+            unwrapObjectLiteral(nestedFieldsEntry.value),
+            baseLine,
+            errors,
+            warnings,
+            references,
+          )
+        : [],
+    };
+  }
+
+  if (fieldType === "array") {
+    const options = parseFieldOptionsObject(rawArgs);
+    const ofEntry = findObjectEntry(options, "of");
+    const of = ofEntry
+      ? parseFieldExpression(
+          ofEntry.value,
+          baseLine,
+          `${fieldName}[]`,
+          errors,
+          warnings,
+          references,
+        )
+      : null;
+
+    if (!of) {
+      errors.push({
+        line: baseLine,
+        column: 0,
+        message: `Array field "${fieldName}" is missing a valid "of" definition`,
+      });
+      return null;
+    }
+
+    return {
+      type: "array",
+      required:
+        parseBooleanValue(findObjectEntry(options, "required")?.value) ?? false,
+      label: parseStringValue(findObjectEntry(options, "label")?.value),
+      description: parseStringValue(
+        findObjectEntry(options, "description")?.value,
+      ),
+      of,
+      minItems: parseNumberValue(findObjectEntry(options, "minItems")?.value),
+      maxItems: parseNumberValue(findObjectEntry(options, "maxItems")?.value),
+    };
+  }
+
+  if (fieldType === "fragment") {
+    const args = splitTopLevel(rawArgs);
+    const fragmentToken = args[0]?.trim() ?? "";
+    const fragment =
+      parseStringValue(fragmentToken) ??
+      references.get(fragmentToken)?.slug ??
+      fragmentToken.replace(/[^\w-]/g, "");
+
+    if (!fragment) {
+      errors.push({
+        line: baseLine,
+        column: 0,
+        message: `Fragment field "${fieldName}" is missing a fragment reference`,
+      });
+      return null;
+    }
+
+    const options =
+      args.length > 1 ? parseFieldOptionsObject(args.slice(1).join(",")) : [];
+
+    return {
+      type: "fragment",
+      required:
+        parseBooleanValue(findObjectEntry(options, "required")?.value) ?? false,
+      label: parseStringValue(findObjectEntry(options, "label")?.value),
+      description: parseStringValue(
+        findObjectEntry(options, "description")?.value,
+      ),
+      fragment,
+    };
+  }
+
+  const options = rawArgs ? parseFieldOptionsObject(rawArgs) : [];
+  const label = parseStringValue(findObjectEntry(options, "label")?.value);
+  const description = parseStringValue(
+    findObjectEntry(options, "description")?.value,
+  );
+  const required =
+    parseBooleanValue(findObjectEntry(options, "required")?.value) ?? false;
+
+  if (fieldType === "select") {
+    const choices = parseChoicesArray(
+      findObjectEntry(options, "choices")?.value,
+    );
+
+    return {
+      type: "select",
+      required,
+      ...(label ? { label } : {}),
+      ...(description ? { description } : {}),
+      ...(choices ? { options: { choices } } : {}),
+    };
+  }
+
+  return {
+    type: fieldType as Exclude<
+      FieldDefinition["type"],
+      "object" | "array" | "fragment" | "select"
+    >,
+    required,
+    ...(label ? { label } : {}),
+    ...(description ? { description } : {}),
+  };
+}
+
+function parseFieldOptionsObject(value: string): ObjectEntry[] {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  if (!trimmed.startsWith("{")) {
+    return [];
+  }
+
+  return parseObjectEntries(unwrapObjectLiteral(trimmed));
+}
+
+function parseChoicesArray(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("[")) {
+    return undefined;
+  }
+
+  const items = splitTopLevel(unwrapArrayLiteral(trimmed));
+  const choices: { label: string; value: string }[] = [];
+
+  for (const item of items) {
+    const entries = parseObjectEntries(unwrapObjectLiteral(item));
+    const label = parseStringValue(findObjectEntry(entries, "label")?.value);
+    const choiceValue = parseStringValue(findObjectEntry(entries, "value")?.value);
+
+    if (label !== undefined && choiceValue !== undefined) {
+      choices.push({ label, value: choiceValue });
+    }
+  }
+
+  return choices;
+}
+
+function parseObjectEntries(body: string): ObjectEntry[] {
+  const entries = splitTopLevel(body);
+  const result: ObjectEntry[] = [];
+
+  for (const entry of entries) {
+    const separatorIndex = findTopLevelColon(entry);
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const rawKey = entry.slice(0, separatorIndex).trim();
+    const rawValue = entry.slice(separatorIndex + 1).trim();
+    if (!rawKey || !rawValue) {
+      continue;
+    }
+
+    result.push({
+      key: parseObjectKey(rawKey),
+      value: rawValue,
+    });
+  }
+
+  return result;
+}
+
+function findObjectEntry(entries: ObjectEntry[], key: string) {
+  return entries.find((entry) => entry.key === key);
+}
+
+function parseObjectKey(rawKey: string) {
+  return parseStringValue(rawKey) ?? rawKey;
+}
+
+function splitTopLevel(source: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let parenDepth = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
   let inString: string | null = null;
   let escaped = false;
 
-  while (i < source.length) {
-    const ch = source[i];
-    const next = source[i + 1];
-
+  for (const char of source) {
     if (escaped) {
-      result += ch;
+      current += char;
       escaped = false;
-      i++;
       continue;
     }
 
     if (inString) {
-      if (ch === "\\") {
+      current += char;
+      if (char === "\\") {
         escaped = true;
-        result += ch;
-        i++;
-        continue;
-      }
-      if (ch === inString) {
+      } else if (char === inString) {
         inString = null;
       }
-      result += ch;
-      i++;
       continue;
     }
 
-    // Template literals
-    if (ch === "`") {
-      inString = "`";
-      result += ch;
-      i++;
+    if (char === '"' || char === "'" || char === "`") {
+      inString = char;
+      current += char;
       continue;
     }
 
-    if (ch === '"' || ch === "'") {
-      inString = ch;
-      result += ch;
-      i++;
+    if (char === "(") parenDepth++;
+    if (char === ")") parenDepth--;
+    if (char === "{") braceDepth++;
+    if (char === "}") braceDepth--;
+    if (char === "[") bracketDepth++;
+    if (char === "]") bracketDepth--;
+
+    if (
+      char === "," &&
+      parenDepth === 0 &&
+      braceDepth === 0 &&
+      bracketDepth === 0
+    ) {
+      if (current.trim()) {
+        parts.push(current.trim());
+      }
+      current = "";
       continue;
     }
 
-    // Line comment
-    if (ch === "/" && next === "/") {
-      while (i < source.length && source[i] !== "\n") {
-        result += " ";
-        i++;
+    current += char;
+  }
+
+  if (current.trim()) {
+    parts.push(current.trim());
+  }
+
+  return parts;
+}
+
+function findTopLevelColon(source: string) {
+  let parenDepth = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let inString: string | null = null;
+  let escaped = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (inString) {
+      if (char === "\\") {
+        escaped = true;
+      } else if (char === inString) {
+        inString = null;
       }
       continue;
     }
 
-    // Block comment
-    if (ch === "/" && next === "*") {
-      i += 2;
-      while (i < source.length) {
-        if (source[i] === "*" && source[i + 1] === "/") {
-          i += 2;
+    if (char === '"' || char === "'" || char === "`") {
+      inString = char;
+      continue;
+    }
+
+    if (char === "(") parenDepth++;
+    if (char === ")") parenDepth--;
+    if (char === "{") braceDepth++;
+    if (char === "}") braceDepth--;
+    if (char === "[") bracketDepth++;
+    if (char === "]") bracketDepth--;
+
+    if (
+      char === ":" &&
+      parenDepth === 0 &&
+      braceDepth === 0 &&
+      bracketDepth === 0
+    ) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function parseStringValue(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  return parseStringLiteral(value.trim(), 0)?.value;
+}
+
+function parseBooleanValue(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed === "true") return true;
+  if (trimmed === "false") return false;
+  return undefined;
+}
+
+function parseNumberValue(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function unwrapObjectLiteral(value: string) {
+  const trimmed = value.trim();
+  const block = extractBalanced(trimmed, 0, "{", "}");
+  return block?.inner ?? "";
+}
+
+function unwrapArrayLiteral(value: string) {
+  const trimmed = value.trim();
+  const block = extractBalanced(trimmed, 0, "[", "]");
+  return block?.inner ?? "";
+}
+
+function stripComments(source: string): string {
+  let result = "";
+  let index = 0;
+  let inString: string | null = null;
+  let escaped = false;
+
+  while (index < source.length) {
+    const char = source[index];
+    const next = source[index + 1];
+
+    if (escaped) {
+      result += char;
+      escaped = false;
+      index += 1;
+      continue;
+    }
+
+    if (inString) {
+      if (char === "\\") {
+        escaped = true;
+        result += char;
+        index += 1;
+        continue;
+      }
+      if (char === inString) {
+        inString = null;
+      }
+      result += char;
+      index += 1;
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === "`") {
+      inString = char;
+      result += char;
+      index += 1;
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      while (index < source.length && source[index] !== "\n") {
+        result += " ";
+        index += 1;
+      }
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      index += 2;
+      while (index < source.length) {
+        if (source[index] === "*" && source[index + 1] === "/") {
+          index += 2;
           break;
         }
-        result += source[i] === "\n" ? "\n" : " ";
-        i++;
+        result += source[index] === "\n" ? "\n" : " ";
+        index += 1;
       }
       continue;
     }
 
-    result += ch;
-    i++;
+    result += char;
+    index += 1;
   }
 
   return result;
@@ -159,274 +721,55 @@ function stripComments(source: string): string {
 
 function lineAt(source: string, index: number): number {
   let line = 1;
-  for (let i = 0; i < index && i < source.length; i++) {
-    if (source[i] === "\n") line++;
+  for (let i = 0; i < index && i < source.length; i += 1) {
+    if (source[i] === "\n") {
+      line += 1;
+    }
   }
   return line;
 }
 
 function columnAt(source: string, index: number): number {
-  let col = 1;
-  for (let i = index - 1; i >= 0; i--) {
-    if (source[i] === "\n") break;
-    col++;
-  }
-  return col;
-}
-
-interface DefineContentTypeResult {
-  contentType: ContentTypeDefinition | null;
-  errors: ParseError[];
-  warnings: ParseWarning[];
-}
-
-/**
- * Parse the arguments of defineContentType(slug, config).
- * `startIdx` points to the character after the opening `(`.
- */
-function parseDefineContentTypeArgs(
-  source: string,
-  startIdx: number,
-  baseLine: number,
-): DefineContentTypeResult {
-  const errors: ParseError[] = [];
-  const warnings: ParseWarning[] = [];
-
-  let i = skipWhitespace(source, startIdx);
-
-  // Parse slug (first string argument)
-  const slugResult = parseStringLiteral(source, i);
-  if (!slugResult) {
-    errors.push({
-      line: baseLine,
-      column: columnAt(source, i),
-      message: "Expected string literal for content type slug",
-    });
-    return { contentType: null, errors, warnings };
-  }
-  const slug = slugResult.value;
-  i = skipWhitespace(source, slugResult.end);
-
-  // Expect comma
-  if (source[i] !== ",") {
-    errors.push({
-      line: lineAt(source, i),
-      column: columnAt(source, i),
-      message: "Expected comma after slug",
-    });
-    return { contentType: null, errors, warnings };
-  }
-  i = skipWhitespace(source, i + 1);
-
-  // Parse config object
-  if (source[i] !== "{") {
-    errors.push({
-      line: lineAt(source, i),
-      column: columnAt(source, i),
-      message: "Expected object literal for content type config",
-    });
-    return { contentType: null, errors, warnings };
-  }
-
-  const configResult = extractBalanced(source, i, "{", "}");
-  if (!configResult) {
-    errors.push({
-      line: lineAt(source, i),
-      column: columnAt(source, i),
-      message: "Unterminated config object",
-    });
-    return { contentType: null, errors, warnings };
-  }
-
-  const configBody = configResult.inner;
-
-  // Extract name
-  const name = extractPropertyString(configBody, "name");
-  if (!name) {
-    warnings.push({
-      line: baseLine,
-      message: `Missing "name" for content type "${slug}" — using slug as name`,
-    });
-  }
-
-  // Extract description
-  const description = extractPropertyString(configBody, "description");
-
-  // Extract fields block
-  const fields: FieldDefinition[] = [];
-  const fieldsMatch = /fields\s*:\s*\{/.exec(configBody);
-  if (fieldsMatch) {
-    const fieldsStart =
-      configBody.indexOf("{", fieldsMatch.index + fieldsMatch[0].length - 1);
-    const fieldsBlock = extractBalanced(configBody, fieldsStart, "{", "}");
-    if (fieldsBlock) {
-      const fieldEntries = parseFieldEntries(
-        fieldsBlock.inner,
-        lineAt(source, startIdx),
-        errors,
-        warnings,
-      );
-      fields.push(...fieldEntries);
+  let column = 1;
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (source[i] === "\n") {
+      break;
     }
+    column += 1;
   }
-
-  const contentType: ContentTypeDefinition = {
-    slug,
-    name: name || slug,
-    fields,
-  };
-
-  if (description) {
-    contentType.description = description;
-  }
-
-  return { contentType, errors, warnings };
+  return column;
 }
-
-/**
- * Parse field entries from the fields object body.
- * Each entry is: fieldName: field.type({ ... }) or field.type()
- */
-function parseFieldEntries(
-  body: string,
-  baseLine: number,
-  errors: ParseError[],
-  warnings: ParseWarning[],
-): FieldDefinition[] {
-  const fields: FieldDefinition[] = [];
-
-  // Match patterns like: fieldName: field.type(...) or fieldName: field.type()
-  const fieldPattern =
-    /(\w+)\s*:\s*field\s*\.\s*(\w+)\s*\(/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = fieldPattern.exec(body)) !== null) {
-    const fieldName = match[1];
-    const fieldType = match[2];
-    const argsStart = match.index + match[0].length;
-
-    if (!FIELD_TYPE_SET.has(fieldType)) {
-      errors.push({
-        line: baseLine,
-        column: 0,
-        message: `Unknown field type "${fieldType}" for field "${fieldName}"`,
-      });
-      continue;
-    }
-
-    // Extract the arguments to field.type(...)
-    // Find matching closing paren
-    const argsResult = extractBalancedFrom(body, argsStart - 1, "(", ")");
-    const argsBody = argsResult ? argsResult.inner : "";
-
-    const fieldDef: FieldDefinition = {
-      name: fieldName,
-      type: fieldType as FieldType,
-      required: false,
-    };
-
-    // Parse options from args body
-    if (argsBody.trim()) {
-      // Look for required
-      const requiredMatch = /required\s*:\s*(true|false)/.exec(argsBody);
-      if (requiredMatch) {
-        fieldDef.required = requiredMatch[1] === "true";
-      }
-
-      // Look for description
-      const descMatch = /description\s*:\s*/.exec(argsBody);
-      if (descMatch) {
-        const descStart = descMatch.index + descMatch[0].length;
-        const descStr = parseStringLiteral(argsBody, skipWhitespace(argsBody, descStart));
-        if (descStr) {
-          fieldDef.description = descStr.value;
-        }
-      }
-
-      // Look for choices (select type)
-      if (fieldType === "select") {
-        const choices = parseChoicesArray(argsBody);
-        if (choices.length > 0) {
-          fieldDef.options = { choices };
-        }
-      }
-    }
-
-    fields.push(fieldDef);
-  }
-
-  return fields;
-}
-
-/**
- * Parse a choices array from text like:
- * choices: [{ label: "Foo", value: "foo" }, ...]
- */
-function parseChoicesArray(
-  text: string,
-): { label: string; value: string }[] {
-  const choices: { label: string; value: string }[] = [];
-
-  const choicesMatch = /choices\s*:\s*\[/.exec(text);
-  if (!choicesMatch) return choices;
-
-  const arrayStart = text.indexOf("[", choicesMatch.index);
-  const arrayBlock = extractBalanced(text, arrayStart, "[", "]");
-  if (!arrayBlock) return choices;
-
-  // Find each { ... } in the array
-  const objPattern = /\{/g;
-  let objMatch: RegExpExecArray | null;
-
-  while ((objMatch = objPattern.exec(arrayBlock.inner)) !== null) {
-    const objBlock = extractBalanced(
-      arrayBlock.inner,
-      objMatch.index,
-      "{",
-      "}",
-    );
-    if (!objBlock) continue;
-
-    const label = extractPropertyString(objBlock.inner, "label");
-    const value = extractPropertyString(objBlock.inner, "value");
-
-    if (label && value) {
-      choices.push({ label, value });
-    }
-  }
-
-  return choices;
-}
-
-// === Utility functions ===
 
 function skipWhitespace(source: string, index: number): number {
-  while (index < source.length && /\s/.test(source[index])) {
-    index++;
+  let current = index;
+  while (current < source.length && /\s/.test(source[current])) {
+    current += 1;
   }
-  return index;
+  return current;
 }
 
-/**
- * Parse a string literal (single-quoted, double-quoted, or backtick) at position i.
- */
 function parseStringLiteral(
   source: string,
-  i: number,
+  startIdx: number,
 ): { value: string; end: number } | null {
-  if (i >= source.length) return null;
-  const quote = source[i];
-  if (quote !== '"' && quote !== "'" && quote !== "`") return null;
+  if (startIdx >= source.length) {
+    return null;
+  }
+
+  const quote = source[startIdx];
+  if (quote !== '"' && quote !== "'" && quote !== "`") {
+    return null;
+  }
 
   let value = "";
-  let j = i + 1;
+  let index = startIdx + 1;
   let escaped = false;
 
-  while (j < source.length) {
-    const ch = source[j];
+  while (index < source.length) {
+    const char = source[index];
 
     if (escaped) {
-      switch (ch) {
+      switch (char) {
         case "n":
           value += "\n";
           break;
@@ -437,109 +780,92 @@ function parseStringLiteral(
           value += "\\";
           break;
         default:
-          value += ch;
+          value += char;
           break;
       }
       escaped = false;
-      j++;
+      index += 1;
       continue;
     }
 
-    if (ch === "\\") {
+    if (char === "\\") {
       escaped = true;
-      j++;
+      index += 1;
       continue;
     }
 
-    if (ch === quote) {
-      return { value, end: j + 1 };
+    if (char === quote) {
+      return { value, end: index + 1 };
     }
 
-    value += ch;
-    j++;
+    value += char;
+    index += 1;
   }
 
-  return null; // unterminated string
+  return null;
 }
 
-/**
- * Extract balanced delimiters starting at position i (which must be the opening delimiter).
- */
 function extractBalanced(
   source: string,
-  i: number,
+  startIdx: number,
   open: string,
   close: string,
 ): { inner: string; end: number } | null {
-  if (source[i] !== open) return null;
-  return extractBalancedFrom(source, i, open, close);
+  if (source[startIdx] !== open) {
+    return null;
+  }
+
+  return extractBalancedFrom(source, startIdx, open, close);
 }
 
 function extractBalancedFrom(
   source: string,
-  i: number,
+  openIdx: number,
   open: string,
   close: string,
 ): { inner: string; end: number } | null {
   let depth = 0;
   let inString: string | null = null;
   let escaped = false;
-  const start = i + 1;
+  const contentStart = openIdx + 1;
 
-  while (i < source.length) {
-    const ch = source[i];
+  for (let index = openIdx; index < source.length; index += 1) {
+    const char = source[index];
 
     if (escaped) {
       escaped = false;
-      i++;
       continue;
     }
 
     if (inString) {
-      if (ch === "\\") {
+      if (char === "\\") {
         escaped = true;
-        i++;
-        continue;
-      }
-      if (ch === inString) {
+      } else if (char === inString) {
         inString = null;
       }
-      i++;
       continue;
     }
 
-    if (ch === '"' || ch === "'" || ch === "`") {
-      inString = ch;
-      i++;
+    if (char === '"' || char === "'" || char === "`") {
+      inString = char;
       continue;
     }
 
-    if (ch === open) {
-      depth++;
-    } else if (ch === close) {
-      depth--;
+    if (char === open) {
+      depth += 1;
+      continue;
+    }
+
+    if (char === close) {
+      depth -= 1;
       if (depth === 0) {
-        return { inner: source.slice(start, i), end: i + 1 };
+        return {
+          inner: source.slice(contentStart, index),
+          end: index + 1,
+        };
       }
     }
-
-    i++;
   }
 
   return null;
-}
-
-/**
- * Extract a string property value from an object literal body.
- * Matches: propName: "value" or propName: 'value'
- */
-function extractPropertyString(body: string, propName: string): string | null {
-  const pattern = new RegExp(`(?<![\\w])${propName}\\s*:\\s*`);
-  const match = pattern.exec(body);
-  if (!match) return null;
-
-  const valueStart = match.index + match[0].length;
-  const i = skipWhitespace(body, valueStart);
-  const result = parseStringLiteral(body, i);
-  return result ? result.value : null;
 }

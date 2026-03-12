@@ -1,7 +1,12 @@
 "use client";
 
+import type {
+  FieldDefinition,
+  NamedFieldDefinition,
+} from "@/packages/no-mess-client/src/schema";
 import { BooleanField } from "./fields/boolean-field";
 import { DatetimeField } from "./fields/datetime-field";
+import { GalleryField } from "./fields/gallery-field";
 import { ImageField } from "./fields/image-field";
 import { NumberField } from "./fields/number-field";
 import { SelectField } from "./fields/select-field";
@@ -11,15 +16,7 @@ import { TextField } from "./fields/text-field";
 import { TextareaField } from "./fields/textarea-field";
 import { UrlField } from "./fields/url-field";
 
-export type FieldDefinition = {
-  name: string;
-  type: string;
-  required: boolean;
-  description?: string;
-  options?: {
-    choices?: { label: string; value: string }[];
-  };
-};
+export type { FieldDefinition, NamedFieldDefinition };
 
 export function renderField(
   field: FieldDefinition,
@@ -93,6 +90,14 @@ export function renderField(
           disabled={disabled}
         />
       );
+    case "gallery":
+      return (
+        <GalleryField
+          value={Array.isArray(value) ? (value as string[]) : []}
+          onChange={onChange}
+          disabled={disabled}
+        />
+      );
     case "shopifyProduct":
       return (
         <ShopifyProductField
@@ -110,12 +115,6 @@ export function renderField(
         />
       );
     default:
-      return (
-        <TextField
-          value={(value as string) ?? ""}
-          onChange={onChange}
-          disabled={disabled}
-        />
-      );
+      return null;
   }
 }

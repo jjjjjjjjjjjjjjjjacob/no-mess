@@ -10,6 +10,53 @@ npm install @no-mess/client
 bun add @no-mess/client
 ```
 
+## Schema Builder
+
+Use `@no-mess/client/schema` to define route-bound templates, reusable
+fragments, and recursive fields:
+
+```ts
+import {
+  defineFragment,
+  defineSchema,
+  defineTemplate,
+  field,
+} from "@no-mess/client/schema";
+
+const imageWithAlt = defineFragment("image-with-alt", {
+  name: "Image With Alt",
+  fields: {
+    image: field.image({ required: true }),
+    alt: field.text(),
+  },
+});
+
+const homePage = defineTemplate("home-page", {
+  name: "Home Page",
+  mode: "singleton",
+  route: "/",
+  fields: {
+    hero: field.object({
+      fields: {
+        headline: field.text({ required: true }),
+        slides: field.array({
+          of: field.fragment(imageWithAlt),
+          minItems: 1,
+        }),
+      },
+    }),
+  },
+});
+
+export default defineSchema({
+  contentTypes: [imageWithAlt, homePage],
+});
+```
+
+`defineContentType()` remains available as a compatibility alias for template
+definitions, but new code should prefer `defineTemplate()` and
+`defineFragment()`.
+
 ## Fetch Content
 
 ```ts
@@ -130,9 +177,9 @@ await client.reportLiveEditRoute({
 
 | Method | Description |
 |--------|-------------|
-| `client.getSchemas()` | List all content type schemas |
+| `client.getSchemas()` | List all template and fragment schemas |
 | `client.getSchema(typeSlug)` | Get a single schema by slug |
-| `client.getEntries(contentType)` | Fetch all published entries of a content type |
+| `client.getEntries(contentType)` | Fetch all published entries of a template |
 | `client.getEntry(contentType, slug)` | Get a single entry by slug |
 
 ### Preview / Live Edit

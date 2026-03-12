@@ -11,6 +11,7 @@ describe("field builders", () => {
       ["datetime", field.datetime],
       ["url", field.url],
       ["image", field.image],
+      ["gallery", field.gallery],
       ["shopifyProduct", field.shopifyProduct],
       ["shopifyCollection", field.shopifyCollection],
     ] as const;

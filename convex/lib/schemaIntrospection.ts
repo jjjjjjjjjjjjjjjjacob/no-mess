@@ -11,6 +11,8 @@ function fieldToTsType(field: Field): string {
     case "image":
     case "datetime":
       return "string";
+    case "gallery":
+      return "string[]";
     case "number":
       return "number";
     case "boolean":

@@ -1,18 +1,40 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-const SCHEMA_TEMPLATE = `import { defineSchema, defineContentType, field } from "@no-mess/client/schema";
+const SCHEMA_TEMPLATE = `import {
+  defineFragment,
+  defineSchema,
+  defineTemplate,
+  field,
+} from "@no-mess/client/schema";
 
-const example = defineContentType("example", {
-  name: "Example",
-  description: "An example content type — replace with your own",
+const imageWithAlt = defineFragment("image-with-alt", {
+  name: "Image With Alt",
   fields: {
-    title: field.text({ required: true }),
-    body: field.textarea(),
+    image: field.image({ required: true }),
+    alt: field.text(),
   },
 });
 
-export default defineSchema({ contentTypes: [example] });
+const homePage = defineTemplate("home-page", {
+  name: "Home Page",
+  description: "A route-bound singleton template you can extend",
+  mode: "singleton",
+  route: "/",
+  fields: {
+    hero: field.object({
+      fields: {
+        headline: field.text({ required: true }),
+        slides: field.array({
+          of: field.fragment(imageWithAlt),
+          minItems: 1,
+        }),
+      },
+    }),
+  },
+});
+
+export default defineSchema({ contentTypes: [imageWithAlt, homePage] });
 `;
 
 const ENV_TEMPLATE = `# no-mess CLI configuration
@@ -54,7 +76,7 @@ export async function initCommand(args: string[]): Promise<void> {
   console.log(`
 Next steps:
   1. Add your secret API key to .env or .env.local (NO_MESS_API_KEY=nm_...)
-  2. Edit ${schemaPath} to define your content types
+  2. Edit ${schemaPath} to define your templates and fragments
   3. Run \`no-mess push\` to sync schemas to the dashboard
   4. Run \`no-mess dev\` for watch mode
 `);

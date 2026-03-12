@@ -3,8 +3,8 @@
 import { useQuery } from "convex/react";
 import { ArrowUpDown, FileText, Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { EntryContextMenu } from "@/components/content-entries/entry-context-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -29,6 +29,7 @@ const sortCycle: Record<SortBy, SortBy> = {
 };
 
 export default function EntriesListPage() {
+  const router = useRouter();
   const { site, siteSlug } = useSite();
   const params = useParams<{ typeSlug: string }>();
   const contentType = useQuery(
@@ -76,6 +77,32 @@ export default function EntriesListPage() {
   }, [entries, searchQuery, statusFilter, sortBy]);
 
   const isFiltered = searchQuery !== "" || statusFilter !== "all";
+  const isSingletonTemplate =
+    contentType?.kind === "template" && contentType.mode === "singleton";
+
+  useEffect(() => {
+    if (
+      !site ||
+      !contentType ||
+      !isSingletonTemplate ||
+      entries === undefined
+    ) {
+      return;
+    }
+
+    const target = entries[0]
+      ? `/sites/${siteSlug}/content/${params.typeSlug}/${entries[0].slug}`
+      : `/sites/${siteSlug}/content/${params.typeSlug}/new`;
+    router.replace(target);
+  }, [
+    contentType,
+    entries,
+    isSingletonTemplate,
+    params.typeSlug,
+    router,
+    site,
+    siteSlug,
+  ]);
 
   if (!site) return null;
 
@@ -92,6 +119,29 @@ export default function EntriesListPage() {
     return (
       <div className="py-12 text-center">
         <h2 className="text-lg font-medium">Content type not found</h2>
+      </div>
+    );
+  }
+
+  if (contentType.kind === "fragment") {
+    return (
+      <div className="py-12 text-center">
+        <h2 className="text-lg font-medium">Fragments do not have entries</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          This schema is a reusable fragment and can only be edited through
+          templates that reference it.
+        </p>
+      </div>
+    );
+  }
+
+  if (isSingletonTemplate) {
+    return (
+      <div className="py-12 text-center">
+        <h2 className="text-lg font-medium">Opening singleton entry</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Redirecting to the single authoring view for {contentType.name}.
+        </p>
       </div>
     );
   }

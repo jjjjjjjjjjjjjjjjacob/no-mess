@@ -1,48 +1,276 @@
 import { ConvexError, v } from "convex/values";
+import { getTemplateMigration } from "../lib/template-migrations";
+import type { Id } from "./_generated/dataModel";
 import {
   internalMutation,
   internalQuery,
+  type MutationCtx,
   mutation,
   query,
 } from "./_generated/server";
 import { requireSiteAccess, requireSiteOwner } from "./lib/access";
-import { contentFieldsValidator, fieldTypeValidator } from "./lib/validators";
+import {
+  type Field,
+  type SchemaKind,
+  type TemplateMode,
+  validateNamedFields,
+} from "./lib/validators";
+
+type DraftSchemaData = {
+  name: string;
+  slug: string;
+  kind: SchemaKind;
+  mode?: TemplateMode;
+  route?: string;
+  description?: string;
+  fields: Field[];
+};
+
+function normalizeKind(value: unknown): SchemaKind {
+  return value === "fragment" ? "fragment" : "template";
+}
+
+function normalizeMode(value: unknown): TemplateMode {
+  return value === "singleton" ? "singleton" : "collection";
+}
+
+function normalizeFields(value: unknown): Field[] {
+  return Array.isArray(value) ? (value as Field[]) : [];
+}
+
+function parseOptionalString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function assertValidFields(fields: unknown) {
+  const errors = validateNamedFields(fields);
+  if (errors.length > 0) {
+    throw new ConvexError(errors.join("; "));
+  }
+  return normalizeFields(fields);
+}
+
+async function assertSlugAvailable(
+  ctx: MutationCtx,
+  siteId: Id<"sites">,
+  slug: string,
+  excludeContentTypeId?: Id<"contentTypes">,
+) {
+  const existing = await ctx.db
+    .query("contentTypes")
+    .withIndex("by_slug", (q) => q.eq("siteId", siteId).eq("slug", slug))
+    .first();
+
+  if (existing && existing._id !== excludeContentTypeId) {
+    throw new ConvexError(
+      "A content type with this slug already exists for this site",
+    );
+  }
+}
+
+async function assertCanBecomeFragment(
+  ctx: MutationCtx,
+  contentTypeId: Id<"contentTypes">,
+) {
+  const entries = await ctx.db
+    .query("contentEntries")
+    .withIndex("by_type", (q) => q.eq("contentTypeId", contentTypeId))
+    .collect();
+
+  if (entries.length > 0) {
+    throw new ConvexError(
+      "Templates with entries cannot be converted into fragments",
+    );
+  }
+}
+
+function normalizeDraftData(
+  draft: unknown,
+  fallback: {
+    name: string;
+    slug: string;
+    kind?: unknown;
+    mode?: unknown;
+    route?: unknown;
+    description?: unknown;
+    fields?: unknown;
+  },
+): DraftSchemaData | undefined {
+  if (!draft || typeof draft !== "object") {
+    return undefined;
+  }
+
+  const raw = draft as Record<string, unknown>;
+  const kind = normalizeKind(raw.kind ?? fallback.kind);
+  return {
+    name:
+      parseOptionalString(raw.name) ??
+      parseOptionalString(fallback.name) ??
+      "Untitled Schema",
+    slug:
+      parseOptionalString(raw.slug) ?? parseOptionalString(fallback.slug) ?? "",
+    kind,
+    mode:
+      kind === "template"
+        ? normalizeMode(raw.mode ?? fallback.mode)
+        : undefined,
+    route:
+      kind === "template"
+        ? (parseOptionalString(raw.route) ??
+          parseOptionalString(fallback.route))
+        : undefined,
+    description:
+      parseOptionalString(raw.description) ??
+      parseOptionalString(fallback.description),
+    fields: normalizeFields(raw.fields ?? fallback.fields),
+  };
+}
+
+function normalizeContentTypeRecord<
+  T extends Record<string, unknown> & {
+    name: string;
+    slug: string;
+    siteId: Id<"sites">;
+  },
+>(contentType: T) {
+  const kind = normalizeKind(contentType.kind);
+  const normalized = {
+    ...contentType,
+    kind,
+    mode: kind === "template" ? normalizeMode(contentType.mode) : undefined,
+    route:
+      kind === "template" ? parseOptionalString(contentType.route) : undefined,
+    fields: normalizeFields(contentType.fields),
+  };
+
+  const draft = normalizeDraftData(contentType.draft, normalized);
+  return {
+    ...normalized,
+    draft,
+  };
+}
+
+function mergeFields(
+  existingFields: Field[],
+  incomingFields: Field[],
+): Field[] {
+  const existingByName = new Map(
+    existingFields.map((field) => [field.name, field]),
+  );
+  const merged: Field[] = [];
+
+  for (const incomingField of incomingFields) {
+    const existingField = existingByName.get(incomingField.name);
+    existingByName.delete(incomingField.name);
+
+    if (
+      existingField &&
+      existingField.type === "object" &&
+      incomingField.type === "object"
+    ) {
+      merged.push({
+        ...incomingField,
+        fields: mergeFields(existingField.fields, incomingField.fields),
+      });
+      continue;
+    }
+
+    merged.push(incomingField);
+  }
+
+  return [...merged, ...existingByName.values()];
+}
+
+function buildDraftData(input: {
+  name: string;
+  slug: string;
+  kind?: unknown;
+  mode?: unknown;
+  route?: unknown;
+  description?: string;
+  fields: Field[];
+}): DraftSchemaData {
+  const kind = normalizeKind(input.kind);
+  return {
+    name: input.name.trim(),
+    slug: input.slug.trim(),
+    kind,
+    mode: kind === "template" ? normalizeMode(input.mode) : undefined,
+    route: kind === "template" ? parseOptionalString(input.route) : undefined,
+    description: parseOptionalString(input.description),
+    fields: input.fields,
+  };
+}
+
+async function runSchemaModelBackfillForSite(
+  ctx: MutationCtx,
+  siteId?: Id<"sites">,
+) {
+  const contentTypes = siteId
+    ? await ctx.db
+        .query("contentTypes")
+        .withIndex("by_site", (q) => q.eq("siteId", siteId))
+        .collect()
+    : await ctx.db.query("contentTypes").collect();
+
+  let updated = 0;
+
+  for (const contentType of contentTypes) {
+    const normalized = normalizeContentTypeRecord(contentType);
+    await ctx.db.patch(contentType._id, {
+      kind: normalized.kind,
+      mode: normalized.mode,
+      route: normalized.route,
+      fields: normalized.fields,
+      draft: normalized.draft,
+      updatedAt: Date.now(),
+    });
+    updated += 1;
+  }
+
+  return { updated };
+}
 
 export const create = mutation({
   args: {
     siteId: v.id("sites"),
     name: v.string(),
     slug: v.string(),
+    kind: v.optional(v.string()),
+    mode: v.optional(v.string()),
+    route: v.optional(v.string()),
     description: v.optional(v.string()),
-    fields: contentFieldsValidator,
+    fields: v.any(),
   },
   handler: async (ctx, args) => {
     await requireSiteAccess(ctx, args.siteId);
 
-    const existing = await ctx.db
-      .query("contentTypes")
-      .withIndex("by_slug", (q) =>
-        q.eq("siteId", args.siteId).eq("slug", args.slug),
-      )
-      .first();
+    const fields = assertValidFields(args.fields);
+    await assertSlugAvailable(ctx, args.siteId, args.slug);
 
-    if (existing) {
-      throw new ConvexError(
-        "A content type with this slug already exists for this site",
-      );
-    }
-
-    const fieldNames = args.fields.map((f) => f.name);
-    if (new Set(fieldNames).size !== fieldNames.length) {
-      throw new ConvexError("Field names must be unique within a content type");
-    }
+    const draftData = buildDraftData({
+      name: args.name,
+      slug: args.slug,
+      kind: args.kind,
+      mode: args.mode,
+      route: args.route,
+      description: args.description,
+      fields,
+    });
 
     const contentTypeId = await ctx.db.insert("contentTypes", {
       siteId: args.siteId,
-      name: args.name,
-      slug: args.slug,
-      description: args.description,
-      fields: args.fields,
+      name: draftData.name,
+      slug: draftData.slug,
+      kind: draftData.kind,
+      mode: draftData.mode,
+      route: draftData.route,
+      description: draftData.description,
+      fields: draftData.fields,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -56,8 +284,11 @@ export const update = mutation({
     contentTypeId: v.id("contentTypes"),
     name: v.optional(v.string()),
     slug: v.optional(v.string()),
+    kind: v.optional(v.string()),
+    mode: v.optional(v.string()),
+    route: v.optional(v.string()),
     description: v.optional(v.string()),
-    fields: v.optional(contentFieldsValidator),
+    fields: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const contentType = await ctx.db.get(args.contentTypeId);
@@ -65,40 +296,56 @@ export const update = mutation({
       throw new ConvexError("Content type not found");
     }
 
-    await requireSiteAccess(ctx, contentType.siteId);
+    const normalized = normalizeContentTypeRecord(contentType);
+    await requireSiteAccess(ctx, normalized.siteId);
+
+    const nextKind = normalizeKind(args.kind ?? normalized.kind);
+    if (normalized.kind === "template" && nextKind === "fragment") {
+      await assertCanBecomeFragment(ctx, args.contentTypeId);
+    }
 
     if (args.slug !== undefined) {
-      const slugToCheck = args.slug;
-      const existing = await ctx.db
-        .query("contentTypes")
-        .withIndex("by_slug", (q) =>
-          q.eq("siteId", contentType.siteId).eq("slug", slugToCheck),
-        )
-        .first();
-
-      if (existing && existing._id !== args.contentTypeId) {
-        throw new ConvexError(
-          "A content type with this slug already exists for this site",
-        );
-      }
+      await assertSlugAvailable(
+        ctx,
+        normalized.siteId,
+        args.slug,
+        args.contentTypeId,
+      );
     }
 
-    if (args.fields !== undefined) {
-      const fieldNames = args.fields.map((f) => f.name);
-      if (new Set(fieldNames).size !== fieldNames.length) {
-        throw new ConvexError(
-          "Field names must be unique within a content type",
-        );
-      }
-    }
+    const fields =
+      args.fields !== undefined
+        ? assertValidFields(args.fields)
+        : normalized.fields;
 
-    const fields: Record<string, unknown> = { updatedAt: Date.now() };
-    if (args.name !== undefined) fields.name = args.name;
-    if (args.slug !== undefined) fields.slug = args.slug;
-    if (args.description !== undefined) fields.description = args.description;
-    if (args.fields !== undefined) fields.fields = args.fields;
-
-    await ctx.db.patch(args.contentTypeId, fields);
+    await ctx.db.patch(args.contentTypeId, {
+      updatedAt: Date.now(),
+      ...(args.name !== undefined ? { name: args.name.trim() } : {}),
+      ...(args.slug !== undefined ? { slug: args.slug.trim() } : {}),
+      ...(args.description !== undefined
+        ? { description: parseOptionalString(args.description) }
+        : {}),
+      ...(args.kind !== undefined ? { kind: nextKind } : {}),
+      ...(args.mode !== undefined ||
+      (args.kind !== undefined && nextKind === "template")
+        ? {
+            mode:
+              nextKind === "template"
+                ? normalizeMode(args.mode ?? normalized.mode)
+                : undefined,
+          }
+        : {}),
+      ...(args.route !== undefined ||
+      (args.kind !== undefined && nextKind === "fragment")
+        ? {
+            route:
+              nextKind === "template"
+                ? parseOptionalString(args.route ?? normalized.route)
+                : undefined,
+          }
+        : {}),
+      ...(args.fields !== undefined ? { fields } : {}),
+    });
   },
 });
 
@@ -112,7 +359,8 @@ export const remove = mutation({
       throw new ConvexError("Content type not found");
     }
 
-    await requireSiteOwner(ctx, contentType.siteId);
+    const normalized = normalizeContentTypeRecord(contentType);
+    await requireSiteOwner(ctx, normalized.siteId);
 
     const entries = await ctx.db
       .query("contentEntries")
@@ -136,9 +384,10 @@ export const get = query({
       throw new ConvexError("Content type not found");
     }
 
-    await requireSiteAccess(ctx, contentType.siteId);
+    const normalized = normalizeContentTypeRecord(contentType);
+    await requireSiteAccess(ctx, normalized.siteId);
 
-    return contentType;
+    return normalized;
   },
 });
 
@@ -154,12 +403,13 @@ export const listBySite = query({
       .withIndex("by_site", (q) => q.eq("siteId", args.siteId))
       .collect();
 
-    return contentTypes.map((ct) => {
-      const { draft: _draft, ...rest } = ct;
+    return contentTypes.map((contentType) => {
+      const normalized = normalizeContentTypeRecord(contentType);
+      const { draft: _draft, ...rest } = normalized;
       return {
         ...rest,
-        status: (ct.status ?? "published") as "draft" | "published",
-        hasDraft: ct.draft !== undefined,
+        status: (normalized.status ?? "published") as "draft" | "published",
+        hasDraft: normalized.draft !== undefined,
       };
     });
   },
@@ -173,12 +423,14 @@ export const getBySlug = query({
   handler: async (ctx, args) => {
     await requireSiteAccess(ctx, args.siteId);
 
-    return await ctx.db
+    const contentType = await ctx.db
       .query("contentTypes")
       .withIndex("by_slug", (q) =>
         q.eq("siteId", args.siteId).eq("slug", args.slug),
       )
       .first();
+
+    return contentType ? normalizeContentTypeRecord(contentType) : null;
   },
 });
 
@@ -208,8 +460,8 @@ export const checkSlugAvailability = query({
     }
 
     const suggestions: string[] = [];
-    for (let i = 1; i <= 10 && suggestions.length < 3; i++) {
-      const candidate = `${args.slug}-${i}`;
+    for (let index = 1; index <= 10 && suggestions.length < 3; index += 1) {
+      const candidate = `${args.slug}-${index}`;
       const taken = await ctx.db
         .query("contentTypes")
         .withIndex("by_slug", (q) =>
@@ -225,10 +477,6 @@ export const checkSlugAvailability = query({
   },
 });
 
-/**
- * Internal query to list all published content types for a site.
- * Used by the schema introspection HTTP API.
- */
 export const listBySiteInternal = internalQuery({
   args: { siteId: v.id("sites") },
   handler: async (ctx, args) => {
@@ -237,15 +485,12 @@ export const listBySiteInternal = internalQuery({
       .withIndex("by_site", (q) => q.eq("siteId", args.siteId))
       .collect();
 
-    // Only return published content types (exclude draft-only schemas)
-    return contentTypes.filter((ct) => ct.status !== "draft");
+    return contentTypes
+      .filter((contentType) => contentType.status !== "draft")
+      .map((contentType) => normalizeContentTypeRecord(contentType));
   },
 });
 
-/**
- * Internal query to get a content type by site ID and slug.
- * Used by the HTTP API. Returns null for draft-only schemas.
- */
 export const getBySlugInternal = internalQuery({
   args: {
     siteId: v.id("sites"),
@@ -259,12 +504,11 @@ export const getBySlugInternal = internalQuery({
       )
       .first();
 
-    if (!contentType) return null;
+    if (!contentType || contentType.status === "draft") {
+      return null;
+    }
 
-    // Never serve draft-only schemas via the public API
-    if (contentType.status === "draft") return null;
-
-    return contentType;
+    return normalizeContentTypeRecord(contentType);
   },
 });
 
@@ -273,46 +517,43 @@ export const createDraft = mutation({
     siteId: v.id("sites"),
     name: v.optional(v.string()),
     slug: v.optional(v.string()),
+    kind: v.optional(v.string()),
+    mode: v.optional(v.string()),
+    route: v.optional(v.string()),
     description: v.optional(v.string()),
-    fields: v.optional(contentFieldsValidator),
+    fields: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     await requireSiteAccess(ctx, args.siteId);
 
     const name = args.name?.trim() || "Untitled Schema";
     const slug = args.slug?.trim() || "";
-    const fields = args.fields ?? [];
+    const fields = assertValidFields(args.fields ?? []);
 
-    // Check slug uniqueness if provided
     if (slug) {
-      const existing = await ctx.db
-        .query("contentTypes")
-        .withIndex("by_slug", (q) =>
-          q.eq("siteId", args.siteId).eq("slug", slug),
-        )
-        .first();
-
-      if (existing) {
-        throw new ConvexError(
-          "A content type with this slug already exists for this site",
-        );
-      }
+      await assertSlugAvailable(ctx, args.siteId, slug);
     }
 
     const now = Date.now();
-    const draftData = {
+    const draftData = buildDraftData({
       name,
       slug,
-      description: args.description?.trim() || undefined,
+      kind: args.kind,
+      mode: args.mode,
+      route: args.route,
+      description: args.description,
       fields,
-    };
+    });
 
     const contentTypeId = await ctx.db.insert("contentTypes", {
       siteId: args.siteId,
-      name,
-      slug,
+      name: draftData.name,
+      slug: draftData.slug,
+      kind: draftData.kind,
+      mode: draftData.mode,
+      route: draftData.route,
       description: draftData.description,
-      fields,
+      fields: draftData.fields,
       status: "draft",
       draft: draftData,
       draftUpdatedAt: now,
@@ -324,13 +565,94 @@ export const createDraft = mutation({
   },
 });
 
+export const runSchemaModelBackfill = mutation({
+  args: {
+    siteId: v.id("sites"),
+  },
+  handler: async (ctx, args) => {
+    await requireSiteOwner(ctx, args.siteId);
+    return runSchemaModelBackfillForSite(ctx, args.siteId);
+  },
+});
+
+export const runTemplateMigration = mutation({
+  args: {
+    siteId: v.id("sites"),
+    migrationName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireSiteOwner(ctx, args.siteId);
+
+    const migration = getTemplateMigration(args.migrationName);
+    if (!migration) {
+      throw new ConvexError(
+        `Unknown template migration: ${args.migrationName}`,
+      );
+    }
+
+    const contentType = await ctx.db
+      .query("contentTypes")
+      .withIndex("by_slug", (q) =>
+        q.eq("siteId", args.siteId).eq("slug", migration.contentTypeSlug),
+      )
+      .first();
+
+    if (!contentType) {
+      throw new ConvexError(
+        `Content type not found for migration: ${migration.contentTypeSlug}`,
+      );
+    }
+
+    const normalized = normalizeContentTypeRecord(contentType);
+    const nextFields = migration.nextFields ?? normalized.fields;
+    const entries = await ctx.db
+      .query("contentEntries")
+      .withIndex("by_type", (q) => q.eq("contentTypeId", contentType._id))
+      .collect();
+
+    const now = Date.now();
+
+    for (const entry of entries) {
+      await ctx.db.patch(entry._id, {
+        draft: isRecord(entry.draft)
+          ? migration.transformEntry(entry.draft)
+          : entry.draft,
+        published: isRecord(entry.published)
+          ? migration.transformEntry(entry.published)
+          : entry.published,
+        updatedAt: now,
+      });
+    }
+
+    await ctx.db.patch(contentType._id, {
+      fields: nextFields,
+      draft: normalized.draft
+        ? {
+            ...normalized.draft,
+            fields: nextFields,
+          }
+        : undefined,
+      updatedAt: now,
+    });
+
+    return {
+      migration: migration.name,
+      contentTypeId: contentType._id,
+      updatedEntries: entries.length,
+    };
+  },
+});
+
 export const saveDraft = mutation({
   args: {
     contentTypeId: v.id("contentTypes"),
     name: v.optional(v.string()),
     slug: v.optional(v.string()),
+    kind: v.optional(v.string()),
+    mode: v.optional(v.string()),
+    route: v.optional(v.string()),
     description: v.optional(v.string()),
-    fields: v.optional(contentFieldsValidator),
+    fields: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const contentType = await ctx.db.get(args.contentTypeId);
@@ -338,63 +660,69 @@ export const saveDraft = mutation({
       throw new ConvexError("Content type not found");
     }
 
-    await requireSiteAccess(ctx, contentType.siteId);
+    const normalized = normalizeContentTypeRecord(contentType);
+    await requireSiteAccess(ctx, normalized.siteId);
 
-    const currentDraft = (contentType.draft as Record<string, unknown>) ?? {};
-    const draftData = {
+    const currentDraft = normalized.draft;
+    const nextKind = normalizeKind(
+      args.kind ?? currentDraft?.kind ?? normalized.kind,
+    );
+    if (normalized.kind === "template" && nextKind === "fragment") {
+      await assertCanBecomeFragment(ctx, args.contentTypeId);
+    }
+
+    const draftData = buildDraftData({
       name:
-        args.name?.trim() ?? (currentDraft.name as string) ?? contentType.name,
+        args.name?.trim() ?? currentDraft?.name ?? (normalized.name as string),
       slug:
-        args.slug?.trim() ?? (currentDraft.slug as string) ?? contentType.slug,
+        args.slug?.trim() ?? currentDraft?.slug ?? (normalized.slug as string),
+      kind: nextKind,
+      mode: args.mode ?? currentDraft?.mode ?? normalized.mode,
+      route: args.route ?? currentDraft?.route ?? normalized.route,
       description:
         args.description !== undefined
-          ? args.description?.trim() || undefined
-          : ((currentDraft.description as string | undefined) ??
-            contentType.description),
+          ? args.description
+          : (currentDraft?.description ??
+            (normalized.description as string | undefined)),
       fields:
-        args.fields ??
-        (currentDraft.fields as typeof contentType.fields) ??
-        contentType.fields,
-    };
+        args.fields !== undefined
+          ? assertValidFields(args.fields)
+          : (currentDraft?.fields ?? normalized.fields),
+    });
+
+    if (draftData.slug) {
+      await assertSlugAvailable(
+        ctx,
+        normalized.siteId,
+        draftData.slug,
+        args.contentTypeId,
+      );
+    }
 
     const now = Date.now();
-    const status = contentType.status ?? "published";
+    const status = normalized.status ?? "published";
 
     if (status === "draft") {
-      // Draft-only schema: update both top-level and draft fields
-      // Check slug uniqueness if slug is changing
-      if (draftData.slug && draftData.slug !== contentType.slug) {
-        const existing = await ctx.db
-          .query("contentTypes")
-          .withIndex("by_slug", (q) =>
-            q.eq("siteId", contentType.siteId).eq("slug", draftData.slug),
-          )
-          .first();
-
-        if (existing && existing._id !== args.contentTypeId) {
-          throw new ConvexError(
-            "A content type with this slug already exists for this site",
-          );
-        }
-      }
-
       await ctx.db.patch(args.contentTypeId, {
         name: draftData.name,
         slug: draftData.slug,
+        kind: draftData.kind,
+        mode: draftData.mode,
+        route: draftData.route,
         description: draftData.description,
         fields: draftData.fields,
         draft: draftData,
         draftUpdatedAt: now,
         updatedAt: now,
       });
-    } else {
-      // Published schema: only update draft field, leave published data untouched
-      await ctx.db.patch(args.contentTypeId, {
-        draft: draftData,
-        draftUpdatedAt: now,
-        updatedAt: now,
-      });
+      return;
     }
+
+    await ctx.db.patch(args.contentTypeId, {
+      draft: draftData,
+      draftUpdatedAt: now,
+      updatedAt: now,
+    });
   },
 });
 
@@ -408,60 +736,42 @@ export const publish = mutation({
       throw new ConvexError("Content type not found");
     }
 
-    await requireSiteAccess(ctx, contentType.siteId);
+    const normalized = normalizeContentTypeRecord(contentType);
+    await requireSiteAccess(ctx, normalized.siteId);
 
-    // Use draft data if available, otherwise use top-level fields
-    const draft = contentType.draft as
-      | {
-          name?: string;
-          slug?: string;
-          description?: string;
-          fields?: typeof contentType.fields;
-        }
-      | undefined;
+    const draft = normalized.draft;
+    const kind = draft?.kind ?? normalized.kind;
+    const name = draft?.name ?? (normalized.name as string);
+    const slug = draft?.slug ?? (normalized.slug as string);
+    const description =
+      draft?.description ?? (normalized.description as string | undefined);
+    const mode =
+      kind === "template" ? (draft?.mode ?? normalized.mode) : undefined;
+    const route =
+      kind === "template" ? (draft?.route ?? normalized.route) : undefined;
+    const fields = draft?.fields ?? normalized.fields;
 
-    const name = draft?.name ?? contentType.name;
-    const slug = draft?.slug ?? contentType.slug;
-    const description = draft?.description ?? contentType.description;
-    const fields = draft?.fields ?? contentType.fields;
-
-    // Full validation
     if (!name?.trim()) {
       throw new ConvexError("Name is required to publish");
     }
     if (!slug?.trim()) {
       throw new ConvexError("Slug is required to publish");
     }
-    if (!fields || fields.length === 0) {
+    if (fields.length === 0) {
       throw new ConvexError("At least one field is required to publish");
     }
 
-    const fieldNames = fields.map((f) => f.name.trim().toLowerCase());
-    if (new Set(fieldNames).size !== fieldNames.length) {
-      throw new ConvexError("Field names must be unique within a content type");
-    }
-
-    // Check slug uniqueness
-    if (slug !== contentType.slug) {
-      const existing = await ctx.db
-        .query("contentTypes")
-        .withIndex("by_slug", (q) =>
-          q.eq("siteId", contentType.siteId).eq("slug", slug),
-        )
-        .first();
-
-      if (existing && existing._id !== args.contentTypeId) {
-        throw new ConvexError(
-          "A content type with this slug already exists for this site",
-        );
-      }
-    }
+    assertValidFields(fields);
+    await assertSlugAvailable(ctx, normalized.siteId, slug, args.contentTypeId);
 
     const now = Date.now();
     await ctx.db.patch(args.contentTypeId, {
       name: name.trim(),
       slug: slug.trim(),
-      description: description?.trim() || undefined,
+      kind,
+      mode,
+      route,
+      description: parseOptionalString(description),
       fields,
       status: "published",
       draft: undefined,
@@ -482,10 +792,10 @@ export const discardDraft = mutation({
       throw new ConvexError("Content type not found");
     }
 
-    await requireSiteAccess(ctx, contentType.siteId);
+    const normalized = normalizeContentTypeRecord(contentType);
+    await requireSiteAccess(ctx, normalized.siteId as never);
 
-    const status = contentType.status ?? "published";
-    if (status === "draft") {
+    if ((normalized.status ?? "published") === "draft") {
       throw new ConvexError(
         "Cannot discard draft on a draft-only schema. Use delete instead.",
       );
@@ -499,121 +809,119 @@ export const discardDraft = mutation({
   },
 });
 
-/**
- * Internal mutation used by the schema sync HTTP endpoint and CLI.
- * For each content type definition in the payload:
- *   - If slug exists: update as draft (merge, never delete existing fields)
- *   - If slug doesn't exist: create as draft
- * Never deletes content types or fields not in the payload.
- */
 export const syncFromSchema = internalMutation({
   args: {
     siteId: v.id("sites"),
-    contentTypes: v.array(
-      v.object({
-        slug: v.string(),
-        name: v.string(),
-        description: v.optional(v.string()),
-        fields: v.array(
-          v.object({
-            name: v.string(),
-            type: fieldTypeValidator,
-            required: v.boolean(),
-            description: v.optional(v.string()),
-            options: v.optional(
-              v.object({
-                choices: v.optional(
-                  v.array(
-                    v.object({
-                      label: v.string(),
-                      value: v.string(),
-                    }),
-                  ),
-                ),
-              }),
-            ),
-          }),
-        ),
-      }),
-    ),
+    contentTypes: v.any(),
   },
   handler: async (ctx, args) => {
+    if (!Array.isArray(args.contentTypes)) {
+      throw new ConvexError("contentTypes must be an array");
+    }
+
     const results: { slug: string; action: "created" | "updated" }[] = [];
 
-    for (const incoming of args.contentTypes) {
+    for (const rawDefinition of args.contentTypes) {
+      if (!rawDefinition || typeof rawDefinition !== "object") {
+        throw new ConvexError("Each schema definition must be an object");
+      }
+
+      const incoming = rawDefinition as Record<string, unknown>;
+      if (
+        typeof incoming.slug !== "string" ||
+        typeof incoming.name !== "string"
+      ) {
+        throw new ConvexError(
+          "Each schema definition must include slug and name",
+        );
+      }
+
+      const validatedFields = assertValidFields(incoming.fields);
+      const draftData = buildDraftData({
+        name: incoming.name,
+        slug: incoming.slug,
+        kind: incoming.kind,
+        mode: incoming.mode,
+        route: incoming.route,
+        description: incoming.description as string | undefined,
+        fields: validatedFields,
+      });
+
       const existing = await ctx.db
         .query("contentTypes")
         .withIndex("by_slug", (q) =>
-          q.eq("siteId", args.siteId).eq("slug", incoming.slug),
+          q.eq("siteId", args.siteId).eq("slug", draftData.slug),
         )
         .first();
 
       if (existing) {
-        // Merge fields: keep existing fields not in the import, update matching ones
-        const existingFieldMap = new Map(
-          existing.fields.map((f) => [f.name, f]),
-        );
-        for (const incomingField of incoming.fields) {
-          existingFieldMap.set(incomingField.name, incomingField);
+        const normalizedExisting = normalizeContentTypeRecord(existing);
+        if (
+          normalizedExisting.kind === "template" &&
+          draftData.kind === "fragment"
+        ) {
+          await assertCanBecomeFragment(ctx, existing._id);
         }
-        const mergedFields = Array.from(existingFieldMap.values());
 
-        const draftData = {
-          name: incoming.name,
-          slug: incoming.slug,
-          description: incoming.description,
-          fields: mergedFields,
-        };
-
+        const mergedFields = mergeFields(
+          normalizedExisting.fields,
+          draftData.fields,
+        );
+        const mergedDraft = { ...draftData, fields: mergedFields };
         const now = Date.now();
-        const status = existing.status ?? "published";
 
-        if (status === "draft") {
+        if ((normalizedExisting.status ?? "published") === "draft") {
           await ctx.db.patch(existing._id, {
-            name: draftData.name,
-            slug: draftData.slug,
-            description: draftData.description,
-            fields: draftData.fields,
-            draft: draftData,
+            name: mergedDraft.name,
+            slug: mergedDraft.slug,
+            kind: mergedDraft.kind,
+            mode: mergedDraft.mode,
+            route: mergedDraft.route,
+            description: mergedDraft.description,
+            fields: mergedDraft.fields,
+            draft: mergedDraft,
             draftUpdatedAt: now,
             updatedAt: now,
           });
         } else {
           await ctx.db.patch(existing._id, {
-            draft: draftData,
+            draft: mergedDraft,
             draftUpdatedAt: now,
             updatedAt: now,
           });
         }
 
-        results.push({ slug: incoming.slug, action: "updated" });
-      } else {
-        // Create new draft content type
-        const now = Date.now();
-        const draftData = {
-          name: incoming.name,
-          slug: incoming.slug,
-          description: incoming.description,
-          fields: incoming.fields,
-        };
-
-        await ctx.db.insert("contentTypes", {
-          siteId: args.siteId,
-          name: incoming.name,
-          slug: incoming.slug,
-          description: incoming.description,
-          fields: incoming.fields,
-          status: "draft",
-          draft: draftData,
-          draftUpdatedAt: now,
-          createdAt: now,
-          updatedAt: now,
-        });
-
-        results.push({ slug: incoming.slug, action: "created" });
+        results.push({ slug: mergedDraft.slug, action: "updated" });
+        continue;
       }
+
+      const now = Date.now();
+      await ctx.db.insert("contentTypes", {
+        siteId: args.siteId,
+        name: draftData.name,
+        slug: draftData.slug,
+        kind: draftData.kind,
+        mode: draftData.mode,
+        route: draftData.route,
+        description: draftData.description,
+        fields: draftData.fields,
+        status: "draft",
+        draft: draftData,
+        draftUpdatedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      results.push({ slug: draftData.slug, action: "created" });
     }
 
     return results;
   },
+});
+
+export const backfillSchemaModel = internalMutation({
+  args: {
+    siteId: v.optional(v.id("sites")),
+  },
+  handler: (ctx, args) => runSchemaModelBackfillForSite(ctx, args.siteId),
 });

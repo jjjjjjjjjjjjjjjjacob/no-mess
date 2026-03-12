@@ -15,6 +15,7 @@ export const create = mutation({
   args: {
     siteId: v.id("sites"),
     storageId: v.id("_storage"),
+    checksum: v.optional(v.string()),
     filename: v.string(),
     mimeType: v.string(),
     size: v.number(),
@@ -24,6 +25,20 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const { user } = await requireSiteAccess(ctx, args.siteId);
 
+    if (args.checksum) {
+      const existingAsset = await ctx.db
+        .query("assets")
+        .withIndex("by_site_checksum", (q) =>
+          q.eq("siteId", args.siteId).eq("checksum", args.checksum),
+        )
+        .first();
+
+      if (existingAsset) {
+        await ctx.storage.delete(args.storageId);
+        return existingAsset._id;
+      }
+    }
+
     const url = await ctx.storage.getUrl(args.storageId);
     if (!url) {
       throw new ConvexError("Failed to get storage URL");
@@ -32,6 +47,7 @@ export const create = mutation({
     const assetId = await ctx.db.insert("assets", {
       siteId: args.siteId,
       storageId: args.storageId,
+      checksum: args.checksum,
       filename: args.filename,
       mimeType: args.mimeType,
       size: args.size,
@@ -43,6 +59,23 @@ export const create = mutation({
     });
 
     return assetId;
+  },
+});
+
+export const findByChecksum = query({
+  args: {
+    siteId: v.id("sites"),
+    checksum: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireSiteAccess(ctx, args.siteId);
+
+    return await ctx.db
+      .query("assets")
+      .withIndex("by_site_checksum", (q) =>
+        q.eq("siteId", args.siteId).eq("checksum", args.checksum),
+      )
+      .first();
   },
 });
 
