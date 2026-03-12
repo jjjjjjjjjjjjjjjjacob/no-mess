@@ -1,5 +1,14 @@
 ## @no-mess/client [0.1.1](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/compare/@no-mess/client@0.1.0...@no-mess/client@0.1.1) (2026-03-03)
 
+## 0.4.0
+
+### Minor Changes
+
+- [#24](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/pull/24) [`bf7e392`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/bf7e392f45095a2bcfd5cff6ccc24f72e36b2b58) Thanks [@jjjjjjjjjjjjjjjjacob](https://github.com/jjjjjjjjjjjjjjjjacob)! - Add route-aware preview and live edit support for real site routes. This
+  releases `NoMessLiveRouteProvider`, `useNoMessEditableEntry`, `NoMessField`,
+  `useNoMessField`, and `client.reportLiveEditRoute()`, and adds select-mode
+  control for the live edit overlay.
+
 ## 0.3.0
 
 ### Minor Changes
