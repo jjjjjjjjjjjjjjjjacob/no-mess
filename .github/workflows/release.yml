@@ -141,6 +141,10 @@ jobs:
         run: |
           while IFS= read -r tag; do
             [ -z "$tag" ] && continue
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+              echo "Tag $tag already exists on origin; skipping recreation."
+              continue
+            fi
             git tag -d "$tag" >/dev/null 2>&1 || true
             git tag -a "$tag" -m "$tag" HEAD
           done < <(node ./scripts/package-release-tags.mjs)
