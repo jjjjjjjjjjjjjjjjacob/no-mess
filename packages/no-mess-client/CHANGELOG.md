@@ -1,5 +1,13 @@
 ## @no-mess/client [0.1.1](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/compare/@no-mess/client@0.1.0...@no-mess/client@0.1.1) (2026-03-03)
 
+## 0.5.1
+
+### Patch Changes
+
+- [#34](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/pull/34) [`25ad291`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/25ad29173115581525df708d1f5d5c3c6ede431b) Thanks [@jjjjjjjjjjjjjjjjacob](https://github.com/jjjjjjjjjjjjjjjjacob)! - Fix nested path updates so deep writes replace primitive values with the
+  required object or array containers. Also initialize fragment-backed fields
+  with empty object defaults when creating new values.
+
 ## 0.5.0
 
 ### Minor Changes
