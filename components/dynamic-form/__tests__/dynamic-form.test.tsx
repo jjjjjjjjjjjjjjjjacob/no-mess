@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -254,6 +255,46 @@ describe("DynamicForm", () => {
     );
     expect(screen.getByTestId("text-field")).toBeInTheDocument();
     expect(screen.getAllByText("Add Item")).toHaveLength(2);
+  });
+
+  it("initializes fragment array items as objects", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DynamicForm
+        fields={[
+          {
+            name: "slides",
+            type: "array",
+            required: false,
+            of: {
+              type: "fragment",
+              required: false,
+              fragment: "image-with-alt",
+            },
+          },
+        ]}
+        values={{ slides: [] }}
+        onChange={defaultOnChange}
+        fragments={[
+          {
+            kind: "fragment",
+            slug: "image-with-alt",
+            name: "Image With Alt",
+            fields: [
+              { name: "image", type: "image", required: false },
+              { name: "alt", type: "text", required: false },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /add item/i }));
+
+    expect(defaultOnChange).toHaveBeenCalledWith({
+      slides: [{ image: "", alt: "" }],
+    });
   });
 
   it("passes disabled prop to fields", () => {

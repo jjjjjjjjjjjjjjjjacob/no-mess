@@ -227,53 +227,63 @@ export default function SchemasPage() {
 
           {filteredSchemas && filteredSchemas.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredSchemas.map((type) => (
-                <ContentTypeContextMenu
-                  key={type._id}
-                  onImportFromCode={() => {
-                    analytics.trackSchemaImported({ step: "dialog_opened" });
-                    setShowImportDialog(true);
-                  }}
-                  siteId={site._id}
-                  siteSlug={siteSlug}
-                  type={type}
-                >
-                  <Link href={`/sites/${siteSlug}/schemas/${type.slug}`}>
-                    <Card className="transition-colors hover:bg-muted/50">
-                      <CardHeader>
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-base">
+              {filteredSchemas.map((type) => {
+                const badges = [
+                  type.kind === "fragment"
+                    ? { label: "Fragment", variant: "outline" as const }
+                    : type.mode === "singleton"
+                      ? { label: "Singleton", variant: "outline" as const }
+                      : null,
+                  type.status === "draft"
+                    ? { label: "Draft", variant: "secondary" as const }
+                    : null,
+                  type.status === "published" && type.hasDraft
+                    ? { label: "Changes", variant: "outline" as const }
+                    : null,
+                ].filter((badge) => badge !== null);
+
+                return (
+                  <ContentTypeContextMenu
+                    key={type._id}
+                    onImportFromCode={() => {
+                      analytics.trackSchemaImported({ step: "dialog_opened" });
+                      setShowImportDialog(true);
+                    }}
+                    siteId={site._id}
+                    siteSlug={siteSlug}
+                    type={type}
+                  >
+                    <Link href={`/sites/${siteSlug}/schemas/${type.slug}`}>
+                      <Card className="transition-colors hover:bg-muted/50">
+                        <CardHeader className="gap-3">
+                          <CardTitle className="text-base leading-tight">
                             {type.name}
                           </CardTitle>
-                          <Badge variant="outline">
-                            {type.kind === "fragment"
-                              ? "Fragment"
-                              : type.mode === "singleton"
-                                ? "Singleton"
-                                : "Collection"}
-                          </Badge>
-                          {type.kind === "template" && type.route && (
-                            <Badge variant="outline">Route</Badge>
+                          {badges.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {badges.map((badge) => (
+                                <Badge
+                                  key={badge.label}
+                                  variant={badge.variant}
+                                >
+                                  {badge.label}
+                                </Badge>
+                              ))}
+                            </div>
                           )}
-                          {type.status === "draft" && (
-                            <Badge variant="secondary">Draft</Badge>
-                          )}
-                          {type.status === "published" && type.hasDraft && (
-                            <Badge variant="outline">Unpublished changes</Badge>
-                          )}
-                        </div>
-                        <CardDescription>
-                          {type.slug} · {type.fields.length} field
-                          {type.fields.length !== 1 ? "s" : ""}
-                          {type.kind === "template" && type.route
-                            ? ` · ${type.route}`
-                            : ""}
-                        </CardDescription>
-                      </CardHeader>
-                    </Card>
-                  </Link>
-                </ContentTypeContextMenu>
-              ))}
+                          <CardDescription>
+                            {type.slug} · {type.fields.length} field
+                            {type.fields.length !== 1 ? "s" : ""}
+                            {type.kind === "template" && type.route
+                              ? ` · ${type.route}`
+                              : ""}
+                          </CardDescription>
+                        </CardHeader>
+                      </Card>
+                    </Link>
+                  </ContentTypeContextMenu>
+                );
+              })}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">

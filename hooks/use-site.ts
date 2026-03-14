@@ -5,15 +5,24 @@ import { useParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 
 export function useSite() {
-  const params = useParams<{ siteSlug: string }>();
+  const params = useParams<{ siteSlug?: string | string[] }>();
+  const siteSlug = normalizeRouteParam(params.siteSlug);
   const site = useQuery(
     api.sites.getBySlug,
-    params.siteSlug ? { slug: params.siteSlug } : "skip",
+    siteSlug ? { slug: siteSlug } : "skip",
   );
 
   return {
     site,
     isLoading: site === undefined,
-    siteSlug: params.siteSlug,
+    siteSlug,
   };
+}
+
+function normalizeRouteParam(value?: string | string[]) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
 }

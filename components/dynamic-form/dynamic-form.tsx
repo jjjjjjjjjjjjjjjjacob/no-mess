@@ -77,7 +77,7 @@ export function DynamicForm({
                 appendValueAtPath(
                   values,
                   fieldPath,
-                  createEmptyValueForField(field.of),
+                  createEmptyValueForField(field.of, fragmentsMap),
                 ),
               )
             }
