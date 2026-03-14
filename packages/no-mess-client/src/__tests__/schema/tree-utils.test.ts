@@ -25,6 +25,24 @@ describe("tree-utils", () => {
     });
   });
 
+  it("replaces primitive path segments with containers for nested writes", () => {
+    const next = setValueAtPath(
+      {
+        hero: {
+          slides: [""],
+        },
+      },
+      "hero.slides[0].image",
+      "asset-1",
+    );
+
+    expect(next).toEqual({
+      hero: {
+        slides: [{ image: "asset-1" }],
+      },
+    });
+  });
+
   it("appends, removes, and reorders nested array items by path", () => {
     const initial = {
       hero: {
@@ -32,7 +50,9 @@ describe("tree-utils", () => {
       },
     };
 
-    const appended = appendValueAtPath(initial, "hero.slides", { label: "Three" });
+    const appended = appendValueAtPath(initial, "hero.slides", {
+      label: "Three",
+    });
     expect(appended.hero.slides).toEqual([
       { label: "One" },
       { label: "Two" },

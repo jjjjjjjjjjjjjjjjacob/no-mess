@@ -84,4 +84,43 @@ describe("ShopifyProductField", () => {
     await user.click(clearButton);
     expect(onChange).toHaveBeenCalledWith("");
   });
+
+  it("selects a product from the dropdown", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    mockUseFormContext.mockReturnValue({
+      siteId: "site123" as Id<"sites">,
+    });
+    mockUseQuery.mockReturnValue(mockProducts);
+
+    render(<ShopifyProductField value="" onChange={onChange} />);
+
+    await user.click(screen.getByPlaceholderText("Search products..."));
+    await user.click(screen.getByRole("button", { name: /blue shirt/i }));
+
+    expect(onChange).toHaveBeenCalledWith("blue-shirt");
+    expect(screen.queryByText("red-hat")).not.toBeInTheDocument();
+  });
+
+  it("closes the dropdown when clicking outside", async () => {
+    const user = userEvent.setup();
+    mockUseFormContext.mockReturnValue({
+      siteId: "site123" as Id<"sites">,
+    });
+    mockUseQuery.mockReturnValue(mockProducts);
+
+    render(
+      <div>
+        <ShopifyProductField value="" onChange={() => {}} />
+        <button type="button">Outside</button>
+      </div>,
+    );
+
+    await user.click(screen.getByPlaceholderText("Search products..."));
+    expect(screen.getByText("Blue Shirt")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Outside" }));
+
+    expect(screen.queryByText("Blue Shirt")).not.toBeInTheDocument();
+  });
 });

@@ -82,34 +82,54 @@ export default function LiveEditIndexPage() {
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {templates.map((ct) => (
-              <Link
-                key={ct._id}
-                href={`/sites/${siteSlug}/live-edit/${ct.slug}`}
-              >
-                <Card className="h-full flex-row items-center gap-3 p-4 py-4 transition-colors hover:bg-accent">
-                  <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-medium">{ct.name}</p>
-                      <Badge variant="outline">
-                        {ct.mode === "singleton" ? "Singleton" : "Collection"}
-                      </Badge>
+            {templates.map((ct) => {
+              const badges = [
+                ct.mode === "singleton"
+                  ? { label: "Singleton", variant: "outline" as const }
+                  : null,
+                ct.status === "draft"
+                  ? { label: "Draft", variant: "secondary" as const }
+                  : null,
+                ct.status === "published" && ct.hasDraft
+                  ? { label: "Changes", variant: "outline" as const }
+                  : null,
+              ].filter((badge) => badge !== null);
+
+              return (
+                <Link
+                  key={ct._id}
+                  href={`/sites/${siteSlug}/live-edit/${ct.slug}`}
+                >
+                  <Card className="h-full flex-row items-center gap-3 p-4 py-4 transition-colors hover:bg-accent">
+                    <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <p className="text-sm font-medium leading-tight">
+                        {ct.name}
+                      </p>
+                      {badges.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {badges.map((badge) => (
+                            <Badge key={badge.label} variant={badge.variant}>
+                              {badge.label}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      {ct.description && (
+                        <p className="text-xs text-muted-foreground">
+                          {ct.description}
+                        </p>
+                      )}
+                      {ct.route && (
+                        <p className="text-xs text-muted-foreground">
+                          {ct.route}
+                        </p>
+                      )}
                     </div>
-                    {ct.description && (
-                      <p className="text-xs text-muted-foreground">
-                        {ct.description}
-                      </p>
-                    )}
-                    {ct.route && (
-                      <p className="text-xs text-muted-foreground">
-                        {ct.route}
-                      </p>
-                    )}
-                  </div>
-                </Card>
-              </Link>
-            ))}
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
