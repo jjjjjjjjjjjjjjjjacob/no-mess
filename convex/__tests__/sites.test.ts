@@ -394,7 +394,7 @@ describe("sites.getBySlug", () => {
   it("returns the site for the owner", async () => {
     const ctx = createMockQueryCtx();
     ctx._mocks.first.mockResolvedValue(mockSite);
-    mockGetCurrentUser.mockResolvedValue(mockUser as any);
+    mockGetCurrentUserOrNull.mockResolvedValue(mockUser as any);
 
     const handler = getHandler(sites.getBySlug);
     const result = await handler(ctx, { slug: "test-site" });
@@ -425,13 +425,23 @@ describe("sites.getBySlug", () => {
       if (firstCallCount === 1) return Promise.resolve(mockSite); // site lookup
       return Promise.resolve(null); // siteAccess lookup
     });
-    // getCurrentUser is mocked separately (does not go through ctx._mocks.first)
-    mockGetCurrentUser.mockResolvedValue(otherUser as any);
+    mockGetCurrentUserOrNull.mockResolvedValue(otherUser as any);
 
     const handler = getHandler(sites.getBySlug);
     const result = await handler(ctx, { slug: "test-site" });
 
     // The user is not the owner and no access record => null
+    expect(result).toBeNull();
+  });
+
+  it("returns null when not authenticated", async () => {
+    const ctx = createMockQueryCtx();
+    ctx._mocks.first.mockResolvedValue(mockSite);
+    mockGetCurrentUserOrNull.mockResolvedValue(null);
+
+    const handler = getHandler(sites.getBySlug);
+    const result = await handler(ctx, { slug: "test-site" });
+
     expect(result).toBeNull();
   });
 });

@@ -2,7 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { FolderOpen, Search, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/convex/_generated/api";
@@ -21,12 +21,46 @@ export function ShopifyCollectionField({
   disabled,
 }: ShopifyCollectionFieldProps) {
   const { siteId } = useFormContext();
+  const containerRef = useRef<HTMLDivElement>(null);
   const collections = useQuery(
     api.shopify.listCollections,
     siteId ? { siteId: siteId as Id<"sites"> } : "skip",
   );
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (containerRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsOpen(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
 
   if (!siteId) {
     return (
@@ -43,6 +77,11 @@ export function ShopifyCollectionField({
         c.title.toLowerCase().includes(search.toLowerCase()) ||
         c.handle.toLowerCase().includes(search.toLowerCase()),
     ) ?? [];
+  const handleSelect = (handle: string) => {
+    onChange(handle);
+    setIsOpen(false);
+    setSearch("");
+  };
 
   if (value && selectedCollection) {
     return (
@@ -80,7 +119,21 @@ export function ShopifyCollectionField({
   }
 
   return (
-    <div className="relative">
+    <div
+      ref={containerRef}
+      className="relative"
+      onBlurCapture={(event) => {
+        const nextTarget = event.relatedTarget;
+        if (
+          nextTarget instanceof Node &&
+          event.currentTarget.contains(nextTarget)
+        ) {
+          return;
+        }
+
+        setIsOpen(false);
+      }}
+    >
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -104,11 +157,8 @@ export function ShopifyCollectionField({
               key={collection._id}
               type="button"
               className="flex w-full items-center gap-2 p-2 text-left text-sm hover:bg-muted/50"
-              onClick={() => {
-                onChange(collection.handle);
-                setIsOpen(false);
-                setSearch("");
-              }}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => handleSelect(collection.handle)}
             >
               {collection.image ? (
                 <img

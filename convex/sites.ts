@@ -213,7 +213,10 @@ export const getBySlug = query({
       return null;
     }
 
-    const user = await getCurrentUser(ctx);
+    const user = await getCurrentUserOrNull(ctx);
+    if (!user) {
+      return null;
+    }
 
     if (site.ownerId === user._id) {
       return site;

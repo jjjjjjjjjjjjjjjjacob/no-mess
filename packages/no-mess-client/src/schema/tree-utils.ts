@@ -127,10 +127,14 @@ function cloneContainer(value: unknown): unknown {
     return { ...(value as Record<string, unknown>) };
   }
 
-  return value;
+  return undefined;
 }
 
-export function setValueAtPath<T>(value: T, path: string, nextValue: unknown): T {
+export function setValueAtPath<T>(
+  value: T,
+  path: string,
+  nextValue: unknown,
+): T {
   const segments = parseFieldPath(path);
 
   if (segments.length === 0) {
@@ -160,8 +164,7 @@ export function setValueAtPath<T>(value: T, path: string, nextValue: unknown): T
 
       const existing = array[segment];
       const cloned =
-        cloneContainer(existing) ??
-        (typeof nextSegment === "number" ? [] : {});
+        cloneContainer(existing) ?? (typeof nextSegment === "number" ? [] : {});
       array[segment] = cloned;
       current = cloned as Record<string, unknown> | unknown[];
       continue;
@@ -175,8 +178,7 @@ export function setValueAtPath<T>(value: T, path: string, nextValue: unknown): T
 
     const existing = record[segment];
     const cloned =
-      cloneContainer(existing) ??
-      (typeof nextSegment === "number" ? [] : {});
+      cloneContainer(existing) ?? (typeof nextSegment === "number" ? [] : {});
     record[segment] = cloned;
     current = cloned as Record<string, unknown> | unknown[];
   }
@@ -184,13 +186,11 @@ export function setValueAtPath<T>(value: T, path: string, nextValue: unknown): T
   return root as T;
 }
 
-export function appendValueAtPath<T>(
-  value: T,
-  path: string,
-  item: unknown,
-): T {
+export function appendValueAtPath<T>(value: T, path: string, item: unknown): T {
   const currentValue = getValueAtPath(value, path);
-  const nextItems = Array.isArray(currentValue) ? [...currentValue, item] : [item];
+  const nextItems = Array.isArray(currentValue)
+    ? [...currentValue, item]
+    : [item];
   return setValueAtPath(value, path, nextItems);
 }
 
@@ -232,12 +232,29 @@ export function moveArrayValueAtPath<T>(
   return setValueAtPath(value, path, nextItems);
 }
 
-export function createEmptyValueForField(field: FieldDefinition): unknown {
+export function createEmptyValueForField(
+  field: FieldDefinition,
+  fragments: Map<string, FragmentDefinition> = new Map(),
+): unknown {
   switch (field.type) {
     case "object":
       return Object.fromEntries(
-        field.fields.map((child) => [child.name, createEmptyValueForField(child)]),
+        field.fields.map((child) => [
+          child.name,
+          createEmptyValueForField(child, fragments),
+        ]),
       );
+    case "fragment": {
+      const fragmentFields = resolveFragmentFields(field, fragments);
+      return fragmentFields
+        ? Object.fromEntries(
+            fragmentFields.map((child) => [
+              child.name,
+              createEmptyValueForField(child, fragments),
+            ]),
+          )
+        : {};
+    }
     case "array":
     case "gallery":
       return [];

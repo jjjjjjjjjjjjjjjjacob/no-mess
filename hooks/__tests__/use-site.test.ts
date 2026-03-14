@@ -69,6 +69,18 @@ describe("useSite", () => {
     expect(result.current.siteSlug).toBe("test-slug");
   });
 
+  it("should normalize array route params to the first slug", () => {
+    mockUseParams.mockReturnValue({ siteSlug: ["test-slug", "ignored"] });
+    mockUseQuery.mockReturnValue(undefined);
+
+    const { result } = renderHook(() => useSite());
+
+    expect(mockUseQuery).toHaveBeenCalledWith("sites:getBySlug", {
+      slug: "test-slug",
+    });
+    expect(result.current.siteSlug).toBe("test-slug");
+  });
+
   it("should have isLoading as false when site is null (not found)", () => {
     mockUseParams.mockReturnValue({ siteSlug: "missing-site" });
     mockUseQuery.mockReturnValue(null);

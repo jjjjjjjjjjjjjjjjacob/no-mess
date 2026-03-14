@@ -44,7 +44,7 @@ export function renderField(
     case "number":
       return (
         <NumberField
-          value={(value as number) ?? 0}
+          value={typeof value === "number" ? value : undefined}
           onChange={onChange}
           disabled={disabled}
         />
