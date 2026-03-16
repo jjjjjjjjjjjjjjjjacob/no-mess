@@ -1,4 +1,4 @@
-import type { NamedFieldDefinition } from "../packages/no-mess-client/src/schema/schema-types";
+import type { NamedFieldDefinition } from "@no-mess/client/schema";
 
 export interface TemplateMigrationDefinition {
   contentTypeSlug: string;

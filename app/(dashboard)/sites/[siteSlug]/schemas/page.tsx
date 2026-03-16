@@ -1,5 +1,7 @@
 "use client";
 
+import type { ContentTypeDefinition } from "@no-mess/client/schema";
+import { generateSchemaSource } from "@no-mess/client/schema";
 import { useQuery } from "convex/react";
 import { ArrowUpDown, Code, FileText, Plus, Search } from "lucide-react";
 import Link from "next/link";
@@ -27,8 +29,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { useSite } from "@/hooks/use-site";
-import type { ContentTypeDefinition } from "@/packages/no-mess-client/src/schema";
-import { generateSchemaSource } from "@/packages/no-mess-client/src/schema";
 
 type SortBy = "alphabetical" | "newest" | "most-fields";
 

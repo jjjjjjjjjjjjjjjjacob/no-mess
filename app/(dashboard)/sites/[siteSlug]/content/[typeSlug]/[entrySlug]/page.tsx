@@ -1,5 +1,6 @@
 "use client";
 
+import type { FragmentDefinition } from "@no-mess/client/schema";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { Eye, EyeOff, MousePointerClick, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -39,7 +40,6 @@ import { usePreviewRefresh } from "@/hooks/use-preview-refresh";
 import { useSite } from "@/hooks/use-site";
 import { useBeforeUnload, useKeyboardSave } from "@/hooks/use-unsaved-changes";
 import { hasPendingEntryDraft } from "@/lib/entry-draft-state";
-import type { FragmentDefinition } from "@/packages/no-mess-client/src/schema";
 
 export default function EditEntryPage() {
   const router = useRouter();

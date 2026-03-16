@@ -3,7 +3,7 @@
 import type {
   FieldDefinition,
   NamedFieldDefinition,
-} from "@/packages/no-mess-client/src/schema";
+} from "@no-mess/client/schema";
 import { BooleanField } from "./fields/boolean-field";
 import { DatetimeField } from "./fields/datetime-field";
 import { GalleryField } from "./fields/gallery-field";

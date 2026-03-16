@@ -1,6 +1,16 @@
 "use client";
 
 import {
+  createEmptyValueForField,
+  type FieldDefinition,
+  type FragmentDefinition,
+  getFieldDisplayName,
+  getValueAtPath,
+  joinFieldPath,
+  type NamedFieldDefinition,
+  resolveFragmentFields,
+} from "@no-mess/client/schema";
+import {
   ArrowDown,
   ArrowUp,
   ChevronDown,
@@ -19,16 +29,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Id } from "@/convex/_generated/dataModel";
 import { cloneContentValue } from "@/lib/clone-content-value";
 import { cn } from "@/lib/utils";
-import {
-  createEmptyValueForField,
-  type FieldDefinition,
-  type FragmentDefinition,
-  getFieldDisplayName,
-  getValueAtPath,
-  joinFieldPath,
-  type NamedFieldDefinition,
-  resolveFragmentFields,
-} from "@/packages/no-mess-client/src/schema";
 
 interface LiveEditFieldPanelProps {
   fields: NamedFieldDefinition[];

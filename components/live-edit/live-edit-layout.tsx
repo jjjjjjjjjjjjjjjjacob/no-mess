@@ -1,5 +1,10 @@
 "use client";
 
+import type {
+  FragmentDefinition,
+  NamedFieldDefinition,
+} from "@no-mess/client/schema";
+import { setValueAtPath } from "@no-mess/client/schema";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -10,11 +15,6 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useSite } from "@/hooks/use-site";
 import { useBeforeUnload, useKeyboardSave } from "@/hooks/use-unsaved-changes";
-import type {
-  FragmentDefinition,
-  NamedFieldDefinition,
-} from "@/packages/no-mess-client/src/schema";
-import { setValueAtPath } from "@/packages/no-mess-client/src/schema";
 import { LiveEditFieldPanel } from "./live-edit-field-panel";
 import {
   LiveEditPreviewPanel,

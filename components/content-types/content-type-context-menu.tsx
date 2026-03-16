@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  type ContentTypeDefinition,
+  generateContentTypeSource,
+  type NamedFieldDefinition,
+} from "@no-mess/client/schema";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import {
   ArrowRight,
@@ -43,11 +48,6 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import {
-  type ContentTypeDefinition,
-  generateContentTypeSource,
-  type NamedFieldDefinition,
-} from "@/packages/no-mess-client/src/schema";
 
 interface ContentTypeContextMenuProps {
   children: React.ReactNode;

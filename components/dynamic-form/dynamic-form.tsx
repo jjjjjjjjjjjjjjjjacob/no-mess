@@ -1,14 +1,10 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import type { Id } from "@/convex/_generated/dataModel";
-import { cloneContentValue } from "@/lib/clone-content-value";
 import type {
   FieldDefinition,
   FragmentDefinition,
   NamedFieldDefinition,
-} from "@/packages/no-mess-client/src/schema";
+} from "@no-mess/client/schema";
 import {
   appendValueAtPath,
   createEmptyValueForField,
@@ -20,7 +16,11 @@ import {
   removeValueAtPath,
   resolveFragmentFields,
   setValueAtPath,
-} from "@/packages/no-mess-client/src/schema";
+} from "@no-mess/client/schema";
+import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import type { Id } from "@/convex/_generated/dataModel";
+import { cloneContentValue } from "@/lib/clone-content-value";
 import { FieldWrapper } from "./field-wrapper";
 import { FormProvider } from "./form-context";
 import { renderField } from "./render-field";

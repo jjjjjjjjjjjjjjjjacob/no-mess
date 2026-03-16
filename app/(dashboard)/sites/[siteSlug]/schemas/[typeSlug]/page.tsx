@@ -1,5 +1,6 @@
 "use client";
 
+import { generateContentTypeSource } from "@no-mess/client/schema";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { Code, Save, Trash2, Undo2, Upload } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -36,7 +37,6 @@ import { useAnalytics } from "@/hooks/use-analytics";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { useSite } from "@/hooks/use-site";
 import { useBeforeUnload, useKeyboardSave } from "@/hooks/use-unsaved-changes";
-import { generateContentTypeSource } from "@/packages/no-mess-client/src/schema";
 
 function formatTimeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
