@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import {
   ArrowRight,
   Code,
@@ -14,6 +14,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { PublishCascadeDialog } from "@/components/publishing/publish-cascade-dialog";
 import { SchemaExportPanel } from "@/components/schemas/schema-export-panel";
 import {
   AlertDialog,
@@ -107,6 +108,7 @@ export function ContentTypeContextMenu({
   type,
 }: ContentTypeContextMenuProps) {
   const router = useRouter();
+  const convex = useConvex();
   const analytics = useAnalytics();
   const { copy } = useCopyToClipboard();
   const contentType = useQuery(api.contentTypes.get, {
@@ -119,6 +121,15 @@ export function ContentTypeContextMenu({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showCascadeDialog, setShowCascadeDialog] = useState(false);
+  const [cascadeTargets, setCascadeTargets] = useState<
+    {
+      kind: "template" | "fragment";
+      name: string;
+      slug: string;
+    }[]
+  >([]);
+  const [pendingCascadeSlugs, setPendingCascadeSlugs] = useState<string[]>([]);
 
   const source = useMemo<ContentTypeDefinition>(() => {
     if (!contentType) {
@@ -191,20 +202,52 @@ export function ContentTypeContextMenu({
     toast.success("Schema code copied");
   };
 
-  const handlePublish = async () => {
+  const publishSchema = async (options?: {
+    cascade?: boolean;
+    expectedCascadeSlugs?: string[];
+  }) => {
     try {
-      await publishMutation({ contentTypeId: type._id });
+      await publishMutation({
+        contentTypeId: type._id,
+        cascade: options?.cascade,
+        expectedCascadeSlugs: options?.expectedCascadeSlugs,
+      });
       analytics.trackSchemaPublished({
         site_id: siteId,
         field_count: source.fields.length,
         field_types: source.fields.map((field) => field.type),
       });
       toast.success("Schema published");
+      setShowCascadeDialog(false);
+      setCascadeTargets([]);
+      setPendingCascadeSlugs([]);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to publish schema",
       );
     }
+  };
+
+  const handlePublish = async () => {
+    const plan = await convex.query(api.contentTypes.getPublishPlan, {
+      contentTypeId: type._id,
+    });
+
+    if (plan.cascadeTargets.length > 0) {
+      setCascadeTargets(plan.cascadeTargets);
+      setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+      setShowCascadeDialog(true);
+      return;
+    }
+
+    await publishSchema();
+  };
+
+  const handleCascadeConfirm = async () => {
+    await publishSchema({
+      cascade: true,
+      expectedCascadeSlugs: pendingCascadeSlugs,
+    });
   };
 
   const handleDiscardDraft = async () => {
@@ -352,6 +395,13 @@ export function ContentTypeContextMenu({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PublishCascadeDialog
+        open={showCascadeDialog}
+        onOpenChange={setShowCascadeDialog}
+        targets={cascadeTargets}
+        onConfirm={handleCascadeConfirm}
+      />
 
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
         <DialogContent className="sm:max-w-[90vw] max-h-[90vh]">

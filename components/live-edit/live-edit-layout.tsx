@@ -1,9 +1,10 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { PublishCascadeDialog } from "@/components/publishing/publish-cascade-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -23,6 +24,7 @@ import { LiveEditToolbar } from "./live-edit-toolbar";
 
 export function LiveEditLayout() {
   const { site, siteSlug } = useSite();
+  const convex = useConvex();
   const params = useParams<{ typeSlug: string; entrySlug: string }>();
 
   const contentType = useQuery(
@@ -49,6 +51,15 @@ export function LiveEditLayout() {
   const [isSaving, setIsSaving] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [mappedFieldNames, setMappedFieldNames] = useState<string[]>([]);
+  const [showCascadeDialog, setShowCascadeDialog] = useState(false);
+  const [cascadeTargets, setCascadeTargets] = useState<
+    {
+      kind: "template" | "fragment";
+      name: string;
+      slug: string;
+    }[]
+  >([]);
+  const [pendingCascadeSlugs, setPendingCascadeSlugs] = useState<string[]>([]);
 
   const savedTitle = useRef("");
   const savedFormData = useRef<Record<string, unknown>>({});
@@ -89,16 +100,53 @@ export function LiveEditLayout() {
     }
   }, [entry, title, formData, updateEntry]);
 
+  const publishEntryWithOptions = useCallback(
+    async (options?: {
+      cascade?: boolean;
+      expectedCascadeSlugs?: string[];
+    }) => {
+      if (!entry) return;
+      try {
+        await handleSave();
+        await publishEntry({
+          entryId: entry._id as Id<"contentEntries">,
+          cascade: options?.cascade,
+          expectedCascadeSlugs: options?.expectedCascadeSlugs,
+        });
+        toast.success("Entry published");
+        setShowCascadeDialog(false);
+        setCascadeTargets([]);
+        setPendingCascadeSlugs([]);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to publish");
+      }
+    },
+    [entry, handleSave, publishEntry],
+  );
+
   const handlePublish = useCallback(async () => {
     if (!entry) return;
-    try {
-      await handleSave();
-      await publishEntry({ entryId: entry._id as Id<"contentEntries"> });
-      toast.success("Entry published");
-    } catch {
-      toast.error("Failed to publish");
+
+    const plan = await convex.query(api.contentEntries.getPublishPlan, {
+      entryId: entry._id as Id<"contentEntries">,
+    });
+
+    if (plan.cascadeTargets.length > 0) {
+      setCascadeTargets(plan.cascadeTargets);
+      setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+      setShowCascadeDialog(true);
+      return;
     }
-  }, [entry, handleSave, publishEntry]);
+
+    await publishEntryWithOptions();
+  }, [convex, entry, publishEntryWithOptions]);
+
+  const handleCascadeConfirm = useCallback(async () => {
+    await publishEntryWithOptions({
+      cascade: true,
+      expectedCascadeSlugs: pendingCascadeSlugs,
+    });
+  }, [pendingCascadeSlugs, publishEntryWithOptions]);
 
   useBeforeUnload(isDirty);
   useKeyboardSave(handleSave);
@@ -136,11 +184,11 @@ export function LiveEditLayout() {
 
   if (entries === undefined || contentType === undefined) {
     return (
-      <div className="flex h-screen flex-col">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <div className="flex h-12 items-center border-b px-4">
           <Skeleton className="h-5 w-32" />
         </div>
-        <div className="flex flex-1">
+        <div className="flex min-h-0 flex-1">
           <Skeleton className="w-[400px]" />
           <Skeleton className="flex-1" />
         </div>
@@ -150,7 +198,7 @@ export function LiveEditLayout() {
 
   if (!entry || !contentType) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-full min-h-0 items-center justify-center">
         <div className="text-center">
           <h2 className="text-lg font-medium">Entry not found</h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -164,7 +212,7 @@ export function LiveEditLayout() {
   const backHref = `/sites/${siteSlug}/content/${params.typeSlug}/${params.entrySlug}`;
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <LiveEditToolbar
         backHref={backHref}
         entryTitle={title || entry.title}
@@ -175,7 +223,7 @@ export function LiveEditLayout() {
         onPublish={handlePublish}
       />
 
-      <div className="grid flex-1 grid-cols-[400px_1fr] overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-cols-[400px_minmax(0,1fr)] overflow-hidden">
         {/* Field editor */}
         <LiveEditFieldPanel
           fields={contentType.fields as NamedFieldDefinition[]}
@@ -206,6 +254,14 @@ export function LiveEditLayout() {
           onFieldClicked={handleFieldClicked}
         />
       </div>
+
+      <PublishCascadeDialog
+        open={showCascadeDialog}
+        onOpenChange={setShowCascadeDialog}
+        targets={cascadeTargets}
+        isConfirming={isSaving}
+        onConfirm={handleCascadeConfirm}
+      />
     </div>
   );
 }

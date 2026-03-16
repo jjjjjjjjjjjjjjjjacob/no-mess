@@ -25,9 +25,9 @@ function fieldToTsType(field: Field): string {
       return "string";
     }
     case "shopifyProduct":
-      return "{ handle: string; title: string; shopifyId: string }";
+      return "ShopifyProductRef";
     case "shopifyCollection":
-      return "{ handle: string; title: string; shopifyId: string }";
+      return "ShopifyCollectionRef";
     default:
       return "unknown";
   }

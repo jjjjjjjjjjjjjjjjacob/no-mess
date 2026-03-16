@@ -378,6 +378,29 @@ export const getProductByHandleInternal = internalQuery({
   },
 });
 
+export const getProductsByHandlesInternal = internalQuery({
+  args: {
+    siteId: v.id("sites"),
+    handles: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const uniqueHandles = [...new Set(args.handles)];
+    const products = await Promise.all(
+      uniqueHandles.map(async (handle) => {
+        const product = await ctx.db
+          .query("shopifyProducts")
+          .withIndex("by_handle", (q) =>
+            q.eq("siteId", args.siteId).eq("handle", handle),
+          )
+          .first();
+        return [handle, product] as const;
+      }),
+    );
+
+    return Object.fromEntries(products);
+  },
+});
+
 export const listCollectionsInternal = internalQuery({
   args: { siteId: v.id("sites") },
   handler: async (ctx, args) => {
@@ -404,5 +427,28 @@ export const getCollectionByHandleInternal = internalQuery({
         q.eq("siteId", args.siteId).eq("handle", args.handle),
       )
       .first();
+  },
+});
+
+export const getCollectionsByHandlesInternal = internalQuery({
+  args: {
+    siteId: v.id("sites"),
+    handles: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const uniqueHandles = [...new Set(args.handles)];
+    const collections = await Promise.all(
+      uniqueHandles.map(async (handle) => {
+        const collection = await ctx.db
+          .query("shopifyCollections")
+          .withIndex("by_handle", (q) =>
+            q.eq("siteId", args.siteId).eq("handle", handle),
+          )
+          .first();
+        return [handle, collection] as const;
+      }),
+    );
+
+    return Object.fromEntries(collections);
   },
 });

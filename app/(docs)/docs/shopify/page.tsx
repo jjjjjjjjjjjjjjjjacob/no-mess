@@ -96,19 +96,32 @@ export default function ShopifyPage() {
       <p className="text-muted-foreground">
         When defining a content type, add a field with type{" "}
         <strong>Shopify Product</strong>. This renders a product picker in the
-        editor that shows your synced products. The field stores the product
-        handle as a string.
+        editor that shows your synced products. The CMS entry stores a raw
+        Shopify ref (
+        <code className="rounded bg-muted px-1 font-mono text-xs">string</code>{" "}
+        or{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          {"{ handle: string }"}
+        </code>
+        ), while the synced Shopify API returns full product and collection
+        records.
       </p>
 
       <DocsHeading>Fetching Products via SDK</DocsHeading>
       <CodeBlock
-        code={`import { createNoMessClient } from "@no-mess/client";
-import type { ShopifyProduct, ShopifyCollection } from "@no-mess/client";
+        code={`import {
+  createServerNoMessClient,
+} from "@no-mess/client/next";
+import {
+  getShopifyHandle,
+  type ShopifyCollection,
+  type ShopifyProduct,
+} from "@no-mess/client";
 
-const cms = createNoMessClient({
-  apiKey: process.env.NO_MESS_SECRET_KEY!,
-  // apiUrl: process.env.NO_MESS_API_URL,
-});
+const cms = createServerNoMessClient();
+
+const homePage = await cms.getSingleton("home-page");
+const featuredHandle = getShopifyHandle(homePage?.featuredProduct);
 
 // Get all synced products
 const products: ShopifyProduct[] = await cms.getProducts();
@@ -120,7 +133,12 @@ const product: ShopifyProduct = await cms.getProduct("classic-tee");
 const collections: ShopifyCollection[] = await cms.getCollections();
 
 // Get a single collection by handle
-const collection: ShopifyCollection = await cms.getCollection("summer-sale");`}
+const collection: ShopifyCollection = await cms.getCollection("summer-sale");
+
+// Or expand Shopify refs inline with CMS content
+const expandedHomePage = await cms.getSingleton("home-page", {
+  expand: ["shopify"],
+});`}
         language="typescript"
       />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "convex/react";
+import { useConvex, useMutation } from "convex/react";
 import {
   ArrowRight,
   Copy,
@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { PublishCascadeDialog } from "@/components/publishing/publish-cascade-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,11 +32,15 @@ import {
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { hasPendingEntryDraft } from "@/lib/entry-draft-state";
 
 interface EntryContextMenuProps {
   children: React.ReactNode;
   entry: {
     _id: Id<"contentEntries">;
+    draft?: unknown;
+    hasDraftChanges?: boolean;
+    published?: unknown;
     slug: string;
     status: "draft" | "published";
     title: string;
@@ -53,14 +58,33 @@ export function EntryContextMenu({
   typeSlug,
 }: EntryContextMenuProps) {
   const router = useRouter();
+  const convex = useConvex();
   const { copy } = useCopyToClipboard();
   const publishEntry = useMutation(api.contentEntries.publish);
   const unpublishEntry = useMutation(api.contentEntries.unpublish);
   const removeEntry = useMutation(api.contentEntries.remove);
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCascadeDialog, setShowCascadeDialog] = useState(false);
+  const [cascadeTargets, setCascadeTargets] = useState<
+    {
+      kind: "template" | "fragment";
+      name: string;
+      slug: string;
+    }[]
+  >([]);
+  const [pendingCascadeSlugs, setPendingCascadeSlugs] = useState<string[]>([]);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const editPath = `/sites/${siteSlug}/content/${typeSlug}/${entry.slug}`;
+  const hasDraftChanges =
+    entry.hasDraftChanges ??
+    hasPendingEntryDraft({
+      status: entry.status,
+      draft: entry.draft,
+      published: entry.published,
+    });
+  const canPublishDraft = entry.status === "draft" || hasDraftChanges;
 
   const openEntry = () => {
     router.push(editPath);
@@ -70,22 +94,62 @@ export function EntryContextMenu({
     router.push(`/sites/${siteSlug}/live-edit/${typeSlug}/${entry.slug}`);
   };
 
-  const handlePublishToggle = async () => {
+  const publishEntryWithOptions = async (options?: {
+    cascade?: boolean;
+    expectedCascadeSlugs?: string[];
+  }) => {
     try {
-      if (entry.status === "published") {
+      setIsPublishing(true);
+      if (!canPublishDraft) {
         await unpublishEntry({ entryId: entry._id });
         toast.success("Entry unpublished");
       } else {
-        await publishEntry({ entryId: entry._id });
+        await publishEntry({
+          entryId: entry._id,
+          cascade: options?.cascade,
+          expectedCascadeSlugs: options?.expectedCascadeSlugs,
+        });
         toast.success("Entry published");
+        setShowCascadeDialog(false);
+        setCascadeTargets([]);
+        setPendingCascadeSlugs([]);
       }
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : `Failed to ${entry.status === "published" ? "unpublish" : "publish"} entry`,
+          : `Failed to ${canPublishDraft ? "publish" : "unpublish"} entry`,
       );
+    } finally {
+      setIsPublishing(false);
     }
+  };
+
+  const handlePublishToggle = async () => {
+    if (!canPublishDraft) {
+      await publishEntryWithOptions();
+      return;
+    }
+
+    const plan = await convex.query(api.contentEntries.getPublishPlan, {
+      entryId: entry._id,
+    });
+
+    if (plan.cascadeTargets.length > 0) {
+      setCascadeTargets(plan.cascadeTargets);
+      setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+      setShowCascadeDialog(true);
+      return;
+    }
+
+    await publishEntryWithOptions();
+  };
+
+  const handleCascadeConfirm = async () => {
+    await publishEntryWithOptions({
+      cascade: true,
+      expectedCascadeSlugs: pendingCascadeSlugs,
+    });
   };
 
   const handleCopySlug = async () => {
@@ -128,7 +192,11 @@ export function EntryContextMenu({
           )}
           <ContextMenuItem onClick={handlePublishToggle}>
             <Upload className="h-4 w-4" />
-            {entry.status === "published" ? "Unpublish" : "Publish"}
+            {entry.status === "draft"
+              ? "Publish"
+              : hasDraftChanges
+                ? "Publish Changes"
+                : "Unpublish"}
           </ContextMenuItem>
 
           <ContextMenuSeparator />
@@ -171,6 +239,14 @@ export function EntryContextMenu({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PublishCascadeDialog
+        open={showCascadeDialog}
+        onOpenChange={setShowCascadeDialog}
+        targets={cascadeTargets}
+        isConfirming={isPublishing}
+        onConfirm={handleCascadeConfirm}
+      />
     </>
   );
 }

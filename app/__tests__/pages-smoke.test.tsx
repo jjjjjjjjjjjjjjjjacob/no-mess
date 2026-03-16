@@ -835,6 +835,45 @@ describe("EditEntryPage (content/[typeSlug]/[entrySlug])", () => {
     expect(screen.getByText("Edit: Hello World")).toBeInTheDocument();
     expect(screen.getByText("Save Draft")).toBeInTheDocument();
   });
+
+  it("keeps publish actions available for published entries with pending draft changes", async () => {
+    const { default: EditEntryPage } = await import(
+      "@/app/(dashboard)/sites/[siteSlug]/content/[typeSlug]/[entrySlug]/page"
+    );
+    const mockContentType = {
+      _id: "ct1",
+      name: "Blog Posts",
+      slug: "blog-posts",
+      fields: [],
+    };
+    const mockEntries = [
+      {
+        _id: "e1",
+        title: "Hello World",
+        slug: "hello-world",
+        status: "published",
+        draft: { body: "Draft body" },
+        published: { body: "Published body" },
+        updatedAt: Date.now(),
+      },
+    ];
+
+    mockUseQuery.mockImplementation((ref: string) => {
+      if (ref === "sites:getBySlug") return mockSite;
+      if (ref === "contentTypes:getBySlug") return mockContentType;
+      if (ref === "contentEntries:listByType") return mockEntries;
+      return undefined;
+    });
+
+    render(<EditEntryPage />);
+
+    expect(
+      screen.getByRole("button", { name: "Save & Publish" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Unpublish" }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 // ===========================================================================

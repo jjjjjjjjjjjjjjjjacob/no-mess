@@ -46,9 +46,11 @@ export default function CliPage() {
           </code>{" "}
           in your project root. This creates a{" "}
           <code className="rounded bg-muted px-1 font-mono text-xs">
-            no-mess.schema.ts
+            schema.ts
           </code>{" "}
-          file and prompts for your API key.
+          file and a{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">.env</code>{" "}
+          placeholder.
         </p>
         <CodeBlock code="no-mess init" language="bash" />
       </DocsStep>
@@ -57,7 +59,7 @@ export default function CliPage() {
         <p>
           Edit{" "}
           <code className="rounded bg-muted px-1 font-mono text-xs">
-            no-mess.schema.ts
+            schema.ts
           </code>{" "}
           using the TypeScript DSL:
         </p>
@@ -125,7 +127,7 @@ export default defineSchema({
   contentTypes: [imageWithAlt, labeledImage, homePage, blogPosts],
 });`}
           language="typescript"
-          filename="no-mess.schema.ts"
+          filename="schema.ts"
         />
         <p className="mt-4 text-sm text-muted-foreground">
           This example covers reusable fragments, a singleton route template, a
@@ -139,10 +141,18 @@ export default defineSchema({
           <code className="rounded bg-muted px-1 font-mono text-xs">
             no-mess push
           </code>{" "}
-          to sync your schema to the dashboard. The CLI shows a diff preview
-          before applying changes.
+          to sync your schema to the dashboard as drafts. Publish the schema in
+          the dashboard before expecting{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            /api/content/:type
+          </code>{" "}
+          to serve it.
         </p>
         <CodeBlock code="no-mess push" language="bash" />
+        <DocsCallout type="warning">
+          Schemas were synced as drafts. Published delivery APIs only include
+          published schemas and published entries.
+        </DocsCallout>
       </DocsStep>
 
       <DocsHeading>Commands Reference</DocsHeading>
@@ -151,9 +161,9 @@ export default defineSchema({
       <p className="text-muted-foreground">
         Scaffolds a new{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">
-          no-mess.schema.ts
+          schema.ts
         </code>{" "}
-        file and writes your API key to{" "}
+        file and writes a{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">.env</code>.
       </p>
       <CodeBlock code="no-mess init" language="bash" />
@@ -161,11 +171,10 @@ export default defineSchema({
       <DocsHeading as="h3">push</DocsHeading>
       <p className="text-muted-foreground">
         Parses the local schema file and pushes template and fragment
-        definitions to the dashboard. Shows a diff preview and prompts for
-        confirmation.
+        definitions to the dashboard as drafts.
       </p>
       <CodeBlock
-        code={`no-mess push                     # uses default no-mess.schema.ts
+        code={`no-mess push                     # uses default schema.ts
 no-mess push --schema ./custom.ts  # specify a custom schema file`}
         language="bash"
       />
@@ -176,8 +185,19 @@ no-mess push --schema ./custom.ts  # specify a custom schema file`}
         local schema file.
       </p>
       <CodeBlock
-        code={`no-mess pull                     # overwrites no-mess.schema.ts
+        code={`no-mess pull                     # overwrites schema.ts
 no-mess pull --stdout              # print to stdout instead of file`}
+        language="bash"
+      />
+
+      <DocsHeading as="h3">codegen</DocsHeading>
+      <p className="text-muted-foreground">
+        Generates app-ready TypeScript contracts and field-path metadata from
+        your local schema file without calling the dashboard API.
+      </p>
+      <CodeBlock
+        code={`no-mess codegen
+no-mess codegen --schema ./schema.ts --out ./no-mess.generated.ts`}
         language="bash"
       />
 
@@ -196,7 +216,8 @@ no-mess pull --stdout              # print to stdout instead of file`}
         </code>{" "}
         starts a file watcher on your schema file. Every time you save, the CLI
         parses and pushes changes automatically. Parser errors are shown inline
-        without crashing the watcher.
+        without crashing the watcher. Each successful sync still produces draft
+        schemas until you publish them in the dashboard.
       </p>
 
       <DocsHeading>Pull from Dashboard</DocsHeading>
@@ -222,11 +243,10 @@ no-mess pull --stdout              # print to stdout instead of file`}
         The dashboard Schemas page also has Import and Export buttons. Export
         generates a{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">
-          no-mess.schema.ts
+          schema.ts
         </code>{" "}
         file you can save to your project. Import accepts a schema file with
-        templates, fragments, nested fields, template modes, and route binding,
-        then shows a diff preview before applying.
+        templates, fragments, nested fields, template modes, and route binding.
       </p>
 
       <DocsHeading>Field Types</DocsHeading>
@@ -353,9 +373,14 @@ no-mess pull --stdout              # print to stdout instead of file`}
         <code className="rounded bg-muted px-1 font-mono text-xs">
           no-mess init
         </code>{" "}
-        will prompt for your API key and add it to your{" "}
+        creates a{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">.env</code>{" "}
-        file automatically.
+        file with a{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          NO_MESS_API_KEY
+        </code>{" "}
+        placeholder. Add your real key before running{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">push</code>.
       </DocsCallout>
     </div>
   );

@@ -1,14 +1,27 @@
 import { ConvexError, v } from "convex/values";
 import { getTemplateMigration } from "../lib/template-migrations";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
   internalMutation,
   internalQuery,
   type MutationCtx,
   mutation,
+  type QueryCtx,
   query,
 } from "./_generated/server";
 import { requireSiteAccess, requireSiteOwner } from "./lib/access";
+import {
+  canonicalizeFieldFragmentReferences,
+  type FragmentReferenceIssue,
+} from "./lib/fragmentReferences";
+import {
+  formatCascadePublishBlockedError,
+  formatCascadePublishStaleError,
+  normalizePublishCascadeSchema,
+  type PublishCascadeSchema,
+  resolvePublishCascadeTargets,
+} from "./lib/publishCascade";
 import {
   type Field,
   type SchemaKind,
@@ -206,6 +219,77 @@ function buildDraftData(input: {
   };
 }
 
+function appendFragmentTarget(
+  targets: Map<string, { slug: string }>,
+  kind: unknown,
+  slug: unknown,
+) {
+  if (normalizeKind(kind) !== "fragment") {
+    return;
+  }
+
+  const parsedSlug = parseOptionalString(slug);
+  if (!parsedSlug) {
+    return;
+  }
+
+  targets.set(parsedSlug, { slug: parsedSlug });
+}
+
+async function getSiteFragmentTargets(
+  ctx: QueryCtx | MutationCtx,
+  siteId: Id<"sites">,
+  extraFragments: Array<{ kind?: unknown; slug?: unknown }> = [],
+) {
+  const contentTypes = await ctx.db
+    .query("contentTypes")
+    .withIndex("by_site", (q) => q.eq("siteId", siteId))
+    .collect();
+
+  const targets = new Map<string, { slug: string }>();
+  for (const contentType of contentTypes) {
+    const normalized = normalizeContentTypeRecord(contentType);
+    appendFragmentTarget(targets, normalized.kind, normalized.slug);
+    appendFragmentTarget(
+      targets,
+      normalized.draft?.kind,
+      normalized.draft?.slug,
+    );
+  }
+
+  for (const fragment of extraFragments) {
+    appendFragmentTarget(targets, fragment.kind, fragment.slug);
+  }
+
+  return [...targets.values()];
+}
+
+async function canonicalizeSiteFields(
+  ctx: QueryCtx | MutationCtx,
+  siteId: Id<"sites">,
+  fields: Field[],
+  extraFragments: Array<{ kind?: unknown; slug?: unknown }> = [],
+) {
+  const fragmentTargets = await getSiteFragmentTargets(
+    ctx,
+    siteId,
+    extraFragments,
+  );
+  return canonicalizeFieldFragmentReferences(fields, fragmentTargets);
+}
+
+function dedupeFragmentReferenceIssues(issues: FragmentReferenceIssue[]) {
+  const seen = new Set<string>();
+  return issues.filter((issue) => {
+    const key = `${issue.path}:${issue.reference}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 async function runSchemaModelBackfillForSite(
   ctx: MutationCtx,
   siteId?: Id<"sites">,
@@ -235,6 +319,191 @@ async function runSchemaModelBackfillForSite(
   return { updated };
 }
 
+type PublishPlanTarget = {
+  _id?: Id<"contentTypes">;
+  kind: SchemaKind;
+  name: string;
+  slug: string;
+};
+
+async function listSiteContentTypes(
+  ctx: QueryCtx | MutationCtx,
+  siteId: Id<"sites">,
+) {
+  return (
+    await ctx.db
+      .query("contentTypes")
+      .withIndex("by_site", (q) => q.eq("siteId", siteId))
+      .collect()
+  ).map((contentType) =>
+    normalizePublishCascadeSchema<Id<"contentTypes">, typeof contentType>(
+      contentType,
+    ),
+  );
+}
+
+function formatPlanTargets(targets: PublishPlanTarget[]) {
+  return targets.map(({ _id, ...target }) => target);
+}
+
+function assertExpectedCascadeSlugs(
+  expectedCascadeSlugs: string[] | undefined,
+  currentTargets: PublishPlanTarget[],
+) {
+  const currentSlugs = currentTargets.map((target) => target.slug);
+  const matches =
+    Array.isArray(expectedCascadeSlugs) &&
+    expectedCascadeSlugs.length === currentSlugs.length &&
+    expectedCascadeSlugs.every((slug, index) => slug === currentSlugs[index]);
+
+  if (!matches) {
+    throw new ConvexError(formatCascadePublishStaleError(currentTargets));
+  }
+}
+
+async function getContentTypePublishPlanForRoot(
+  ctx: QueryCtx | MutationCtx,
+  siteId: Id<"sites">,
+  rootSchema: PublishCascadeSchema<Id<"contentTypes">>,
+) {
+  const siteSchemas = await listSiteContentTypes(ctx, siteId);
+  const plan = resolvePublishCascadeTargets({
+    schemas: siteSchemas,
+    root: {
+      schema: rootSchema,
+      includeRootIfDraft: false,
+      useDraftFields: true,
+    },
+  });
+
+  return {
+    cascadeTargets: plan.cascadeTargets as PublishPlanTarget[],
+    expectedCascadeSlugs: plan.expectedCascadeSlugs,
+  };
+}
+
+async function getContentTypePublishPlan(
+  ctx: QueryCtx | MutationCtx,
+  contentTypeId: Id<"contentTypes">,
+) {
+  const contentType = await ctx.db.get(contentTypeId);
+  if (!contentType) {
+    throw new ConvexError("Content type not found");
+  }
+
+  const normalized = normalizeContentTypeRecord(contentType);
+  const publishRoot = normalizePublishCascadeSchema<
+    Id<"contentTypes">,
+    {
+      _id: Id<"contentTypes">;
+      name: string;
+      slug: string;
+      kind: SchemaKind;
+      status?: "draft" | "published";
+      fields: Field[];
+      draft?:
+        | {
+            name: string;
+            slug: string;
+            kind: SchemaKind;
+            fields: Field[];
+          }
+        | undefined;
+    }
+  >({
+    _id: normalized._id,
+    name: normalized.draft?.name ?? normalized.name,
+    slug: normalized.draft?.slug ?? normalized.slug,
+    kind: normalized.draft?.kind ?? normalized.kind,
+    status: normalized.status,
+    fields: normalized.fields,
+    draft: normalized.draft
+      ? {
+          name: normalized.draft.name,
+          slug: normalized.draft.slug,
+          kind: normalized.draft.kind,
+          fields: normalized.draft.fields,
+        }
+      : undefined,
+  });
+
+  const plan = await getContentTypePublishPlanForRoot(
+    ctx,
+    normalized.siteId,
+    publishRoot,
+  );
+
+  return { normalized, ...plan };
+}
+
+async function buildPublishedContentTypePatch(
+  ctx: MutationCtx,
+  contentTypeId: Id<"contentTypes">,
+) {
+  const contentType = await ctx.db.get(contentTypeId);
+  if (!contentType) {
+    throw new ConvexError("Content type not found");
+  }
+
+  const normalized = normalizeContentTypeRecord(contentType);
+  const draft = normalized.draft;
+  const kind = draft?.kind ?? normalized.kind;
+  const name = draft?.name ?? (normalized.name as string);
+  const slug = draft?.slug ?? (normalized.slug as string);
+  const description =
+    draft?.description ?? (normalized.description as string | undefined);
+  const mode =
+    kind === "template" ? (draft?.mode ?? normalized.mode) : undefined;
+  const route =
+    kind === "template" ? (draft?.route ?? normalized.route) : undefined;
+  const canonicalizedFields = await canonicalizeSiteFields(
+    ctx,
+    normalized.siteId,
+    draft?.fields ?? normalized.fields,
+    [{ kind, slug }],
+  );
+  const fields = canonicalizedFields.fields;
+
+  if (!name?.trim()) {
+    throw new ConvexError("Name is required to publish");
+  }
+  if (!slug?.trim()) {
+    throw new ConvexError("Slug is required to publish");
+  }
+  if (fields.length === 0) {
+    throw new ConvexError("At least one field is required to publish");
+  }
+
+  assertValidFields(fields);
+  await assertSlugAvailable(ctx, normalized.siteId, slug, contentTypeId);
+
+  return {
+    normalized,
+    patch: {
+      name: name.trim(),
+      slug: slug.trim(),
+      kind,
+      mode,
+      route,
+      description: parseOptionalString(description),
+      fields,
+      status: "published" as const,
+      draft: undefined,
+      draftUpdatedAt: undefined,
+      publishedAt: Date.now(),
+      updatedAt: Date.now(),
+    },
+  };
+}
+
+async function publishContentTypeById(
+  ctx: MutationCtx,
+  contentTypeId: Id<"contentTypes">,
+) {
+  const { patch } = await buildPublishedContentTypePatch(ctx, contentTypeId);
+  await ctx.db.patch(contentTypeId, patch);
+}
+
 export const create = mutation({
   args: {
     siteId: v.id("sites"),
@@ -249,8 +518,13 @@ export const create = mutation({
   handler: async (ctx, args) => {
     await requireSiteAccess(ctx, args.siteId);
 
-    const fields = assertValidFields(args.fields);
+    const validatedFields = assertValidFields(args.fields);
     await assertSlugAvailable(ctx, args.siteId, args.slug);
+    const fields = (
+      await canonicalizeSiteFields(ctx, args.siteId, validatedFields, [
+        { kind: args.kind, slug: args.slug },
+      ])
+    ).fields;
 
     const draftData = buildDraftData({
       name: args.name,
@@ -261,6 +535,24 @@ export const create = mutation({
       description: args.description,
       fields,
     });
+
+    const publishPlan = await getContentTypePublishPlanForRoot(
+      ctx,
+      args.siteId,
+      normalizePublishCascadeSchema({
+        name: draftData.name,
+        slug: draftData.slug,
+        kind: draftData.kind,
+        status: "published" as const,
+        fields: draftData.fields,
+      }),
+    );
+
+    if (publishPlan.cascadeTargets.length > 0) {
+      throw new ConvexError(
+        formatCascadePublishBlockedError(publishPlan.cascadeTargets),
+      );
+    }
 
     const contentTypeId = await ctx.db.insert("contentTypes", {
       siteId: args.siteId,
@@ -313,10 +605,16 @@ export const update = mutation({
       );
     }
 
-    const fields =
+    const nextSlug = parseOptionalString(args.slug) ?? normalized.slug;
+    const canonicalizedFields = await canonicalizeSiteFields(
+      ctx,
+      normalized.siteId,
       args.fields !== undefined
         ? assertValidFields(args.fields)
-        : normalized.fields;
+        : normalized.fields,
+      [{ kind: nextKind, slug: nextSlug }],
+    );
+    const fields = canonicalizedFields.fields;
 
     await ctx.db.patch(args.contentTypeId, {
       updatedAt: Date.now(),
@@ -344,7 +642,9 @@ export const update = mutation({
                 : undefined,
           }
         : {}),
-      ...(args.fields !== undefined ? { fields } : {}),
+      ...(args.fields !== undefined || canonicalizedFields.changed
+        ? { fields }
+        : {}),
     });
   },
 });
@@ -431,6 +731,81 @@ export const getBySlug = query({
       .first();
 
     return contentType ? normalizeContentTypeRecord(contentType) : null;
+  },
+});
+
+export const previewPublishPlan = query({
+  args: {
+    siteId: v.id("sites"),
+    contentTypeId: v.optional(v.id("contentTypes")),
+    name: v.string(),
+    slug: v.string(),
+    kind: v.optional(v.string()),
+    mode: v.optional(v.string()),
+    route: v.optional(v.string()),
+    description: v.optional(v.string()),
+    fields: v.any(),
+  },
+  handler: async (ctx, args) => {
+    await requireSiteAccess(ctx, args.siteId);
+
+    const validatedFields = assertValidFields(args.fields);
+    const fields = canonicalizeFieldFragmentReferences(
+      validatedFields,
+      await getSiteFragmentTargets(ctx, args.siteId, [
+        { kind: args.kind, slug: args.slug },
+      ]),
+    ).fields;
+    const draftData = buildDraftData({
+      name: args.name,
+      slug: args.slug,
+      kind: args.kind,
+      mode: args.mode,
+      route: args.route,
+      description: args.description,
+      fields,
+    });
+
+    const plan = await getContentTypePublishPlanForRoot(
+      ctx,
+      args.siteId,
+      normalizePublishCascadeSchema({
+        _id: args.contentTypeId,
+        name: draftData.name,
+        slug: draftData.slug,
+        kind: draftData.kind,
+        status: "draft" as const,
+        fields: draftData.fields,
+        draft: {
+          name: draftData.name,
+          slug: draftData.slug,
+          kind: draftData.kind,
+          fields: draftData.fields,
+        },
+      }),
+    );
+
+    return {
+      cascadeTargets: formatPlanTargets(plan.cascadeTargets),
+      expectedCascadeSlugs: plan.expectedCascadeSlugs,
+    };
+  },
+});
+
+export const getPublishPlan = query({
+  args: {
+    contentTypeId: v.id("contentTypes"),
+  },
+  handler: async (ctx, args) => {
+    const { normalized, cascadeTargets, expectedCascadeSlugs } =
+      await getContentTypePublishPlan(ctx, args.contentTypeId);
+
+    await requireSiteAccess(ctx, normalized.siteId);
+
+    return {
+      cascadeTargets: formatPlanTargets(cascadeTargets),
+      expectedCascadeSlugs,
+    };
   },
 });
 
@@ -528,11 +903,17 @@ export const createDraft = mutation({
 
     const name = args.name?.trim() || "Untitled Schema";
     const slug = args.slug?.trim() || "";
-    const fields = assertValidFields(args.fields ?? []);
+    const validatedFields = assertValidFields(args.fields ?? []);
 
     if (slug) {
       await assertSlugAvailable(ctx, args.siteId, slug);
     }
+
+    const fields = (
+      await canonicalizeSiteFields(ctx, args.siteId, validatedFields, [
+        { kind: args.kind, slug },
+      ])
+    ).fields;
 
     const now = Date.now();
     const draftData = buildDraftData({
@@ -572,6 +953,92 @@ export const runSchemaModelBackfill = mutation({
   handler: async (ctx, args) => {
     await requireSiteOwner(ctx, args.siteId);
     return runSchemaModelBackfillForSite(ctx, args.siteId);
+  },
+});
+
+export const repairFragmentReferences = mutation({
+  args: {
+    siteId: v.id("sites"),
+  },
+  handler: async (ctx, args) => {
+    await requireSiteOwner(ctx, args.siteId);
+
+    const contentTypes = await ctx.db
+      .query("contentTypes")
+      .withIndex("by_site", (q) => q.eq("siteId", args.siteId))
+      .collect();
+
+    const fragmentTargets = await getSiteFragmentTargets(ctx, args.siteId);
+    let updated = 0;
+    const unresolved: Array<{
+      contentTypeId: Id<"contentTypes">;
+      slug: string;
+      scope: "fields" | "draft";
+      path: string;
+      reference: string;
+    }> = [];
+
+    for (const contentType of contentTypes) {
+      const normalized = normalizeContentTypeRecord(contentType);
+      const publishedResult = canonicalizeFieldFragmentReferences(
+        normalized.fields,
+        fragmentTargets,
+      );
+      const draftResult = normalized.draft
+        ? canonicalizeFieldFragmentReferences(
+            normalized.draft.fields,
+            fragmentTargets,
+          )
+        : null;
+
+      if (publishedResult.changed || draftResult?.changed) {
+        await ctx.db.patch(contentType._id, {
+          fields: publishedResult.fields,
+          ...(draftResult && normalized.draft
+            ? {
+                draft: {
+                  ...normalized.draft,
+                  fields: draftResult.fields,
+                },
+              }
+            : {}),
+          updatedAt: Date.now(),
+        });
+        updated += 1;
+      }
+
+      unresolved.push(
+        ...dedupeFragmentReferenceIssues(publishedResult.unresolved).map(
+          (issue) => ({
+            contentTypeId: contentType._id,
+            slug: normalized.slug,
+            scope: "fields" as const,
+            path: issue.path,
+            reference: issue.reference,
+          }),
+        ),
+      );
+
+      if (draftResult) {
+        unresolved.push(
+          ...dedupeFragmentReferenceIssues(draftResult.unresolved).map(
+            (issue) => ({
+              contentTypeId: contentType._id,
+              slug: normalized.slug,
+              scope: "draft" as const,
+              path: issue.path,
+              reference: issue.reference,
+            }),
+          ),
+        );
+      }
+    }
+
+    return {
+      scanned: contentTypes.length,
+      updated,
+      unresolved,
+    };
   },
 });
 
@@ -643,6 +1110,27 @@ export const runTemplateMigration = mutation({
   },
 });
 
+export const publishManyInternal = internalMutation({
+  args: {
+    contentTypeIds: v.array(v.id("contentTypes")),
+  },
+  handler: async (ctx, args) => {
+    for (const contentTypeId of args.contentTypeIds) {
+      const contentType = await ctx.db.get(contentTypeId);
+      if (!contentType) {
+        continue;
+      }
+
+      const normalized = normalizeContentTypeRecord(contentType);
+      if (normalized.status !== "draft") {
+        continue;
+      }
+
+      await publishContentTypeById(ctx, contentTypeId);
+    }
+  },
+});
+
 export const saveDraft = mutation({
   args: {
     contentTypeId: v.id("contentTypes"),
@@ -671,11 +1159,21 @@ export const saveDraft = mutation({
       await assertCanBecomeFragment(ctx, args.contentTypeId);
     }
 
+    const nextSlug =
+      args.slug?.trim() ?? currentDraft?.slug ?? (normalized.slug as string);
+    const canonicalizedFields = await canonicalizeSiteFields(
+      ctx,
+      normalized.siteId,
+      args.fields !== undefined
+        ? assertValidFields(args.fields)
+        : (currentDraft?.fields ?? normalized.fields),
+      [{ kind: nextKind, slug: nextSlug }],
+    );
+
     const draftData = buildDraftData({
       name:
         args.name?.trim() ?? currentDraft?.name ?? (normalized.name as string),
-      slug:
-        args.slug?.trim() ?? currentDraft?.slug ?? (normalized.slug as string),
+      slug: nextSlug,
       kind: nextKind,
       mode: args.mode ?? currentDraft?.mode ?? normalized.mode,
       route: args.route ?? currentDraft?.route ?? normalized.route,
@@ -684,10 +1182,7 @@ export const saveDraft = mutation({
           ? args.description
           : (currentDraft?.description ??
             (normalized.description as string | undefined)),
-      fields:
-        args.fields !== undefined
-          ? assertValidFields(args.fields)
-          : (currentDraft?.fields ?? normalized.fields),
+      fields: canonicalizedFields.fields,
     });
 
     if (draftData.slug) {
@@ -729,56 +1224,33 @@ export const saveDraft = mutation({
 export const publish = mutation({
   args: {
     contentTypeId: v.id("contentTypes"),
+    cascade: v.optional(v.boolean()),
+    expectedCascadeSlugs: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const contentType = await ctx.db.get(args.contentTypeId);
-    if (!contentType) {
-      throw new ConvexError("Content type not found");
-    }
-
-    const normalized = normalizeContentTypeRecord(contentType);
+    const { normalized, cascadeTargets } = await getContentTypePublishPlan(
+      ctx,
+      args.contentTypeId,
+    );
     await requireSiteAccess(ctx, normalized.siteId);
 
-    const draft = normalized.draft;
-    const kind = draft?.kind ?? normalized.kind;
-    const name = draft?.name ?? (normalized.name as string);
-    const slug = draft?.slug ?? (normalized.slug as string);
-    const description =
-      draft?.description ?? (normalized.description as string | undefined);
-    const mode =
-      kind === "template" ? (draft?.mode ?? normalized.mode) : undefined;
-    const route =
-      kind === "template" ? (draft?.route ?? normalized.route) : undefined;
-    const fields = draft?.fields ?? normalized.fields;
-
-    if (!name?.trim()) {
-      throw new ConvexError("Name is required to publish");
-    }
-    if (!slug?.trim()) {
-      throw new ConvexError("Slug is required to publish");
-    }
-    if (fields.length === 0) {
-      throw new ConvexError("At least one field is required to publish");
+    if (cascadeTargets.length > 0 && !args.cascade) {
+      throw new ConvexError(formatCascadePublishBlockedError(cascadeTargets));
     }
 
-    assertValidFields(fields);
-    await assertSlugAvailable(ctx, normalized.siteId, slug, args.contentTypeId);
+    if (args.cascade) {
+      assertExpectedCascadeSlugs(args.expectedCascadeSlugs, cascadeTargets);
+    }
 
-    const now = Date.now();
-    await ctx.db.patch(args.contentTypeId, {
-      name: name.trim(),
-      slug: slug.trim(),
-      kind,
-      mode,
-      route,
-      description: parseOptionalString(description),
-      fields,
-      status: "published",
-      draft: undefined,
-      draftUpdatedAt: undefined,
-      publishedAt: now,
-      updatedAt: now,
-    });
+    if (cascadeTargets.length > 0) {
+      await ctx.runMutation(internal.contentTypes.publishManyInternal, {
+        contentTypeIds: cascadeTargets
+          .map((target) => target._id)
+          .filter((targetId): targetId is Id<"contentTypes"> => !!targetId),
+      });
+    }
+
+    await publishContentTypeById(ctx, args.contentTypeId);
   },
 });
 
@@ -820,8 +1292,7 @@ export const syncFromSchema = internalMutation({
     }
 
     const results: { slug: string; action: "created" | "updated" }[] = [];
-
-    for (const rawDefinition of args.contentTypes) {
+    const incomingDefinitions = args.contentTypes.map((rawDefinition) => {
       if (!rawDefinition || typeof rawDefinition !== "object") {
         throw new ConvexError("Each schema definition must be an object");
       }
@@ -836,7 +1307,27 @@ export const syncFromSchema = internalMutation({
         );
       }
 
+      return incoming as Record<string, unknown> & {
+        name: string;
+        slug: string;
+      };
+    });
+
+    const fragmentTargets = await getSiteFragmentTargets(
+      ctx,
+      args.siteId,
+      incomingDefinitions.map((definition) => ({
+        kind: definition.kind,
+        slug: definition.slug,
+      })),
+    );
+
+    for (const incoming of incomingDefinitions) {
       const validatedFields = assertValidFields(incoming.fields);
+      const canonicalizedFields = canonicalizeFieldFragmentReferences(
+        validatedFields,
+        fragmentTargets,
+      ).fields;
       const draftData = buildDraftData({
         name: incoming.name,
         slug: incoming.slug,
@@ -844,7 +1335,7 @@ export const syncFromSchema = internalMutation({
         mode: incoming.mode,
         route: incoming.route,
         description: incoming.description as string | undefined,
-        fields: validatedFields,
+        fields: canonicalizedFields,
       });
 
       const existing = await ctx.db
@@ -867,7 +1358,13 @@ export const syncFromSchema = internalMutation({
           normalizedExisting.fields,
           draftData.fields,
         );
-        const mergedDraft = { ...draftData, fields: mergedFields };
+        const mergedDraft = {
+          ...draftData,
+          fields: canonicalizeFieldFragmentReferences(
+            mergedFields,
+            fragmentTargets,
+          ).fields,
+        };
         const now = Date.now();
 
         if ((normalizedExisting.status ?? "published") === "draft") {

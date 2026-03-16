@@ -8,6 +8,8 @@ import {
 } from "./error-utils.js";
 import { createSdkLogger, warnOnce } from "./logging.js";
 import type {
+  ContentExpandTarget,
+  GetEntriesOptions,
   GetEntryOptions,
   NoMessClientConfig,
   NoMessEntry,
@@ -20,7 +22,7 @@ import type {
   ShopifyCollection,
   ShopifyProduct,
 } from "./types.js";
-import { DEFAULT_API_URL, type NoMessError } from "./types.js";
+import { DEFAULT_API_URL, NoMessError } from "./types.js";
 
 interface RequestOptions {
   method: "GET" | "POST";
@@ -28,6 +30,51 @@ interface RequestOptions {
   params?: Record<string, string>;
   body?: unknown;
   operation: string;
+}
+
+const CONTENT_EXPAND_TARGETS = new Set<ContentExpandTarget>(["shopify"]);
+
+function normalizeExpandTargets(
+  expand?: ContentExpandTarget[],
+): ContentExpandTarget[] {
+  if (!expand) {
+    return [];
+  }
+
+  const targets = new Set<ContentExpandTarget>();
+  for (const target of expand) {
+    if (typeof target !== "string") {
+      continue;
+    }
+
+    const normalized = target.trim() as ContentExpandTarget;
+    if (CONTENT_EXPAND_TARGETS.has(normalized)) {
+      targets.add(normalized);
+    }
+  }
+
+  return [...targets];
+}
+
+function compareEntriesForSingleton(
+  left: NoMessEntry,
+  right: NoMessEntry,
+): number {
+  const leftPublished = left._publishedAt ?? -1;
+  const rightPublished = right._publishedAt ?? -1;
+  if (leftPublished !== rightPublished) {
+    return rightPublished - leftPublished;
+  }
+
+  if (left._updatedAt !== right._updatedAt) {
+    return right._updatedAt - left._updatedAt;
+  }
+
+  if (left._createdAt !== right._createdAt) {
+    return right._createdAt - left._createdAt;
+  }
+
+  return right.slug.localeCompare(left.slug);
 }
 
 export class NoMessClient {
@@ -214,6 +261,26 @@ export class NoMessClient {
     return parsed.value as T;
   }
 
+  private buildContentParams(
+    options?: GetEntriesOptions | GetEntryOptions,
+  ): Record<string, string> | undefined {
+    const params: Record<string, string> = {};
+    const expand = normalizeExpandTargets(options?.expand);
+    if (expand.length > 0) {
+      params.expand = expand.join(",");
+    }
+
+    const entryOptions = options as GetEntryOptions | undefined;
+    if (entryOptions?.preview) {
+      params.preview = "true";
+      if (entryOptions.previewSecret) {
+        params.secret = entryOptions.previewSecret;
+      }
+    }
+
+    return Object.keys(params).length > 0 ? params : undefined;
+  }
+
   /**
    * List all content type schemas with fields, TypeScript interfaces, and entry counts.
    */
@@ -241,10 +308,12 @@ export class NoMessClient {
    */
   async getEntries<T extends NoMessEntry = NoMessEntry>(
     contentType: string,
+    options?: GetEntriesOptions,
   ): Promise<T[]> {
     return this.request<T[]>({
       method: "GET",
       path: `/api/content/${contentType}`,
+      params: this.buildContentParams(options),
       operation: "getEntries",
     });
   }
@@ -258,19 +327,90 @@ export class NoMessClient {
     slug: string,
     options?: GetEntryOptions,
   ): Promise<T> {
-    const params: Record<string, string> = {};
-    if (options?.preview) {
-      params.preview = "true";
-      if (options.previewSecret) {
-        params.secret = options.previewSecret;
-      }
-    }
-
     return this.request<T>({
       method: "GET",
       path: `/api/content/${contentType}/${slug}`,
-      params,
+      params: this.buildContentParams(options),
       operation: "getEntry",
+    });
+  }
+
+  async getEntryOrNull<T extends NoMessEntry = NoMessEntry>(
+    contentType: string,
+    slug: string,
+    options?: GetEntryOptions,
+  ): Promise<T | null> {
+    try {
+      return await this.getEntry<T>(contentType, slug, options);
+    } catch (error) {
+      if (error instanceof NoMessError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async getSingleton<T extends NoMessEntry = NoMessEntry>(
+    contentType: string,
+    options?: GetEntriesOptions,
+  ): Promise<T | null> {
+    try {
+      const entries = await this.getEntries<T>(contentType, options);
+      if (entries.length === 0) {
+        return null;
+      }
+
+      const sortedEntries = [...entries].sort(compareEntriesForSingleton);
+      const chosenEntry = sortedEntries[0];
+
+      if (sortedEntries.length > 1) {
+        warnOnce(
+          this.logger,
+          `multiple-singleton-entries:${contentType}`,
+          {
+            level: "warn",
+            code: "multiple_singleton_entries",
+            message:
+              `Content type "${contentType}" is being fetched as a singleton, but multiple published entries were returned. ` +
+              `Using "${chosenEntry.slug}".`,
+            scope: "client",
+            operation: "getSingleton",
+            timestamp: new Date().toISOString(),
+            context: {
+              contentType,
+              chosenSlug: chosenEntry.slug,
+              slugs: sortedEntries.map((entry) => entry.slug),
+            },
+          },
+        );
+      }
+
+      return chosenEntry;
+    } catch (error) {
+      if (error instanceof NoMessError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async getRequiredSingleton<T extends NoMessEntry = NoMessEntry>(
+    contentType: string,
+    options?: GetEntriesOptions,
+  ): Promise<T> {
+    const entry = await this.getSingleton<T>(contentType, options);
+    if (entry) {
+      return entry;
+    }
+
+    throw createNoMessHttpError(`Singleton entry for "${contentType}" not found`, {
+      kind: "http",
+      code: "http_error",
+      status: 404,
+      retryable: false,
+      operation: "getRequiredSingleton",
+      method: "GET",
+      url: `${this.apiUrl}/api/content/${contentType}`,
     });
   }
 

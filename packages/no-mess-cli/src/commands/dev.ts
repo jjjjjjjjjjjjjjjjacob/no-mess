@@ -3,6 +3,7 @@ import { watch } from "chokidar";
 import { parseSchemaSource } from "@no-mess/client/schema";
 import { pushSchema } from "../api.js";
 import { loadConfig, validateApiKey } from "../config.js";
+import { printDraftPublishWarning } from "../sync-output.js";
 
 export async function devCommand(args: string[]): Promise<void> {
   const schemaFlag = args.indexOf("--schema");
@@ -81,6 +82,7 @@ async function pushOnce(
     console.log(
       `Synced ${syncResult.synced.length} content type${syncResult.synced.length !== 1 ? "s" : ""}`,
     );
+    printDraftPublishWarning();
   } catch (err) {
     console.error(
       `Push failed: ${err instanceof Error ? err.message : "Unknown error"}`,

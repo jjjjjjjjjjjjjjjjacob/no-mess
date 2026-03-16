@@ -5,7 +5,7 @@ import type {
   NamedFieldDefinition,
   SchemaDefinition,
   TemplateDefinition,
-} from "./schema-types";
+} from "./schema-types.js";
 
 /**
  * Generates a complete schema.ts source file from a SchemaDefinition.

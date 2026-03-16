@@ -11,9 +11,11 @@ Commands:
   push                  Parse and push schema to the dashboard
   pull                  Pull schemas from the dashboard and generate schema.ts
   dev                   Watch schema.ts and sync changes on save
+  codegen               Generate app-ready types from schema.ts
 
 Options:
   --schema <path>       Path to schema file (default: schema.ts)
+  --out <path>          Output file for codegen (default: no-mess.generated.ts)
   --stdout              (pull only) Print to stdout instead of writing file
   --help, -h            Show this help message
   --version, -v         Show version
@@ -54,6 +56,11 @@ async function main(): Promise<void> {
     case "dev": {
       const { devCommand } = await import("./commands/dev.js");
       await devCommand(commandArgs);
+      break;
+    }
+    case "codegen": {
+      const { codegenCommand } = await import("./commands/codegen.js");
+      await codegenCommand(commandArgs);
       break;
     }
     default:

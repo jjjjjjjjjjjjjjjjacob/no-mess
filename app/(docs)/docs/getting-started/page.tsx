@@ -97,7 +97,8 @@ export default function GettingStartedPage() {
           <code className="rounded bg-muted px-1 font-mono text-xs">
             no-mess push
           </code>{" "}
-          to sync your schema file to the dashboard.
+          to sync your schema file to the dashboard as drafts, then publish the
+          schema in the dashboard before expecting delivery APIs to use it.
         </DocsCallout>
       </DocsStep>
 
@@ -133,11 +134,9 @@ export default function GettingStartedPage() {
         <CodeBlock code="npm install @no-mess/client" language="bash" />
         <p className="mt-4">Then fetch your content:</p>
         <CodeBlock
-          code={`import { createNoMessClient } from "@no-mess/client";
+          code={`import { createServerNoMessClient } from "@no-mess/client/next";
 
-const cms = createNoMessClient({
-  apiKey: process.env.NO_MESS_SECRET_KEY!,
-});
+const cms = createServerNoMessClient();
 
 // Get all published blog posts
 const posts = await cms.getEntries("blog-posts");
@@ -154,7 +153,7 @@ const post = await cms.getEntry("blog-posts", "hello-world");`}
         from no-mess:
       </p>
       <CodeBlock
-        code={`import { createNoMessClient } from "@no-mess/client";
+        code={`import { createServerNoMessClient } from "@no-mess/client/next";
 
 interface BlogPost {
   slug: string;
@@ -164,9 +163,7 @@ interface BlogPost {
   publishedAt: string;
 }
 
-const cms = createNoMessClient({
-  apiKey: process.env.NO_MESS_SECRET_KEY!,
-});
+const cms = createServerNoMessClient();
 
 export default async function BlogPage() {
   const posts = await cms.getEntries<BlogPost>("blog-posts");

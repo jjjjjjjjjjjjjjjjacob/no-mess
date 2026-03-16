@@ -3,7 +3,7 @@ import type {
   FieldDefinition,
   FragmentDefinition,
   NamedFieldDefinition,
-} from "./schema-types";
+} from "./schema-types.js";
 
 type PathSegment = string | number;
 
@@ -15,6 +15,53 @@ export function buildFragmentMap(
       definition.kind === "fragment",
   );
   return new Map(fragments.map((fragment) => [fragment.slug, fragment]));
+}
+
+function fragmentReferenceToTokens(reference: string): string[] {
+  return reference
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/[_\s-]+/g, " ")
+    .replace(/[^a-zA-Z0-9 ]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => token.toLowerCase());
+}
+
+export function normalizeFragmentReference(reference: string): string {
+  return fragmentReferenceToTokens(reference).join("-");
+}
+
+export function resolveFragmentDefinition(
+  reference: string,
+  fragments: Map<string, FragmentDefinition>,
+): FragmentDefinition | null {
+  const exactMatch = fragments.get(reference);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const normalizedReference = normalizeFragmentReference(reference);
+  if (!normalizedReference) {
+    return null;
+  }
+
+  let resolved: FragmentDefinition | null = null;
+  for (const fragment of fragments.values()) {
+    if (normalizeFragmentReference(fragment.slug) !== normalizedReference) {
+      continue;
+    }
+
+    if (resolved && resolved.slug !== fragment.slug) {
+      return null;
+    }
+
+    resolved = fragment;
+  }
+
+  return resolved;
 }
 
 export function getFieldDisplayName(field: { name?: string; label?: string }) {
@@ -194,6 +241,24 @@ export function appendValueAtPath<T>(value: T, path: string, item: unknown): T {
   return setValueAtPath(value, path, nextItems);
 }
 
+export function insertValueAtPath<T>(
+  value: T,
+  path: string,
+  index: number,
+  item: unknown,
+): T {
+  const currentValue = getValueAtPath(value, path);
+
+  if (!Array.isArray(currentValue)) {
+    return setValueAtPath(value, path, [item]);
+  }
+
+  const nextItems = [...currentValue];
+  const insertIndex = Math.max(0, Math.min(index, nextItems.length));
+  nextItems.splice(insertIndex, 0, item);
+  return setValueAtPath(value, path, nextItems);
+}
+
 export function removeValueAtPath<T>(
   value: T,
   path: string,
@@ -276,12 +341,12 @@ export function resolveFragmentFields(
     return null;
   }
 
-  if (stack.includes(field.fragment)) {
+  const fragment = resolveFragmentDefinition(field.fragment, fragments);
+  if (!fragment) {
     return null;
   }
 
-  const fragment = fragments.get(field.fragment);
-  if (!fragment) {
+  if (stack.includes(fragment.slug)) {
     return null;
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { Eye, EyeOff, MousePointerClick, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ import {
   type PreviewPanelRef,
 } from "@/components/content-entries/preview-panel";
 import { DynamicForm } from "@/components/dynamic-form/dynamic-form";
+import { PublishCascadeDialog } from "@/components/publishing/publish-cascade-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,11 +38,13 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { usePreviewRefresh } from "@/hooks/use-preview-refresh";
 import { useSite } from "@/hooks/use-site";
 import { useBeforeUnload, useKeyboardSave } from "@/hooks/use-unsaved-changes";
+import { hasPendingEntryDraft } from "@/lib/entry-draft-state";
 import type { FragmentDefinition } from "@/packages/no-mess-client/src/schema";
 
 export default function EditEntryPage() {
   const router = useRouter();
   const { site, siteSlug } = useSite();
+  const convex = useConvex();
   const params = useParams<{ typeSlug: string; entrySlug: string }>();
 
   const contentType = useQuery(
@@ -71,6 +74,15 @@ export default function EditEntryPage() {
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCascadeDialog, setShowCascadeDialog] = useState(false);
+  const [cascadeTargets, setCascadeTargets] = useState<
+    {
+      kind: "template" | "fragment";
+      name: string;
+      slug: string;
+    }[]
+  >([]);
+  const [pendingCascadeSlugs, setPendingCascadeSlugs] = useState<string[]>([]);
   const fragments = useMemo(
     () =>
       (schemaDefinitions ?? [])
@@ -109,6 +121,7 @@ export default function EditEntryPage() {
     initialized &&
     (title !== savedTitle.current ||
       JSON.stringify(formData) !== JSON.stringify(savedFormData.current));
+  const hasDraftChanges = hasPendingEntryDraft(entry);
 
   const handlePreviewRefresh = useCallback(() => {
     previewRef.current?.refresh();
@@ -157,7 +170,7 @@ export default function EditEntryPage() {
 
   if (entries === undefined || contentType === undefined) {
     return (
-      <div className="max-w-2xl space-y-4">
+      <div className="max-w-5xl space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -186,14 +199,46 @@ export default function EditEntryPage() {
 
   const isSingletonTemplate = contentType.mode === "singleton";
 
-  const handlePublish = async () => {
+  const publishEntryWithOptions = async (options?: {
+    cascade?: boolean;
+    expectedCascadeSlugs?: string[];
+  }) => {
     try {
       await handleSave();
-      await publishEntry({ entryId: entry._id as Id<"contentEntries"> });
+      await publishEntry({
+        entryId: entry._id as Id<"contentEntries">,
+        cascade: options?.cascade,
+        expectedCascadeSlugs: options?.expectedCascadeSlugs,
+      });
       toast.success("Entry published");
-    } catch {
-      toast.error("Failed to publish");
+      setShowCascadeDialog(false);
+      setCascadeTargets([]);
+      setPendingCascadeSlugs([]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to publish");
     }
+  };
+
+  const handlePublish = async () => {
+    const plan = await convex.query(api.contentEntries.getPublishPlan, {
+      entryId: entry._id as Id<"contentEntries">,
+    });
+
+    if (plan.cascadeTargets.length > 0) {
+      setCascadeTargets(plan.cascadeTargets);
+      setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+      setShowCascadeDialog(true);
+      return;
+    }
+
+    await publishEntryWithOptions();
+  };
+
+  const handleCascadeConfirm = async () => {
+    await publishEntryWithOptions({
+      cascade: true,
+      expectedCascadeSlugs: pendingCascadeSlugs,
+    });
   };
 
   const handleUnpublish = async () => {
@@ -219,8 +264,8 @@ export default function EditEntryPage() {
 
   const editorContent = (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-xl font-semibold tracking-tight">
             Edit: {entry.title}
           </h2>
@@ -230,7 +275,7 @@ export default function EditEntryPage() {
             {entry.status}
           </Badge>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           {canPreview ? (
             <Button
               variant="outline"
@@ -315,7 +360,7 @@ export default function EditEntryPage() {
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {isDirty && (
             <span className="text-xs text-muted-foreground">
               Unsaved changes
@@ -324,7 +369,7 @@ export default function EditEntryPage() {
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving ? "Saving..." : "Save Draft"}
           </Button>
-          {entry.status === "draft" ? (
+          {entry.status === "draft" || hasDraftChanges ? (
             <Button
               variant="outline"
               onClick={handlePublish}
@@ -372,7 +417,7 @@ export default function EditEntryPage() {
           </ResizablePanel>
         </ResizablePanelGroup>
       ) : (
-        <div className="max-w-2xl">{editorContent}</div>
+        <div className="max-w-5xl">{editorContent}</div>
       )}
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -392,6 +437,14 @@ export default function EditEntryPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PublishCascadeDialog
+        open={showCascadeDialog}
+        onOpenChange={setShowCascadeDialog}
+        targets={cascadeTargets}
+        isConfirming={isSaving}
+        onConfirm={handleCascadeConfirm}
+      />
     </>
   );
 }

@@ -19,13 +19,13 @@ export default function SdkPage() {
 
       <DocsHeading>Server-Side Content Fetching</DocsHeading>
       <CodeBlock
-        code={`import { createNoMessClient } from "@no-mess/client";
+        code={`import { createServerNoMessClient } from "@no-mess/client/next";
+import { getShopifyHandle } from "@no-mess/client";
 
-export const cms = createNoMessClient({
-  apiKey: process.env.NO_MESS_API_KEY!,
-});
+export const cms = createServerNoMessClient();
 
-const post = await cms.getEntry("blog-post", "hello-world");`}
+const homePage = await cms.getSingleton("home-page");
+const featuredHandle = getShopifyHandle(homePage?.featuredProduct);`}
         language="typescript"
         filename="lib/cms.ts"
       />
@@ -115,9 +115,9 @@ export function BlogArticle({ entry }) {
         . If you need to report manually, use the client method below:
       </p>
       <CodeBlock
-        code={`const client = createNoMessClient({
-  apiKey: process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY!,
-});
+        code={`import { createBrowserNoMessClient } from "@no-mess/client/next";
+
+const client = createBrowserNoMessClient();
 
 await client.reportLiveEditRoute({
   entryId: "entry_123",
@@ -125,6 +125,23 @@ await client.reportLiveEditRoute({
 });`}
         language="typescript"
       />
+
+      <DocsHeading>Shopify Refs</DocsHeading>
+      <p className="text-muted-foreground">
+        Shopify fields inside CMS entries store raw refs by default. Use{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          getShopifyHandle()
+        </code>{" "}
+        to normalize the handle from either a string or{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          {"{ handle: string }"}
+        </code>
+        . If you want synced Shopify records inline, pass{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          expand: ["shopify"]
+        </code>{" "}
+        to the content fetch call.
+      </p>
 
       <DocsHeading>React API Summary</DocsHeading>
       <div className="overflow-x-auto">

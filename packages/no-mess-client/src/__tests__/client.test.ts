@@ -327,6 +327,171 @@ describe("NoMessClient", () => {
     });
   });
 
+  describe("high-level content helpers", () => {
+    it("returns null from getEntryOrNull on 404", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: false,
+          status: 404,
+          body: { error: "Entry not found" },
+        }),
+      );
+
+      await expect(
+        client.getEntryOrNull("blog-post", "missing"),
+      ).resolves.toBeNull();
+    });
+
+    it("rethrows non-404 errors from getEntryOrNull", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: false,
+          status: 500,
+          body: { error: "Server error" },
+        }),
+      );
+
+      await expect(client.getEntryOrNull("blog-post", "missing")).rejects.toThrow(
+        "Server error (HTTP 500)",
+      );
+    });
+
+    it("returns null from getSingleton when the content type is missing", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: false,
+          status: 404,
+          body: { error: 'Content type "missing" not found' },
+        }),
+      );
+
+      await expect(client.getSingleton("missing")).resolves.toBeNull();
+    });
+
+    it("returns null from getSingleton when no entries are published", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          body: [],
+        }),
+      );
+
+      await expect(client.getSingleton("home-page")).resolves.toBeNull();
+    });
+
+    it("returns the only singleton entry when one exists", async () => {
+      const entry = {
+        slug: "home-page",
+        title: "Home",
+        _id: "1",
+        _createdAt: 1,
+        _updatedAt: 1,
+        _publishedAt: 1,
+      };
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          body: [entry],
+        }),
+      );
+
+      await expect(client.getSingleton("home-page")).resolves.toEqual(entry);
+    });
+
+    it("sorts competing singleton entries deterministically and warns once", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const entries = [
+        {
+          slug: "older",
+          title: "Older",
+          _id: "1",
+          _createdAt: 1,
+          _updatedAt: 10,
+          _publishedAt: 20,
+        },
+        {
+          slug: "newer",
+          title: "Newer",
+          _id: "2",
+          _createdAt: 2,
+          _updatedAt: 11,
+          _publishedAt: 21,
+        },
+      ];
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          body: entries,
+        }),
+      );
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          body: entries,
+        }),
+      );
+
+      await expect(client.getSingleton("home-page")).resolves.toMatchObject({
+        slug: "newer",
+      });
+      await client.getSingleton("home-page");
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0]?.[0]).toContain(
+        'Content type "home-page" is being fetched as a singleton',
+      );
+    });
+
+    it("throws a 404 from getRequiredSingleton when no singleton exists", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          body: [],
+        }),
+      );
+
+      await expect(client.getRequiredSingleton("home-page")).rejects.toMatchObject({
+        status: 404,
+        message: 'Singleton entry for "home-page" not found (HTTP 404)',
+      });
+    });
+  });
+
+  describe("expand serialization", () => {
+    it("serializes expand on getEntries", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          body: [],
+        }),
+      );
+
+      await client.getEntries("blog-post", { expand: ["shopify"] });
+
+      const calledUrl = mockFetch.mock.calls[0][0];
+      expect(calledUrl).toContain("expand=shopify");
+    });
+
+    it("serializes preview and expand together on getEntry", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          body: {
+            slug: "hello",
+            title: "Hello",
+            _id: "1",
+            _createdAt: 0,
+            _updatedAt: 0,
+          },
+        }),
+      );
+
+      await client.getEntry("blog-post", "hello", {
+        preview: true,
+        previewSecret: "secret123",
+        expand: ["shopify"],
+      });
+
+      const calledUrl = mockFetch.mock.calls[0][0];
+      expect(calledUrl).toContain("preview=true");
+      expect(calledUrl).toContain("secret=secret123");
+      expect(calledUrl).toContain("expand=shopify");
+    });
+  });
+
   describe("error handling edge cases", () => {
     it("normalizes fetch rejections as retryable NoMessError", async () => {
       mockFetch.mockRejectedValueOnce(new TypeError("Network down"));

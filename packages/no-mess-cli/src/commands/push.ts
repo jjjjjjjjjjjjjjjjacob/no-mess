@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { parseSchemaSource } from "@no-mess/client/schema";
 import { pushSchema } from "../api.js";
 import { loadConfig, validateApiKey } from "../config.js";
+import { printDraftPublishWarning } from "../sync-output.js";
 
 export async function pushCommand(args: string[]): Promise<void> {
   const schemaFlag = args.indexOf("--schema");
@@ -62,6 +63,7 @@ export async function pushCommand(args: string[]): Promise<void> {
     }
 
     console.log("Push complete.");
+    printDraftPublishWarning();
   } catch (err) {
     console.error(
       `Error: ${err instanceof Error ? err.message : "Failed to push schema"}`,

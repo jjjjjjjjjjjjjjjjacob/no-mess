@@ -12,6 +12,8 @@ export type NoMessErrorKind =
 
 export type NoMessErrorCode =
   | "secret_key_in_browser"
+  | "missing_configuration"
+  | "multiple_singleton_entries"
   | "request_failed"
   | "http_error"
   | "invalid_success_response"
@@ -74,10 +76,19 @@ export function isSecretKey(key: string): boolean {
   return key.startsWith("nm_") && !key.startsWith("nm_pub_");
 }
 
-export interface GetEntryOptions {
+export type ContentExpandTarget = "shopify";
+
+export interface GetEntriesOptions {
+  expand?: ContentExpandTarget[];
+}
+
+export interface GetEntryOptions extends GetEntriesOptions {
   preview?: boolean;
   previewSecret?: string;
 }
+
+export type ShopifyProductRef = string | { handle: string };
+export type ShopifyCollectionRef = string | { handle: string };
 
 export interface NoMessEntry {
   slug: string;

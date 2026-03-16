@@ -235,6 +235,34 @@ function corsJsonResponseNoCache(data: unknown, status = 200): Response {
   });
 }
 
+function parseExpandTargets(url: URL) {
+  const targets = [
+    ...new Set(
+      url.searchParams
+        .getAll("expand")
+        .flatMap((value) => value.split(","))
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  const invalidTargets = targets.filter((target) => target !== "shopify");
+  if (invalidTargets.length > 0) {
+    return {
+      ok: false as const,
+      error: corsJsonError(
+        `Unsupported expand target${invalidTargets.length !== 1 ? "s" : ""}: ${invalidTargets.join(", ")}`,
+        400,
+      ),
+    };
+  }
+
+  return {
+    ok: true as const,
+    expand: targets as Array<"shopify">,
+  };
+}
+
 function getRequestOrigin(request: Request): string | null {
   const origin = request.headers.get("Origin");
   if (origin) {
@@ -281,6 +309,10 @@ http.route({
 
     const typeSlug = pathParts[0];
     const entrySlug = pathParts[1]; // undefined if listing
+    const expandResult = parseExpandTargets(url);
+    if (!expandResult.ok) {
+      return expandResult.error;
+    }
 
     // Look up content type
     const contentType = await ctx.runQuery(
@@ -309,6 +341,7 @@ http.route({
           contentTypeId: contentType._id as any,
           slug: entrySlug,
           preview: isPreview,
+          expand: expandResult.expand,
         },
       );
 
@@ -327,6 +360,7 @@ http.route({
         contentTypeId: contentType._id as any,
         // biome-ignore lint/suspicious/noExplicitAny: Convex ID type coercion
         siteId: site._id as any,
+        expand: expandResult.expand,
       },
     );
 

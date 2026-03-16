@@ -17,6 +17,8 @@ export function logEvent(logger: NoMessLogger | undefined, event: NoMessLogEvent
 
 export function shouldDefaultConsoleLog(event: NoMessLogEvent): boolean {
   switch (event.code) {
+    case "missing_configuration":
+    case "multiple_singleton_entries":
     case "secret_key_in_browser":
     case "preview_message_invalid":
       return event.level === "warn" || event.level === "error";

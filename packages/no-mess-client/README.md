@@ -68,6 +68,71 @@ const client = createNoMessClient({
 
 const posts = await client.getEntries("blog-post");
 const post = await client.getEntry("blog-post", "hello-world");
+const maybePost = await client.getEntryOrNull("blog-post", "missing");
+```
+
+## Next.js Helpers
+
+For Next.js apps, prefer the dedicated env-backed helpers:
+
+```ts
+import { createServerNoMessClient } from "@no-mess/client/next";
+import { getShopifyHandle } from "@no-mess/client";
+
+const cms = createServerNoMessClient();
+const homePage = await cms.getSingleton("home-page");
+
+const featuredHandles =
+  homePage?.featuredProducts
+    ?.map((item) => getShopifyHandle(item.product))
+    .filter(Boolean) ?? [];
+```
+
+For browser-side no-mess fetches that should use your publishable key:
+
+```ts
+import { createBrowserNoMessClient } from "@no-mess/client/next";
+
+const client = createBrowserNoMessClient();
+const posts = await client.getEntries("blog-post");
+```
+
+`createServerNoMessClient()` reads:
+- `NO_MESS_API_KEY`
+- `NO_MESS_API_URL`
+- `NEXT_PUBLIC_NO_MESS_API_URL`
+- `DEFAULT_API_URL`
+
+`createBrowserNoMessClient()` reads:
+- `NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_NO_MESS_API_URL`
+- `DEFAULT_API_URL`
+
+Both helpers throw when the required key is missing.
+
+## Shopify Refs
+
+CMS Shopify fields store raw refs, not expanded Shopify records:
+
+```ts
+type ShopifyProductRef = string | { handle: string };
+type ShopifyCollectionRef = string | { handle: string };
+```
+
+Use the helper below to read the handle from either shape:
+
+```ts
+import { getShopifyHandle } from "@no-mess/client";
+
+const handle = getShopifyHandle(entry.featuredProduct);
+```
+
+If you want synced Shopify records inline, opt into expansion:
+
+```ts
+const post = await client.getEntry("blog-post", "hello-world", {
+  expand: ["shopify"],
+});
 ```
 
 ## Preview-Only Route
@@ -159,11 +224,9 @@ export function BlogArticle({ entry }) {
 If you need custom reporting logic, call the client method directly:
 
 ```ts
-import { createNoMessClient } from "@no-mess/client";
+import { createBrowserNoMessClient } from "@no-mess/client/next";
 
-const client = createNoMessClient({
-  apiKey: process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY!,
-});
+const client = createBrowserNoMessClient();
 
 await client.reportLiveEditRoute({
   entryId: "entry_123",
@@ -179,8 +242,12 @@ await client.reportLiveEditRoute({
 |--------|-------------|
 | `client.getSchemas()` | List all template and fragment schemas |
 | `client.getSchema(typeSlug)` | Get a single schema by slug |
-| `client.getEntries(contentType)` | Fetch all published entries of a template |
-| `client.getEntry(contentType, slug)` | Get a single entry by slug |
+| `client.getEntries(contentType, options?)` | Fetch all published entries of a template |
+| `client.getEntry(contentType, slug, options?)` | Get a single entry by slug |
+| `client.getEntryOrNull(contentType, slug, options?)` | Return `null` instead of throwing on 404 |
+| `client.getSingleton(contentType, options?)` | Fetch the first published entry for a singleton-like content type |
+| `client.getRequiredSingleton(contentType, options?)` | Like `getSingleton()` but throws a 404-style `NoMessError` when missing |
+| `getShopifyHandle(ref)` | Extract a Shopify handle from a raw ref |
 
 ### Preview / Live Edit
 
