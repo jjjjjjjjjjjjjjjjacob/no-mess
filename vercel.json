@@ -3,5 +3,5 @@
   "framework": "nextjs",
   "buildCommand": "bun run build",
   "installCommand": "bun install",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ':!packages'"
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ."
 }
