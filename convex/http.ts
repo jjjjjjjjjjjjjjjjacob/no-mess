@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { httpAction } from "./_generated/server";
+import { contentApiResponse } from "./lib/contentApiResponse";
 
 const http = httpRouter();
 
@@ -309,6 +310,8 @@ http.route({
 
     const typeSlug = pathParts[0];
     const entrySlug = pathParts[1]; // undefined if listing
+    const previewRequested = url.searchParams.get("preview") === "true";
+    const fresh = url.searchParams.get("fresh") === "true";
     const expandResult = parseExpandTargets(url);
     if (!expandResult.ok) {
       return expandResult.error;
@@ -327,10 +330,9 @@ http.route({
 
     if (entrySlug) {
       // Single entry
-      const preview = url.searchParams.get("preview") === "true";
       const secret = url.searchParams.get("secret");
 
-      const isPreview = preview && secret === site.previewSecret;
+      const isPreview = previewRequested && secret === site.previewSecret;
 
       const entry = await ctx.runQuery(
         internal.contentEntries.getBySlugInternal,
@@ -349,7 +351,7 @@ http.route({
         return corsJsonError(`Entry "${entrySlug}" not found`, 404);
       }
 
-      return corsJsonResponse(entry);
+      return contentApiResponse(entry, { previewRequested, fresh });
     }
 
     // List entries
@@ -364,7 +366,7 @@ http.route({
       },
     );
 
-    return corsJsonResponse(entries);
+    return contentApiResponse(entries, { previewRequested, fresh });
   }),
 });
 

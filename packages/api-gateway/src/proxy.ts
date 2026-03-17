@@ -1,3 +1,4 @@
+import { shouldBypassCache } from "./cache";
 import type { Env } from "./config";
 
 /**
@@ -9,6 +10,7 @@ export async function proxyToUpstream(
   env: Env,
   request: Request,
 ): Promise<Response> {
+  const bypassCache = shouldBypassCache(request);
   const url = new URL(request.url);
   const upstreamUrl = new URL(url.pathname + url.search, env.UPSTREAM_URL);
 
@@ -31,9 +33,10 @@ export async function proxyToUpstream(
   const upstreamResponse = await fetch(upstreamUrl.toString(), {
     method: request.method,
     headers,
-    body: request.method !== "GET" && request.method !== "HEAD"
-      ? request.body
-      : undefined,
+    body:
+      request.method !== "GET" && request.method !== "HEAD"
+        ? request.body
+        : undefined,
   });
 
   // Strip backend-identifying headers
@@ -45,7 +48,9 @@ export async function proxyToUpstream(
   if (upstreamResponse.ok && request.method === "GET") {
     responseHeaders.set(
       "Cache-Control",
-      "public, s-maxage=60, stale-while-revalidate=300",
+      bypassCache
+        ? "no-store, no-cache, must-revalidate"
+        : "public, s-maxage=60, stale-while-revalidate=300",
     );
   }
 

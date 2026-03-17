@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { proxyToUpstream } from "../proxy";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../config";
+import { proxyToUpstream } from "../proxy";
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -44,9 +44,7 @@ describe("proxyToUpstream", () => {
     await proxyToUpstream(env, request);
 
     const calledOptions = mockFetch.mock.calls[0][1];
-    expect(calledOptions.headers.get("Authorization")).toBe(
-      "Bearer nm_abc123",
-    );
+    expect(calledOptions.headers.get("Authorization")).toBe("Bearer nm_abc123");
   });
 
   it("sets Content-Type from request or defaults to application/json", async () => {
@@ -87,9 +85,7 @@ describe("proxyToUpstream", () => {
     await proxyToUpstream(env, request);
 
     const calledOptions = mockFetch.mock.calls[0][1];
-    expect(calledOptions.headers.get("X-Gateway")).toBe(
-      "no-mess-api-gateway",
-    );
+    expect(calledOptions.headers.get("X-Gateway")).toBe("no-mess-api-gateway");
   });
 
   it("forwards CF-Connecting-IP as X-Forwarded-For", async () => {
@@ -187,6 +183,50 @@ describe("proxyToUpstream", () => {
 
     expect(response.headers.get("Cache-Control")).toBe(
       "public, s-maxage=60, stale-while-revalidate=300",
+    );
+  });
+
+  it("returns no-store Cache-Control for preview GET responses", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        statusText: "OK",
+      }),
+    );
+
+    const request = new Request(
+      "https://api.nomess.xyz/api/content/blog?preview=true",
+      {
+        method: "GET",
+      },
+    );
+
+    const response = await proxyToUpstream(env, request);
+
+    expect(response.headers.get("Cache-Control")).toBe(
+      "no-store, no-cache, must-revalidate",
+    );
+  });
+
+  it("returns no-store Cache-Control for fresh GET responses", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        statusText: "OK",
+      }),
+    );
+
+    const request = new Request(
+      "https://api.nomess.xyz/api/content/blog?fresh=true",
+      {
+        method: "GET",
+      },
+    );
+
+    const response = await proxyToUpstream(env, request);
+
+    expect(response.headers.get("Cache-Control")).toBe(
+      "no-store, no-cache, must-revalidate",
     );
   });
 

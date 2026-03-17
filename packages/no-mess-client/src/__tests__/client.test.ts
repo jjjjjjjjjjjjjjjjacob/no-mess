@@ -111,6 +111,110 @@ describe("NoMessClient", () => {
     const calledUrl = mockFetch.mock.calls[0][0];
     expect(calledUrl).toContain("preview=true");
     expect(calledUrl).toContain("secret=secret123");
+    expect(calledUrl).toContain("fresh=true");
+  });
+
+  it("appends fresh=true when explicitly requested", async () => {
+    mockFetch.mockResolvedValueOnce(createMockResponse({ body: [] }));
+
+    await client.getEntries("blog-post", { fresh: true });
+
+    const calledUrl = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain("fresh=true");
+  });
+
+  it("infers fresh mode from cache: no-store", async () => {
+    const runtimeClient = createNoMessClient({
+      apiUrl: "https://api.test.convex.site",
+      apiKey: "nm_runtime",
+      fetch: {
+        cache: "no-store",
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce(createMockResponse({ body: [] }));
+
+    await runtimeClient.getEntries("blog-post");
+
+    const calledUrl = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain("fresh=true");
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
+  });
+
+  it("infers fresh mode from next.revalidate=0", async () => {
+    mockFetch.mockResolvedValueOnce(createMockResponse({ body: [] }));
+
+    await client.getEntries("blog-post", {
+      fetch: {
+        next: {
+          revalidate: 0,
+        },
+      },
+    });
+
+    const calledUrl = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain("fresh=true");
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        next: {
+          revalidate: 0,
+        },
+      }),
+    );
+  });
+
+  it("merges default and per-call fetch options for GET requests", async () => {
+    const mergeClient = createNoMessClient({
+      apiUrl: "https://api.test.convex.site",
+      apiKey: "nm_merge",
+      fetch: {
+        cache: "force-cache",
+        credentials: "include",
+        headers: {
+          "X-Default": "client",
+        },
+        next: {
+          revalidate: 120,
+          tags: ["cms"],
+        },
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce(createMockResponse({ body: [] }));
+
+    await mergeClient.getEntries("blog-post", {
+      fetch: {
+        headers: {
+          "X-Default": "request",
+          "X-Request": "entry",
+        },
+        mode: "cors",
+        next: {
+          tags: ["entry"],
+        },
+      },
+    });
+
+    const calledOptions = mockFetch.mock.calls[0][1];
+    const calledHeaders = new Headers(calledOptions.headers);
+
+    expect(calledOptions.cache).toBe("force-cache");
+    expect(calledOptions.credentials).toBe("include");
+    expect(calledOptions.mode).toBe("cors");
+    expect(calledOptions.next).toEqual({
+      revalidate: 120,
+      tags: ["entry"],
+    });
+    expect(calledHeaders.get("Authorization")).toBe("Bearer nm_merge");
+    expect(calledHeaders.get("Content-Type")).toBe("application/json");
+    expect(calledHeaders.get("X-Default")).toBe("request");
+    expect(calledHeaders.get("X-Request")).toBe("entry");
   });
 
   it("reports live edit routes", async () => {
@@ -351,9 +455,9 @@ describe("NoMessClient", () => {
         }),
       );
 
-      await expect(client.getEntryOrNull("blog-post", "missing")).rejects.toThrow(
-        "Server error (HTTP 500)",
-      );
+      await expect(
+        client.getEntryOrNull("blog-post", "missing"),
+      ).rejects.toThrow("Server error (HTTP 500)");
     });
 
     it("returns null from getSingleton when the content type is missing", async () => {
@@ -445,7 +549,9 @@ describe("NoMessClient", () => {
         }),
       );
 
-      await expect(client.getRequiredSingleton("home-page")).rejects.toMatchObject({
+      await expect(
+        client.getRequiredSingleton("home-page"),
+      ).rejects.toMatchObject({
         status: 404,
         message: 'Singleton entry for "home-page" not found (HTTP 404)',
       });

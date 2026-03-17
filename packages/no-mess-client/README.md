@@ -79,7 +79,9 @@ For Next.js apps, prefer the dedicated env-backed helpers:
 import { createServerNoMessClient } from "@no-mess/client/next";
 import { getShopifyHandle } from "@no-mess/client";
 
-const cms = createServerNoMessClient();
+const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});
 const homePage = await cms.getSingleton("home-page");
 
 const featuredHandles =
@@ -109,6 +111,26 @@ const posts = await client.getEntries("blog-post");
 - `DEFAULT_API_URL`
 
 Both helpers throw when the required key is missing.
+
+### Deployed runtime delivery
+
+For deployed routes that should reflect CMS publishes immediately and support
+route-aware Live Edit, fetch content at request time:
+
+```ts
+import { createServerNoMessClient } from "@no-mess/client/next";
+
+export const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});
+```
+
+This appends `fresh=true` to content API reads, bypasses no-mess-side GET
+caches, and avoids build-time content snapshots on deployed routes.
+
+If your route is fully statically generated, exported, or relies on build-only
+slug generation, new routes still will not exist until you redeploy even though
+existing runtime routes can fetch fresh content.
 
 ## Shopify Refs
 
@@ -213,11 +235,35 @@ export function BlogArticle({ entry }) {
 }
 ```
 
+On deployed routes, the server component should fetch the entry with runtime
+delivery and pass it to a client component that calls
+`useNoMessEditableEntry(entry)`.
+
 `useNoMessEditableEntry()` automatically:
 - swaps in draft content for the active iframe session
 - applies unsaved field overrides from Live Edit
 - reports the current URL for route-aware reopening
 - emits the entry-bound signal used by dashboard warnings
+
+The rendered route must also allow the dashboard origin in CSP:
+
+```ts
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/blog/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors 'self' https://admin.no-mess.xyz",
+          },
+        ],
+      },
+    ];
+  },
+};
+```
 
 ## Manual Route Reporting
 
@@ -248,6 +294,10 @@ await client.reportLiveEditRoute({
 | `client.getSingleton(contentType, options?)` | Fetch the first published entry for a singleton-like content type |
 | `client.getRequiredSingleton(contentType, options?)` | Like `getSingleton()` but throws a 404-style `NoMessError` when missing |
 | `getShopifyHandle(ref)` | Extract a Shopify handle from a raw ref |
+
+For content reads, `options.fetch` forwards cache-related `fetch` options and
+`options.fresh` explicitly appends `fresh=true` to bypass no-mess-side GET
+caches.
 
 ### Preview / Live Edit
 

@@ -2,8 +2,11 @@
 "@no-mess/client": minor
 ---
 
-Add higher-level SDK helpers for common app integrations.
+Expand the SDK for deployed runtime delivery and route-aware Live Edit.
 
-- add `@no-mess/client/next` helpers for server and browser client creation
-- add singleton content helpers, entry expansion options, and Shopify ref utils
-- expose schema contract generation utilities and fix explicit `.js` ESM specifiers for Bun
+- add `fetch` and `fresh` options for content reads, with automatic `fresh=true`
+  for runtime `cache: "no-store"` and `next.revalidate = 0` requests
+- allow `@no-mess/client/next` helpers to accept API URL, fetch, logger, and
+  fresh-mode overrides
+- document deployed runtime delivery, uncached preview/fresh reads, and the
+  route-aware Live Edit integration requirements

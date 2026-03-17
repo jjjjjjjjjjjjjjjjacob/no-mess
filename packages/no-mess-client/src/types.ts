@@ -53,6 +53,15 @@ export interface NoMessErrorOptions {
   cause?: unknown;
 }
 
+export interface NoMessNextFetchOptions {
+  revalidate?: number | false;
+  tags?: string[];
+}
+
+export type NoMessFetchOptions = Omit<RequestInit, "method" | "body"> & {
+  next?: NoMessNextFetchOptions;
+};
+
 export interface NoMessClientConfig {
   apiUrl?: string;
   /**
@@ -63,6 +72,8 @@ export interface NoMessClientConfig {
    * - **Publishable key**: Safe for client-side use. Read-only access to published content.
    */
   apiKey: string;
+  fetch?: NoMessFetchOptions;
+  fresh?: boolean;
   logger?: NoMessLogger;
 }
 
@@ -80,6 +91,8 @@ export type ContentExpandTarget = "shopify";
 
 export interface GetEntriesOptions {
   expand?: ContentExpandTarget[];
+  fetch?: NoMessFetchOptions;
+  fresh?: boolean;
 }
 
 export interface GetEntryOptions extends GetEntriesOptions {

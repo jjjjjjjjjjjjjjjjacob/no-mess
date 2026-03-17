@@ -36,6 +36,30 @@ GET /api/content/{contentType}/{slug}`}
         These responses are cached. Use a publishable key for browser-safe
         reads.
       </p>
+      <p className="text-muted-foreground">
+        Add{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          fresh=true
+        </code>{" "}
+        when a deployed route needs request-time content and immediate publish
+        visibility:
+      </p>
+      <CodeBlock
+        code={`GET /api/content/{contentType}?fresh=true
+GET /api/content/{contentType}/{slug}?fresh=true`}
+        language="http"
+      />
+      <p className="text-muted-foreground">
+        Preview reads (
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          preview=true
+        </code>
+        ) and fresh reads both return{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          Cache-Control: no-store, no-cache, must-revalidate
+        </code>
+        .
+      </p>
 
       <DocsHeading>Preview Session Exchange</DocsHeading>
       <CodeBlock

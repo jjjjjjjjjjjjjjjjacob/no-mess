@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../config";
 
 // Mock global fetch for upstream proxy calls
@@ -129,5 +129,43 @@ describe("Worker fetch handler", () => {
     expect(mockFetch).toHaveBeenCalled();
     expect(response.status).toBe(200);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+
+  it("bypasses worker cache for preview requests", async () => {
+    const request = new Request(
+      "https://api.nomess.xyz/api/content/blog?preview=true",
+      {
+        method: "GET",
+        headers: { Authorization: "Bearer nm_testkey" },
+      },
+    );
+    const ctx = createExecutionContext();
+
+    const response = await worker.fetch(request, env, ctx);
+
+    expect(mockCacheMatch).not.toHaveBeenCalled();
+    expect(mockCachePut).not.toHaveBeenCalled();
+    expect(response.headers.get("Cache-Control")).toBe(
+      "no-store, no-cache, must-revalidate",
+    );
+  });
+
+  it("bypasses worker cache for fresh requests", async () => {
+    const request = new Request(
+      "https://api.nomess.xyz/api/content/blog?fresh=true",
+      {
+        method: "GET",
+        headers: { Authorization: "Bearer nm_testkey" },
+      },
+    );
+    const ctx = createExecutionContext();
+
+    const response = await worker.fetch(request, env, ctx);
+
+    expect(mockCacheMatch).not.toHaveBeenCalled();
+    expect(mockCachePut).not.toHaveBeenCalled();
+    expect(response.headers.get("Cache-Control")).toBe(
+      "no-store, no-cache, must-revalidate",
+    );
   });
 });

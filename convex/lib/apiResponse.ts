@@ -13,6 +13,20 @@ export function jsonResponse(data: unknown, status = 200): Response {
 }
 
 /**
+ * Creates an uncached JSON response with proper headers.
+ */
+export function jsonNoStoreResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    },
+  });
+}
+
+/**
  * Creates a JSON error response.
  */
 export function errorResponse(message: string, status = 400): Response {

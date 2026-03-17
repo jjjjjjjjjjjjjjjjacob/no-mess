@@ -1,4 +1,4 @@
-import { buildCacheKey } from "./cache";
+import { buildCacheKey, shouldBypassCache } from "./cache";
 import type { Env } from "./config";
 import { addCorsHeaders, handleCorsOptions } from "./cors";
 import { logRequest } from "./logger";
@@ -18,6 +18,7 @@ export default {
 
     // 2. Extract API key for rate limiting and caching
     const apiKey = extractApiKey(request);
+    const bypassCache = shouldBypassCache(request);
 
     // 3. Rate limiting
     const rateLimitResponse = await checkRateLimit(env, apiKey);
@@ -26,7 +27,7 @@ export default {
     }
 
     // 4. Check cache (GET requests only)
-    if (request.method === "GET") {
+    if (request.method === "GET" && !bypassCache) {
       const cacheKey = buildCacheKey(request, apiKey);
       const cachedResponse = await caches.default.match(cacheKey);
       if (cachedResponse) {
@@ -39,7 +40,7 @@ export default {
     const response = await proxyToUpstream(env, request);
 
     // 6. Cache successful GET responses
-    if (request.method === "GET" && response.ok) {
+    if (request.method === "GET" && response.ok && !bypassCache) {
       const cacheKey = buildCacheKey(request, apiKey);
       const responseToCache = response.clone();
       ctx.waitUntil(caches.default.put(cacheKey, responseToCache));

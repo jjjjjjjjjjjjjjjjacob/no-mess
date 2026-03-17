@@ -1,5 +1,13 @@
 import { createNoMessClient } from "../index.js";
+import type { NoMessFetchOptions, NoMessLogger } from "../types.js";
 import { DEFAULT_API_URL, NoMessError } from "../types.js";
+
+interface NoMessNextClientOverrides {
+  apiUrl?: string;
+  fetch?: NoMessFetchOptions;
+  fresh?: boolean;
+  logger?: NoMessLogger;
+}
 
 function requireEnv(name: string, usage: string): string {
   const value = process.env[name];
@@ -21,12 +29,13 @@ function requireEnv(name: string, usage: string): string {
   );
 }
 
-export function createServerNoMessClient() {
+export function createServerNoMessClient(options?: NoMessNextClientOverrides) {
   const apiKey = requireEnv(
     "NO_MESS_API_KEY",
     "Set NO_MESS_API_KEY to your secret key (nm_...) in your server environment.",
   );
   const apiUrl =
+    options?.apiUrl?.trim() ||
     process.env.NO_MESS_API_URL?.trim() ||
     process.env.NEXT_PUBLIC_NO_MESS_API_URL?.trim() ||
     DEFAULT_API_URL;
@@ -34,19 +43,27 @@ export function createServerNoMessClient() {
   return createNoMessClient({
     apiKey,
     apiUrl,
+    fetch: options?.fetch,
+    fresh: options?.fresh,
+    logger: options?.logger,
   });
 }
 
-export function createBrowserNoMessClient() {
+export function createBrowserNoMessClient(options?: NoMessNextClientOverrides) {
   const apiKey = requireEnv(
     "NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY",
     "Set NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY to your publishable key (nm_pub_...) in your browser environment.",
   );
   const apiUrl =
-    process.env.NEXT_PUBLIC_NO_MESS_API_URL?.trim() || DEFAULT_API_URL;
+    options?.apiUrl?.trim() ||
+    process.env.NEXT_PUBLIC_NO_MESS_API_URL?.trim() ||
+    DEFAULT_API_URL;
 
   return createNoMessClient({
     apiKey,
     apiUrl,
+    fetch: options?.fetch,
+    fresh: options?.fresh,
+    logger: options?.logger,
   });
 }

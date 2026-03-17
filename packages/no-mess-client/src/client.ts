@@ -13,7 +13,9 @@ import type {
   GetEntryOptions,
   NoMessClientConfig,
   NoMessEntry,
+  NoMessFetchOptions,
   NoMessLogLevel,
+  NoMessNextFetchOptions,
   PreviewExchangeResult,
   PreviewSessionAuth,
   ReportLiveEditRouteOptions,
@@ -29,10 +31,19 @@ interface RequestOptions {
   path: string;
   params?: Record<string, string>;
   body?: unknown;
+  fetch?: NoMessFetchOptions;
+  fresh?: boolean;
+  forceFresh?: boolean;
   operation: string;
 }
 
 const CONTENT_EXPAND_TARGETS = new Set<ContentExpandTarget>(["shopify"]);
+const FRESH_REQUEST_PARAM = "fresh";
+const NO_CACHE_VALUE = "no-store";
+
+type InternalRequestInit = RequestInit & {
+  next?: NoMessNextFetchOptions;
+};
 
 function normalizeExpandTargets(
   expand?: ContentExpandTarget[],
@@ -80,11 +91,15 @@ function compareEntriesForSingleton(
 export class NoMessClient {
   private apiUrl: string;
   private apiKey: string;
+  private defaultFetch?: NoMessFetchOptions;
+  private fresh?: boolean;
   private logger: ReturnType<typeof createSdkLogger>;
 
   constructor(config: NoMessClientConfig) {
     this.apiUrl = (config.apiUrl ?? DEFAULT_API_URL).replace(/\/$/, "");
     this.apiKey = config.apiKey;
+    this.defaultFetch = config.fetch;
+    this.fresh = config.fresh;
     this.logger = createSdkLogger(config.logger);
 
     if (
@@ -105,6 +120,93 @@ export class NoMessClient {
         },
       });
     }
+  }
+
+  private mergeFetchOptions(
+    defaults?: NoMessFetchOptions,
+    overrides?: NoMessFetchOptions,
+  ): NoMessFetchOptions | undefined {
+    if (!defaults && !overrides) {
+      return undefined;
+    }
+
+    const mergedHeaders = this.mergeHeaders(
+      defaults?.headers,
+      overrides?.headers,
+    );
+    const mergedNext =
+      defaults?.next || overrides?.next
+        ? {
+            ...(defaults?.next ?? {}),
+            ...(overrides?.next ?? {}),
+          }
+        : undefined;
+
+    const merged: NoMessFetchOptions = {
+      ...(defaults ?? {}),
+      ...(overrides ?? {}),
+    };
+
+    if (mergedHeaders) {
+      merged.headers = mergedHeaders;
+    } else {
+      delete merged.headers;
+    }
+
+    if (mergedNext) {
+      merged.next = mergedNext;
+    } else {
+      delete merged.next;
+    }
+
+    return Object.keys(merged).length > 0 ? merged : undefined;
+  }
+
+  private mergeHeaders(
+    defaults?: HeadersInit,
+    overrides?: HeadersInit,
+  ): Headers | undefined {
+    if (!defaults && !overrides) {
+      return undefined;
+    }
+
+    const merged = new Headers(defaults);
+    if (overrides) {
+      const overrideHeaders = new Headers(overrides);
+      for (const [key, value] of overrideHeaders.entries()) {
+        merged.set(key, value);
+      }
+    }
+
+    return merged;
+  }
+
+  private shouldUseFreshMode(
+    fetchOptions: NoMessFetchOptions | undefined,
+    fresh: boolean | undefined,
+    forceFresh: boolean,
+  ): boolean {
+    if (forceFresh) {
+      return true;
+    }
+
+    if (typeof fresh === "boolean") {
+      return fresh;
+    }
+
+    if (typeof this.fresh === "boolean") {
+      return this.fresh;
+    }
+
+    if (fetchOptions?.cache === NO_CACHE_VALUE) {
+      return true;
+    }
+
+    if (fetchOptions?.next?.revalidate === 0) {
+      return true;
+    }
+
+    return false;
   }
 
   private emitErrorLog(
@@ -166,23 +268,53 @@ export class NoMessClient {
     path,
     params,
     body,
+    fetch: fetchOptions,
+    fresh,
+    forceFresh = false,
     operation,
   }: RequestOptions): Promise<T> {
     const url = new URL(`${this.apiUrl}${path}`);
+    const requestFetchOptions =
+      method === "GET"
+        ? this.mergeFetchOptions(this.defaultFetch, fetchOptions)
+        : undefined;
+    const isFreshRequest = this.shouldUseFreshMode(
+      requestFetchOptions,
+      fresh,
+      forceFresh,
+    );
+
     if (params) {
       for (const [key, value] of Object.entries(params)) {
         url.searchParams.set(key, value);
       }
     }
+    if (isFreshRequest) {
+      url.searchParams.set(FRESH_REQUEST_PARAM, "true");
+    }
 
     const requestUrl = url.toString();
-    const init: RequestInit = {
+    const init: InternalRequestInit = {
       method,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
       },
     };
+
+    if (requestFetchOptions) {
+      Object.assign(init, requestFetchOptions);
+      const mergedHeaders = this.mergeHeaders(
+        {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        requestFetchOptions.headers,
+      );
+      if (mergedHeaders) {
+        init.headers = mergedHeaders;
+      }
+    }
 
     if (typeof body !== "undefined") {
       init.body = JSON.stringify(body);
@@ -314,6 +446,8 @@ export class NoMessClient {
       method: "GET",
       path: `/api/content/${contentType}`,
       params: this.buildContentParams(options),
+      fetch: options?.fetch,
+      fresh: options?.fresh,
       operation: "getEntries",
     });
   }
@@ -331,6 +465,9 @@ export class NoMessClient {
       method: "GET",
       path: `/api/content/${contentType}/${slug}`,
       params: this.buildContentParams(options),
+      fetch: options?.fetch,
+      fresh: options?.fresh,
+      forceFresh: options?.preview === true,
       operation: "getEntry",
     });
   }
@@ -364,25 +501,21 @@ export class NoMessClient {
       const chosenEntry = sortedEntries[0];
 
       if (sortedEntries.length > 1) {
-        warnOnce(
-          this.logger,
-          `multiple-singleton-entries:${contentType}`,
-          {
-            level: "warn",
-            code: "multiple_singleton_entries",
-            message:
-              `Content type "${contentType}" is being fetched as a singleton, but multiple published entries were returned. ` +
-              `Using "${chosenEntry.slug}".`,
-            scope: "client",
-            operation: "getSingleton",
-            timestamp: new Date().toISOString(),
-            context: {
-              contentType,
-              chosenSlug: chosenEntry.slug,
-              slugs: sortedEntries.map((entry) => entry.slug),
-            },
+        warnOnce(this.logger, `multiple-singleton-entries:${contentType}`, {
+          level: "warn",
+          code: "multiple_singleton_entries",
+          message:
+            `Content type "${contentType}" is being fetched as a singleton, but multiple published entries were returned. ` +
+            `Using "${chosenEntry.slug}".`,
+          scope: "client",
+          operation: "getSingleton",
+          timestamp: new Date().toISOString(),
+          context: {
+            contentType,
+            chosenSlug: chosenEntry.slug,
+            slugs: sortedEntries.map((entry) => entry.slug),
           },
-        );
+        });
       }
 
       return chosenEntry;
@@ -403,15 +536,18 @@ export class NoMessClient {
       return entry;
     }
 
-    throw createNoMessHttpError(`Singleton entry for "${contentType}" not found`, {
-      kind: "http",
-      code: "http_error",
-      status: 404,
-      retryable: false,
-      operation: "getRequiredSingleton",
-      method: "GET",
-      url: `${this.apiUrl}/api/content/${contentType}`,
-    });
+    throw createNoMessHttpError(
+      `Singleton entry for "${contentType}" not found`,
+      {
+        kind: "http",
+        code: "http_error",
+        status: 404,
+        retryable: false,
+        operation: "getRequiredSingleton",
+        method: "GET",
+        url: `${this.apiUrl}/api/content/${contentType}`,
+      },
+    );
   }
 
   /**

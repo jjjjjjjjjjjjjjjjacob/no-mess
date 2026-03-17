@@ -41,6 +41,29 @@ describe("@no-mess/client/next", () => {
     );
   });
 
+  it("passes optional server overrides through to the client", async () => {
+    process.env.NO_MESS_API_KEY = "nm_server_key";
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: () => Promise.resolve("[]"),
+      headers: { get: () => null },
+    });
+
+    await createServerNoMessClient({
+      apiUrl: "https://override.example.com",
+      fetch: {
+        cache: "no-store",
+      },
+    }).getEntries("blog-post");
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://override.example.com/api/content/blog-post?fresh=true",
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
+  });
+
   it("falls back to NEXT_PUBLIC_NO_MESS_API_URL then DEFAULT_API_URL on the server", async () => {
     process.env.NO_MESS_API_KEY = "nm_server_key";
     process.env.NEXT_PUBLIC_NO_MESS_API_URL = "https://public.example.com";
@@ -87,6 +110,29 @@ describe("@no-mess/client/next", () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       "https://browser.example.com/api/content/blog-post",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer nm_pub_browser_key",
+        }),
+      }),
+    );
+  });
+
+  it("passes optional browser overrides through to the client", async () => {
+    process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY = "nm_pub_browser_key";
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: () => Promise.resolve("[]"),
+      headers: { get: () => null },
+    });
+
+    await createBrowserNoMessClient({
+      apiUrl: "https://override-browser.example.com",
+      fresh: true,
+    }).getEntries("blog-post");
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://override-browser.example.com/api/content/blog-post?fresh=true",
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: "Bearer nm_pub_browser_key",

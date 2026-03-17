@@ -33,7 +33,24 @@ export default function PreviewPage() {
 
       <DocsHeading>Recommended Setup</DocsHeading>
 
-      <DocsStep number={1} title="Wrap route-aware pages">
+      <DocsStep number={1} title="Fetch content at request time">
+        <p>
+          Deployed routes that should reflect publishes immediately and support
+          Live Edit on the real page should fetch no-mess content at request
+          time.
+        </p>
+        <CodeBlock
+          code={`import { createServerNoMessClient } from "@no-mess/client/next";
+
+export const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});`}
+          language="typescript"
+          filename="lib/cms.ts"
+        />
+      </DocsStep>
+
+      <DocsStep number={2} title="Wrap route-aware pages">
         <p>
           Add{" "}
           <code className="rounded bg-muted px-1 font-mono text-xs">
@@ -64,7 +81,7 @@ export default function MarketingLayout({
         />
       </DocsStep>
 
-      <DocsStep number={2} title="Bind each rendered entry">
+      <DocsStep number={3} title="Bind each rendered entry">
         <p>
           Wherever a route renders a no-mess entry, call{" "}
           <code className="rounded bg-muted px-1 font-mono text-xs">
@@ -109,7 +126,7 @@ export function BlogArticle({ entry }: { entry: BlogEntry }) {
         />
       </DocsStep>
 
-      <DocsStep number={3} title="Allow iframe embedding">
+      <DocsStep number={4} title="Allow iframe embedding">
         <p>
           Route-aware preview loads your real page inside the no-mess iframe, so
           the actual delivery routes must allow the dashboard origin in{" "}
@@ -202,6 +219,12 @@ export default function PreviewPage() {
           If you do nothing, preview-only routes continue to work exactly as
           before. You only miss real-route auto-navigation, stored delivery
           URLs, and iframe-only unsaved updates on production routes.
+        </p>
+        <p>
+          Runtime delivery does not override framework routing limits. If you
+          use static export or generate all slugs only at build time, newly
+          created CMS routes still will not exist on the deployed site until
+          redeploy.
         </p>
       </div>
 

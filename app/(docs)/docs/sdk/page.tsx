@@ -18,11 +18,17 @@ export default function SdkPage() {
       </div>
 
       <DocsHeading>Server-Side Content Fetching</DocsHeading>
+      <p className="text-muted-foreground">
+        For deployed routes that should update immediately after publish and
+        support route-aware Live Edit, fetch content at request time.
+      </p>
       <CodeBlock
         code={`import { createServerNoMessClient } from "@no-mess/client/next";
 import { getShopifyHandle } from "@no-mess/client";
 
-export const cms = createServerNoMessClient();
+export const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});
 
 const homePage = await cms.getSingleton("home-page");
 const featuredHandle = getShopifyHandle(homePage?.featuredProduct);`}
@@ -53,8 +59,39 @@ export default function PreviewPage() {
       />
 
       <DocsHeading>Route-Aware Live Edit</DocsHeading>
+      <p className="text-muted-foreground">
+        The canonical deployed-site shape is a server component that fetches
+        with{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          cache: "no-store"
+        </code>{" "}
+        and a client component that calls{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          useNoMessEditableEntry()
+        </code>
+        .
+      </p>
 
-      <DocsStep number={1} title="Provider">
+      <DocsStep number={1} title="Server component">
+        <CodeBlock
+          code={`import { createServerNoMessClient } from "@no-mess/client/next";
+import { BlogArticle } from "@/components/blog-article";
+
+const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});
+
+export default async function BlogPage() {
+  const entry = await cms.getEntry("blog-post", "hello-world");
+
+  return <BlogArticle entry={entry} />;
+}`}
+          language="tsx"
+          filename="app/blog/[slug]/page.tsx"
+        />
+      </DocsStep>
+
+      <DocsStep number={2} title="Provider">
         <CodeBlock
           code={`"use client";
 
@@ -78,7 +115,7 @@ export default function SiteLayout({
         />
       </DocsStep>
 
-      <DocsStep number={2} title="Editable entry">
+      <DocsStep number={3} title="Editable entry">
         <CodeBlock
           code={`"use client";
 
@@ -216,7 +253,8 @@ await client.reportLiveEditRoute({
         >
           Live Edit
         </a>{" "}
-        for the route-aware workflow and dashboard behavior.
+        for the route-aware workflow, deployed-route CSP, and runtime delivery
+        behavior.
       </p>
     </div>
   );

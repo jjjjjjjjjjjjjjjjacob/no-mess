@@ -127,6 +127,11 @@ export default function GettingStartedPage() {
           integration path for Live Edit. Preview-only routes remain supported
           as a fallback.
         </p>
+        <p className="mt-2">
+          On deployed routes, fetch CMS content at request time so publishes
+          appear without redeploying and the live editor opens the real route
+          with current content.
+        </p>
       </DocsStep>
 
       <DocsStep number={6} title="Fetch content with the SDK">
@@ -136,7 +141,9 @@ export default function GettingStartedPage() {
         <CodeBlock
           code={`import { createServerNoMessClient } from "@no-mess/client/next";
 
-const cms = createServerNoMessClient();
+const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});
 
 // Get all published blog posts
 const posts = await cms.getEntries("blog-posts");
@@ -145,6 +152,15 @@ const posts = await cms.getEntries("blog-posts");
 const post = await cms.getEntry("blog-posts", "hello-world");`}
           language="typescript"
         />
+        <p className="mt-4 text-muted-foreground">
+          In Next.js,{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            cache: "no-store"
+          </code>{" "}
+          keeps deployed routes runtime-driven. If you statically export the
+          site or generate all route slugs only at build time, newly created
+          routes still will not exist until redeploy.
+        </p>
       </DocsStep>
 
       <DocsHeading>Full Example</DocsHeading>
@@ -154,8 +170,10 @@ const post = await cms.getEntry("blog-posts", "hello-world");`}
       </p>
       <CodeBlock
         code={`import { createServerNoMessClient } from "@no-mess/client/next";
+import { BlogArticle } from "@/components/blog-article";
 
 interface BlogPost {
+  _id: string;
   slug: string;
   title: string;
   body: string;
@@ -163,7 +181,9 @@ interface BlogPost {
   publishedAt: string;
 }
 
-const cms = createServerNoMessClient();
+const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});
 
 export default async function BlogPage() {
   const posts = await cms.getEntries<BlogPost>("blog-posts");
@@ -172,16 +192,38 @@ export default async function BlogPage() {
     <main>
       <h1>Blog</h1>
       {posts.map((post) => (
-        <article key={post.slug}>
-          <h2>{post.title}</h2>
-          <p>{post.body}</p>
-        </article>
+        <BlogArticle key={post.slug} entry={post} />
       ))}
     </main>
   );
 }`}
         language="tsx"
         filename="app/blog/page.tsx"
+      />
+      <CodeBlock
+        code={`"use client";
+
+import {
+  NoMessField,
+  useNoMessEditableEntry,
+} from "@no-mess/client/react";
+
+export function BlogArticle({ entry }) {
+  const editableEntry = useNoMessEditableEntry(entry);
+
+  return (
+    <article>
+      <NoMessField as="h2" name="title">
+        {editableEntry.title}
+      </NoMessField>
+      <NoMessField as="p" name="body">
+        {editableEntry.body}
+      </NoMessField>
+    </article>
+  );
+}`}
+        language="tsx"
+        filename="components/blog-article.tsx"
       />
 
       <DocsCallout type="tip">
