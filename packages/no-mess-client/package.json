@@ -14,6 +14,10 @@
       "import": "./dist/react/index.js",
       "types": "./dist/react/index.d.ts"
     },
+    "./next": {
+      "import": "./dist/next/index.js",
+      "types": "./dist/next/index.d.ts"
+    },
     "./schema": {
       "import": "./dist/schema/index.js",
       "types": "./dist/schema/index.d.ts"

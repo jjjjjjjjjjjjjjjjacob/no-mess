@@ -1,0 +1,82 @@
+import { createNoMessClient } from "../index.js";
+import type { NoMessFetchOptions, NoMessLogger } from "../types.js";
+import { DEFAULT_API_URL, NoMessError } from "../types.js";
+
+interface NoMessNextClientOverrides {
+  apiUrl?: string;
+  fetch?: NoMessFetchOptions;
+  fresh?: boolean;
+  logger?: NoMessLogger;
+}
+
+function requireEnv(name: string, usage: string): string {
+  const value = process.env[name];
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value;
+  }
+
+  throw new NoMessError(
+    `Missing required no-mess configuration: ${name}. ${usage}`,
+    {
+      kind: "config",
+      code: "missing_configuration",
+      retryable: false,
+      operation: "createNoMessClient",
+      details: {
+        envVar: name,
+      },
+    },
+  );
+}
+
+export function createServerNoMessClient(options?: NoMessNextClientOverrides) {
+  const apiKey = requireEnv(
+    "NO_MESS_API_KEY",
+    "Set NO_MESS_API_KEY to your secret key (nm_...) in your server environment.",
+  );
+  const apiUrl =
+    options?.apiUrl?.trim() ||
+    process.env.NO_MESS_API_URL?.trim() ||
+    process.env.NEXT_PUBLIC_NO_MESS_API_URL?.trim() ||
+    DEFAULT_API_URL;
+
+  return createNoMessClient({
+    apiKey,
+    apiUrl,
+    fetch: options?.fetch,
+    fresh: options?.fresh,
+    logger: options?.logger,
+  });
+}
+
+export function createBrowserNoMessClient(options?: NoMessNextClientOverrides) {
+  const browserApiKey = process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY;
+  if (typeof browserApiKey !== "string" || browserApiKey.trim().length === 0) {
+    throw new NoMessError(
+      "Missing required no-mess configuration: NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY. Set NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY to your publishable key (nm_pub_...) in your browser environment.",
+      {
+        kind: "config",
+        code: "missing_configuration",
+        retryable: false,
+        operation: "createNoMessClient",
+        details: {
+          envVar: "NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY",
+        },
+      },
+    );
+  }
+
+  const apiKey = browserApiKey.trim();
+  const apiUrl =
+    options?.apiUrl?.trim() ||
+    process.env.NEXT_PUBLIC_NO_MESS_API_URL?.trim() ||
+    DEFAULT_API_URL;
+
+  return createNoMessClient({
+    apiKey,
+    apiUrl,
+    fetch: options?.fetch,
+    fresh: options?.fresh,
+    logger: options?.logger,
+  });
+}

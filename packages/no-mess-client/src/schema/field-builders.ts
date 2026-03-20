@@ -2,7 +2,7 @@ import type {
   FragmentDefinition,
   PrimitiveFieldType,
   SelectChoice,
-} from "./schema-types";
+} from "./schema-types.js";
 
 export interface FieldBuilderOptions {
   required?: boolean;

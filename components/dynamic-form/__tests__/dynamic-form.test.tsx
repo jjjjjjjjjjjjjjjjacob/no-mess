@@ -254,7 +254,34 @@ describe("DynamicForm", () => {
       />,
     );
     expect(screen.getByTestId("text-field")).toBeInTheDocument();
-    expect(screen.getAllByText("Add Item")).toHaveLength(2);
+    expect(screen.getAllByText("Add Item")).toHaveLength(4);
+  });
+
+  it("inserts array items directly after the clicked item", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DynamicForm
+        fields={[
+          {
+            name: "tags",
+            type: "array",
+            required: false,
+            of: { type: "text", required: false },
+          },
+        ]}
+        values={{ tags: ["first", "second"] }}
+        onChange={defaultOnChange}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: /add item after item 1/i }),
+    );
+
+    expect(defaultOnChange).toHaveBeenCalledWith({
+      tags: ["first", "", "second"],
+    });
   });
 
   it("initializes fragment array items as objects", async () => {
@@ -295,6 +322,177 @@ describe("DynamicForm", () => {
     expect(defaultOnChange).toHaveBeenCalledWith({
       slides: [{ image: "", alt: "" }],
     });
+  });
+
+  it("renders footer actions for fragment arrays", () => {
+    render(
+      <DynamicForm
+        fields={[
+          {
+            name: "slides",
+            type: "array",
+            required: false,
+            of: {
+              type: "fragment",
+              required: false,
+              fragment: "image-with-alt",
+            },
+          },
+        ]}
+        values={{ slides: [] }}
+        onChange={defaultOnChange}
+        fragments={[
+          {
+            kind: "fragment",
+            slug: "image-with-alt",
+            name: "Image With Alt",
+            fields: [
+              { name: "image", type: "image", required: false },
+              { name: "alt", type: "text", required: false },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Add Item" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Duplicate Previous" }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: /add item after item/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("duplicates the previous fragment array item from the footer", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DynamicForm
+        fields={[
+          {
+            name: "slides",
+            type: "array",
+            required: false,
+            of: {
+              type: "fragment",
+              required: false,
+              fragment: "image-with-alt",
+            },
+          },
+        ]}
+        values={{
+          slides: [
+            { image: "asset-1", alt: "Intro" },
+            { image: "asset-2", alt: "Outro" },
+          ],
+        }}
+        onChange={defaultOnChange}
+        fragments={[
+          {
+            kind: "fragment",
+            slug: "image-with-alt",
+            name: "Image With Alt",
+            fields: [
+              { name: "image", type: "image", required: false },
+              { name: "alt", type: "text", required: false },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Duplicate Previous" }),
+    );
+
+    expect(defaultOnChange).toHaveBeenCalledWith({
+      slides: [
+        { image: "asset-1", alt: "Intro" },
+        { image: "asset-2", alt: "Outro" },
+        { image: "asset-2", alt: "Outro" },
+      ],
+    });
+  });
+
+  it("renders nested fragment image fields when refs use identifier aliases", () => {
+    render(
+      <DynamicForm
+        fields={[
+          {
+            name: "sections",
+            type: "array",
+            required: false,
+            of: {
+              type: "object",
+              required: false,
+              fields: [
+                {
+                  name: "images",
+                  type: "array",
+                  required: false,
+                  of: {
+                    type: "fragment",
+                    required: false,
+                    fragment: "imageWithAlt",
+                  },
+                },
+                { name: "body", type: "text", required: false },
+              ],
+            },
+          },
+        ]}
+        values={{
+          sections: [
+            {
+              images: [{ image: "asset-1", alt: "Hero" }],
+              body: "Body",
+            },
+          ],
+        }}
+        onChange={defaultOnChange}
+        fragments={[
+          {
+            kind: "fragment",
+            slug: "image-with-alt",
+            name: "Image With Alt",
+            fields: [
+              { name: "image", type: "image", required: false },
+              { name: "alt", type: "text", required: false },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("image-field")).toBeInTheDocument();
+    expect(screen.queryByText("Missing fragment: imageWithAlt")).toBeNull();
+  });
+
+  it("keeps inline add controls for non-fragment arrays", () => {
+    render(
+      <DynamicForm
+        fields={[
+          {
+            name: "tags",
+            type: "array",
+            required: false,
+            of: { type: "text", required: false },
+          },
+        ]}
+        values={{ tags: ["first"] }}
+        onChange={defaultOnChange}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /add item after item 1/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Duplicate Previous" }),
+    ).not.toBeInTheDocument();
   });
 
   it("passes disabled prop to fields", () => {

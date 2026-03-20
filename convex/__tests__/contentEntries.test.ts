@@ -101,6 +101,71 @@ const mockAssetEntry = {
   },
 };
 
+const mockFragmentTemplateContentType = {
+  _id: "ct_fragment_template" as any,
+  siteId: "site_1",
+  name: "Landing Page",
+  slug: "landing-page",
+  kind: "template" as const,
+  fields: [
+    {
+      name: "sections",
+      type: "array",
+      required: false,
+      of: {
+        type: "object",
+        required: false,
+        fields: [
+          {
+            name: "images",
+            type: "array",
+            required: false,
+            of: {
+              type: "fragment",
+              required: false,
+              fragment: "imageWithAlt",
+            },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+const mockImageWithAltFragment = {
+  _id: "ct_fragment_image" as any,
+  siteId: "site_1",
+  name: "Image With Alt",
+  slug: "image-with-alt",
+  kind: "fragment" as const,
+  fields: [
+    { name: "image", type: "image", required: false },
+    { name: "alt", type: "text", required: false },
+  ],
+};
+
+const mockFragmentAssetEntry = {
+  ...mockEntry,
+  _id: "entry_fragment" as any,
+  contentTypeId: "ct_fragment_template",
+  title: "Landing Page",
+  slug: "landing-page",
+  draft: {
+    sections: [
+      {
+        images: [{ image: "asset_hero_1", alt: "Hero" }],
+      },
+    ],
+  },
+  published: {
+    sections: [
+      {
+        images: [{ image: "asset_hero_1", alt: "Hero" }],
+      },
+    ],
+  },
+};
+
 const mockDraftEntry = {
   ...mockEntry,
   _id: "entry_2" as any,
@@ -113,6 +178,60 @@ const mockDraftEntry = {
   publishedBy: undefined,
 };
 
+const mockShopifyContentType = {
+  _id: "ct_shopify" as any,
+  siteId: "site_1",
+  name: "Home Page",
+  slug: "home-page",
+  fields: [
+    {
+      name: "featuredProduct",
+      type: "shopifyProduct",
+      required: false,
+    },
+    {
+      name: "featuredCollection",
+      type: "shopifyCollection",
+      required: false,
+    },
+  ],
+};
+
+const mockShopifyEntry = {
+  ...mockEntry,
+  contentTypeId: "ct_shopify",
+  slug: "home-page",
+  published: {
+    featuredProduct: "classic-tee",
+    featuredCollection: { handle: "summer-sale" },
+  },
+};
+
+const mockShopifyProduct = {
+  _id: "shopify_product_1",
+  siteId: "site_1",
+  shopifyId: "gid://shopify/Product/1",
+  handle: "classic-tee",
+  title: "Classic Tee",
+  status: "active",
+  featuredImage: "https://cdn.example.com/classic-tee.jpg",
+  images: [],
+  variants: [],
+  priceRange: { min: "19.00", max: "19.00" },
+  syncedAt: 123,
+};
+
+const mockShopifyCollection = {
+  _id: "shopify_collection_1",
+  siteId: "site_1",
+  shopifyId: "gid://shopify/Collection/1",
+  handle: "summer-sale",
+  title: "Summer Sale",
+  image: "https://cdn.example.com/summer-sale.jpg",
+  productsCount: 12,
+  syncedAt: 123,
+};
+
 function mockAssetLookups(ctx: ReturnType<typeof createMockQueryCtx>) {
   ctx.db.get.mockImplementation(async (id) => {
     if (id === "ct_1") return mockAssetContentType;
@@ -120,6 +239,99 @@ function mockAssetLookups(ctx: ReturnType<typeof createMockQueryCtx>) {
     if (id === "asset_gallery_1") return mockGalleryAsset;
     if (id === "entry_1") return mockAssetEntry;
     return null;
+  });
+}
+
+function mockFragmentAssetLookups(ctx: ReturnType<typeof createMockQueryCtx>) {
+  ctx.db.get.mockImplementation(async (id) => {
+    if (id === "entry_fragment") return mockFragmentAssetEntry;
+    if (id === "ct_fragment_template") return mockFragmentTemplateContentType;
+    if (id === "asset_hero_1") return mockHeroAsset;
+    return null;
+  });
+
+  ctx.db.query.mockImplementation((table: string) => {
+    if (table === "contentTypes") {
+      return {
+        withIndex: () => ({
+          collect: vi
+            .fn()
+            .mockResolvedValue([
+              mockFragmentTemplateContentType,
+              mockImageWithAltFragment,
+            ]),
+          first: vi.fn().mockResolvedValue(mockFragmentTemplateContentType),
+        }),
+      };
+    }
+
+    return {
+      withIndex: () => ({
+        collect: vi.fn().mockResolvedValue([]),
+        first: vi.fn().mockResolvedValue(null),
+      }),
+    };
+  });
+}
+
+function mockShopifyExpansionLookups(
+  ctx: ReturnType<typeof createMockQueryCtx>,
+  {
+    entry = mockShopifyEntry,
+    product = mockShopifyProduct,
+    collection = mockShopifyCollection,
+  }: {
+    entry?: typeof mockShopifyEntry;
+    product?: typeof mockShopifyProduct | null;
+    collection?: typeof mockShopifyCollection | null;
+  } = {},
+) {
+  ctx.db.get.mockImplementation(async (id) => {
+    if (id === "ct_shopify") return mockShopifyContentType;
+    return null;
+  });
+
+  ctx.db.query.mockImplementation((table: string) => {
+    if (table === "contentEntries") {
+      return {
+        withIndex: () => ({
+          collect: vi.fn().mockResolvedValue([entry]),
+          first: vi.fn().mockResolvedValue(entry),
+        }),
+      };
+    }
+
+    if (table === "contentTypes") {
+      return {
+        withIndex: () => ({
+          collect: vi.fn().mockResolvedValue([mockShopifyContentType]),
+          first: vi.fn().mockResolvedValue(mockShopifyContentType),
+        }),
+      };
+    }
+
+    if (table === "shopifyProducts") {
+      return {
+        withIndex: () => ({
+          first: vi.fn().mockResolvedValue(product),
+        }),
+      };
+    }
+
+    if (table === "shopifyCollections") {
+      return {
+        withIndex: () => ({
+          first: vi.fn().mockResolvedValue(collection),
+        }),
+      };
+    }
+
+    return {
+      withIndex: () => ({
+        collect: vi.fn().mockResolvedValue([]),
+        first: vi.fn().mockResolvedValue(null),
+      }),
+    };
   });
 }
 
@@ -302,7 +514,37 @@ describe("contentEntries.publish", () => {
 
   it("copies draft to published and updates status", async () => {
     const ctx = createMockMutationCtx();
-    ctx.db.get.mockResolvedValue(mockDraftEntry);
+    ctx.db.get.mockImplementation(async (id) => {
+      if (id === "entry_2") return mockDraftEntry;
+      if (id === "ct_1") return mockContentType;
+      return null;
+    });
+    ctx.db.query.mockImplementation((table: string) => {
+      if (table === "contentEntries") {
+        return {
+          withIndex: () => ({
+            collect: vi.fn().mockResolvedValue([]),
+            first: vi.fn().mockResolvedValue(mockFragmentAssetEntry),
+          }),
+        };
+      }
+
+      if (table === "contentTypes") {
+        return {
+          withIndex: () => ({
+            collect: vi.fn().mockResolvedValue([mockContentType]),
+            first: vi.fn().mockResolvedValue(mockContentType),
+          }),
+        };
+      }
+
+      return {
+        withIndex: () => ({
+          collect: vi.fn().mockResolvedValue([]),
+          first: vi.fn().mockResolvedValue(null),
+        }),
+      };
+    });
     mockRequireSiteAccess.mockResolvedValue({
       user: mockUser,
       site: mockSite,
@@ -334,7 +576,28 @@ describe("contentEntries.publish", () => {
 
   it("sets publishedAt timestamp", async () => {
     const ctx = createMockMutationCtx();
-    ctx.db.get.mockResolvedValue(mockDraftEntry);
+    ctx.db.get.mockImplementation(async (id) => {
+      if (id === "entry_2") return mockDraftEntry;
+      if (id === "ct_1") return mockContentType;
+      return null;
+    });
+    ctx.db.query.mockImplementation((table: string) => {
+      if (table === "contentTypes") {
+        return {
+          withIndex: () => ({
+            collect: vi.fn().mockResolvedValue([mockContentType]),
+            first: vi.fn().mockResolvedValue(mockContentType),
+          }),
+        };
+      }
+
+      return {
+        withIndex: () => ({
+          collect: vi.fn().mockResolvedValue([]),
+          first: vi.fn().mockResolvedValue(null),
+        }),
+      };
+    });
     mockRequireSiteAccess.mockResolvedValue({
       user: mockUser,
       site: mockSite,
@@ -349,6 +612,221 @@ describe("contentEntries.publish", () => {
     const patchCall = ctx.db.patch.mock.calls[0][1] as Record<string, unknown>;
     expect(patchCall.publishedAt).toBeGreaterThanOrEqual(before);
     expect(patchCall.publishedAt).toBeLessThanOrEqual(after);
+  });
+
+  it("blocks publish when downstream schemas still need publishing", async () => {
+    const ctx = createMockMutationCtx();
+    const draftTemplate = {
+      ...mockContentType,
+      status: "draft" as const,
+      kind: "template" as const,
+      fields: [
+        {
+          name: "hero",
+          type: "fragment",
+          required: false,
+          fragment: "draft-fragment",
+        },
+      ],
+      draft: {
+        name: "Blog Post",
+        slug: "blog-post",
+        kind: "template" as const,
+        fields: [
+          {
+            name: "hero",
+            type: "fragment",
+            required: false,
+            fragment: "draft-fragment",
+          },
+        ],
+      },
+    };
+    const draftFragment = {
+      _id: "ct_fragment_draft" as any,
+      siteId: "site_1" as any,
+      name: "Draft Fragment",
+      slug: "draft-fragment",
+      kind: "fragment" as const,
+      status: "draft" as const,
+      fields: [{ name: "copy", type: "text", required: false }],
+      draft: {
+        name: "Draft Fragment",
+        slug: "draft-fragment",
+        kind: "fragment" as const,
+        fields: [{ name: "copy", type: "text", required: false }],
+      },
+    };
+    const draftEntry = {
+      ...mockDraftEntry,
+      contentTypeId: "ct_template_draft",
+    };
+
+    ctx.db.get.mockImplementation(async (id) => {
+      if (id === "entry_2") return draftEntry;
+      if (id === "ct_template_draft") return draftTemplate;
+      return null;
+    });
+    ctx.db.query.mockImplementation((table: string) => {
+      if (table === "contentTypes") {
+        return {
+          withIndex: () => ({
+            collect: vi.fn().mockResolvedValue([draftTemplate, draftFragment]),
+            first: vi.fn().mockResolvedValue(null),
+          }),
+        };
+      }
+
+      return {
+        withIndex: () => ({
+          collect: vi.fn().mockResolvedValue([]),
+          first: vi.fn().mockResolvedValue(null),
+        }),
+      };
+    });
+    mockRequireSiteAccess.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+
+    await expect(
+      getHandler(contentEntries.publish)(ctx, { entryId: "entry_2" }),
+    ).rejects.toThrow(
+      "Cannot publish until these schemas are published: Draft Fragment (draft-fragment), Blog Post (blog-post)",
+    );
+
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+    expect(ctx.db.patch).not.toHaveBeenCalled();
+  });
+
+  it("publishes draft-only downstream schemas before publishing the entry", async () => {
+    const ctx = createMockMutationCtx();
+    const draftTemplate = {
+      _id: "ct_template_draft" as any,
+      siteId: "site_1" as any,
+      name: "Blog Post",
+      slug: "blog-post",
+      kind: "template" as const,
+      status: "draft" as const,
+      fields: [
+        {
+          name: "hero",
+          type: "fragment",
+          required: false,
+          fragment: "draft-fragment",
+        },
+      ],
+      draft: {
+        name: "Blog Post",
+        slug: "blog-post",
+        kind: "template" as const,
+        fields: [
+          {
+            name: "hero",
+            type: "fragment",
+            required: false,
+            fragment: "draft-fragment",
+          },
+        ],
+      },
+    };
+    const nestedDraftFragment = {
+      _id: "ct_fragment_nested" as any,
+      siteId: "site_1" as any,
+      name: "Nested Fragment",
+      slug: "nested-fragment",
+      kind: "fragment" as const,
+      status: "draft" as const,
+      fields: [{ name: "copy", type: "text", required: false }],
+      draft: {
+        name: "Nested Fragment",
+        slug: "nested-fragment",
+        kind: "fragment" as const,
+        fields: [{ name: "copy", type: "text", required: false }],
+      },
+    };
+    const draftFragment = {
+      _id: "ct_fragment_draft" as any,
+      siteId: "site_1" as any,
+      name: "Draft Fragment",
+      slug: "draft-fragment",
+      kind: "fragment" as const,
+      status: "draft" as const,
+      fields: [{ name: "copy", type: "text", required: false }],
+      draft: {
+        name: "Draft Fragment",
+        slug: "draft-fragment",
+        kind: "fragment" as const,
+        fields: [
+          {
+            name: "nested",
+            type: "fragment",
+            required: false,
+            fragment: "nested-fragment",
+          },
+        ],
+      },
+    };
+    const draftEntry = {
+      ...mockDraftEntry,
+      contentTypeId: "ct_template_draft",
+    };
+
+    ctx.db.get.mockImplementation(async (id) => {
+      if (id === "entry_2") return draftEntry;
+      if (id === "ct_template_draft") return draftTemplate;
+      return null;
+    });
+    ctx.db.query.mockImplementation((table: string) => {
+      if (table === "contentTypes") {
+        return {
+          withIndex: () => ({
+            collect: vi
+              .fn()
+              .mockResolvedValue([
+                draftTemplate,
+                draftFragment,
+                nestedDraftFragment,
+              ]),
+            first: vi.fn().mockResolvedValue(null),
+          }),
+        };
+      }
+
+      return {
+        withIndex: () => ({
+          collect: vi.fn().mockResolvedValue([]),
+          first: vi.fn().mockResolvedValue(null),
+        }),
+      };
+    });
+    mockRequireSiteAccess.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+
+    await getHandler(contentEntries.publish)(ctx, {
+      entryId: "entry_2",
+      cascade: true,
+      expectedCascadeSlugs: ["nested-fragment", "draft-fragment", "blog-post"],
+    });
+
+    expect(ctx.runMutation).toHaveBeenCalledWith(expect.anything(), {
+      contentTypeIds: [
+        "ct_fragment_nested",
+        "ct_fragment_draft",
+        "ct_template_draft",
+      ],
+    });
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "entry_2",
+      expect.objectContaining({
+        published: draftEntry.draft,
+        status: "published",
+      }),
+    );
   });
 });
 
@@ -590,6 +1068,22 @@ describe("contentEntries.listPublishedByType", () => {
       mockGalleryAsset.url,
     ]);
   });
+
+  it("expands Shopify refs when requested", async () => {
+    const ctx = createMockQueryCtx();
+    mockShopifyExpansionLookups(ctx);
+
+    const handler = getHandler(contentEntries.listPublishedByType);
+    const result = await handler(ctx, {
+      contentTypeId: "ct_shopify",
+      siteId: "site_1",
+      expand: ["shopify"],
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].featuredProduct).toEqual(mockShopifyProduct);
+    expect(result[0].featuredCollection).toEqual(mockShopifyCollection);
+  });
 });
 
 describe("contentEntries.getBySlugInternal", () => {
@@ -690,6 +1184,123 @@ describe("contentEntries.getBySlugInternal", () => {
     expect(result.heroImage).toBe(mockHeroAsset.url);
     expect(result.gallery).toEqual([mockHeroAsset.url, mockGalleryAsset.url]);
   });
+
+  it("does not resolve draft-only fragment schemas for non-preview delivery", async () => {
+    const ctx = createMockQueryCtx();
+    const draftOnlyFragment = {
+      ...mockImageWithAltFragment,
+      status: "draft" as const,
+      draft: {
+        name: "Image With Alt",
+        slug: "image-with-alt",
+        kind: "fragment" as const,
+        fields: mockImageWithAltFragment.fields,
+      },
+    };
+
+    ctx.db.get.mockImplementation(async (id) => {
+      if (id === "entry_fragment") return mockFragmentAssetEntry;
+      if (id === "ct_fragment_template") return mockFragmentTemplateContentType;
+      if (id === "asset_hero_1") return mockHeroAsset;
+      return null;
+    });
+    ctx.db.query.mockImplementation((table: string) => {
+      if (table === "contentEntries") {
+        return {
+          withIndex: () => ({
+            collect: vi.fn().mockResolvedValue([]),
+            first: vi.fn().mockResolvedValue(mockFragmentAssetEntry),
+          }),
+        };
+      }
+
+      if (table === "contentTypes") {
+        return {
+          withIndex: () => ({
+            collect: vi
+              .fn()
+              .mockResolvedValue([
+                mockFragmentTemplateContentType,
+                draftOnlyFragment,
+              ]),
+            first: vi.fn().mockResolvedValue(mockFragmentTemplateContentType),
+          }),
+        };
+      }
+
+      return {
+        withIndex: () => ({
+          collect: vi.fn().mockResolvedValue([]),
+          first: vi.fn().mockResolvedValue(null),
+        }),
+      };
+    });
+
+    const handler = getHandler(contentEntries.getBySlugInternal);
+    const result = await handler(ctx, {
+      siteId: "site_1",
+      contentTypeId: "ct_fragment_template",
+      slug: "landing-page",
+    });
+
+    expect(result?.sections).toEqual([
+      {
+        images: [{ image: "asset_hero_1", alt: "Hero" }],
+      },
+    ]);
+
+    const previewResult = await handler(ctx, {
+      siteId: "site_1",
+      contentTypeId: "ct_fragment_template",
+      slug: "landing-page",
+      preview: true,
+    });
+
+    expect(previewResult?.sections).toEqual([
+      {
+        images: [{ image: mockHeroAsset.url, alt: "Hero" }],
+      },
+    ]);
+  });
+
+  it("keeps raw Shopify refs by default and expands them when requested", async () => {
+    const ctx = createMockQueryCtx();
+    mockShopifyExpansionLookups(ctx);
+
+    const handler = getHandler(contentEntries.getBySlugInternal);
+    const rawResult = await handler(ctx, {
+      siteId: "site_1",
+      contentTypeId: "ct_shopify",
+      slug: "home-page",
+    });
+    const expandedResult = await handler(ctx, {
+      siteId: "site_1",
+      contentTypeId: "ct_shopify",
+      slug: "home-page",
+      expand: ["shopify"],
+    });
+
+    expect(rawResult?.featuredProduct).toBe("classic-tee");
+    expect(rawResult?.featuredCollection).toEqual({ handle: "summer-sale" });
+    expect(expandedResult?.featuredProduct).toEqual(mockShopifyProduct);
+    expect(expandedResult?.featuredCollection).toEqual(mockShopifyCollection);
+  });
+
+  it("preserves unresolved Shopify refs during expansion", async () => {
+    const ctx = createMockQueryCtx();
+    mockShopifyExpansionLookups(ctx, { product: null, collection: null });
+
+    const handler = getHandler(contentEntries.getBySlugInternal);
+    const result = await handler(ctx, {
+      siteId: "site_1",
+      contentTypeId: "ct_shopify",
+      slug: "home-page",
+      expand: ["shopify"],
+    });
+
+    expect(result?.featuredProduct).toBe("classic-tee");
+    expect(result?.featuredCollection).toEqual({ handle: "summer-sale" });
+  });
 });
 
 describe("contentEntries.getByIdInternal", () => {
@@ -731,5 +1342,20 @@ describe("contentEntries.getByIdInternal", () => {
     expect(result).not.toBeNull();
     expect(result.heroImage).toBe(mockHeroAsset.url);
     expect(result.gallery).toEqual([mockHeroAsset.url, mockGalleryAsset.url]);
+  });
+
+  it("resolves asset-backed nested fragment fields when refs use aliases", async () => {
+    const ctx = createMockQueryCtx();
+    mockFragmentAssetLookups(ctx);
+
+    const handler = getHandler(contentEntries.getByIdInternal);
+    const result = await handler(ctx, { entryId: "entry_fragment" });
+
+    expect(result).not.toBeNull();
+    expect(result?.sections).toEqual([
+      {
+        images: [{ image: mockHeroAsset.url, alt: "Hero" }],
+      },
+    ]);
   });
 });

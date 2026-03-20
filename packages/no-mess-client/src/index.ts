@@ -1,7 +1,14 @@
 export { NoMessClient } from "./client.js";
 export { createLiveEditHandler } from "./live-edit.js";
+export {
+  getShopifyHandle,
+  isShopifyCollectionRef,
+  isShopifyProductRef,
+} from "./reference-utils.js";
 export type {
+  ContentExpandTarget,
   ContentTypeSchema,
+  GetEntriesOptions,
   GetEntryOptions,
   LiveEditConfig,
   LiveEditHandle,
@@ -10,10 +17,12 @@ export type {
   NoMessErrorCode,
   NoMessErrorKind,
   NoMessErrorOptions,
+  NoMessFetchOptions,
   NoMessLiveRouteProviderProps,
   NoMessLogEvent,
   NoMessLogger,
   NoMessLogLevel,
+  NoMessNextFetchOptions,
   NoMessProviderProps,
   PreviewExchangeResult,
   PreviewHandlerConfig,
@@ -22,7 +31,9 @@ export type {
   SchemaGetResponse,
   SchemaListResponse,
   ShopifyCollection,
+  ShopifyCollectionRef,
   ShopifyProduct,
+  ShopifyProductRef,
   UseNoMessEditableEntryOptions,
   UseNoMessLiveEditConfig,
   UseNoMessLiveEditResult,

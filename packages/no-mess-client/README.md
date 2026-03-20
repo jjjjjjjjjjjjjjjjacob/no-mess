@@ -68,6 +68,93 @@ const client = createNoMessClient({
 
 const posts = await client.getEntries("blog-post");
 const post = await client.getEntry("blog-post", "hello-world");
+const maybePost = await client.getEntryOrNull("blog-post", "missing");
+```
+
+## Next.js Helpers
+
+For Next.js apps, prefer the dedicated env-backed helpers:
+
+```ts
+import { createServerNoMessClient } from "@no-mess/client/next";
+import { getShopifyHandle } from "@no-mess/client";
+
+const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});
+const homePage = await cms.getSingleton("home-page");
+
+const featuredHandles =
+  homePage?.featuredProducts
+    ?.map((item) => getShopifyHandle(item.product))
+    .filter(Boolean) ?? [];
+```
+
+For browser-side no-mess fetches that should use your publishable key:
+
+```ts
+import { createBrowserNoMessClient } from "@no-mess/client/next";
+
+const client = createBrowserNoMessClient();
+const posts = await client.getEntries("blog-post");
+```
+
+`createServerNoMessClient()` reads:
+- `NO_MESS_API_KEY`
+- `NO_MESS_API_URL`
+- `NEXT_PUBLIC_NO_MESS_API_URL`
+- `DEFAULT_API_URL`
+
+`createBrowserNoMessClient()` reads:
+- `NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_NO_MESS_API_URL`
+- `DEFAULT_API_URL`
+
+Both helpers throw when the required key is missing.
+
+### Deployed runtime delivery
+
+For deployed routes that should reflect CMS publishes immediately and support
+route-aware Live Edit, fetch content at request time:
+
+```ts
+import { createServerNoMessClient } from "@no-mess/client/next";
+
+export const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});
+```
+
+This appends `fresh=true` to content API reads, bypasses no-mess-side GET
+caches, and avoids build-time content snapshots on deployed routes.
+
+If your route is fully statically generated, exported, or relies on build-only
+slug generation, new routes still will not exist until you redeploy even though
+existing runtime routes can fetch fresh content.
+
+## Shopify Refs
+
+CMS Shopify fields store raw refs, not expanded Shopify records:
+
+```ts
+type ShopifyProductRef = string | { handle: string };
+type ShopifyCollectionRef = string | { handle: string };
+```
+
+Use the helper below to read the handle from either shape:
+
+```ts
+import { getShopifyHandle } from "@no-mess/client";
+
+const handle = getShopifyHandle(entry.featuredProduct);
+```
+
+If you want synced Shopify records inline, opt into expansion:
+
+```ts
+const post = await client.getEntry("blog-post", "hello-world", {
+  expand: ["shopify"],
+});
 ```
 
 ## Preview-Only Route
@@ -148,22 +235,44 @@ export function BlogArticle({ entry }) {
 }
 ```
 
+On deployed routes, the server component should fetch the entry with runtime
+delivery and pass it to a client component that calls
+`useNoMessEditableEntry(entry)`.
+
 `useNoMessEditableEntry()` automatically:
 - swaps in draft content for the active iframe session
 - applies unsaved field overrides from Live Edit
 - reports the current URL for route-aware reopening
 - emits the entry-bound signal used by dashboard warnings
 
+The rendered route must also allow the dashboard origin in CSP:
+
+```ts
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/blog/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors 'self' https://admin.no-mess.xyz",
+          },
+        ],
+      },
+    ];
+  },
+};
+```
+
 ## Manual Route Reporting
 
 If you need custom reporting logic, call the client method directly:
 
 ```ts
-import { createNoMessClient } from "@no-mess/client";
+import { createBrowserNoMessClient } from "@no-mess/client/next";
 
-const client = createNoMessClient({
-  apiKey: process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY!,
-});
+const client = createBrowserNoMessClient();
 
 await client.reportLiveEditRoute({
   entryId: "entry_123",
@@ -179,8 +288,16 @@ await client.reportLiveEditRoute({
 |--------|-------------|
 | `client.getSchemas()` | List all template and fragment schemas |
 | `client.getSchema(typeSlug)` | Get a single schema by slug |
-| `client.getEntries(contentType)` | Fetch all published entries of a template |
-| `client.getEntry(contentType, slug)` | Get a single entry by slug |
+| `client.getEntries(contentType, options?)` | Fetch all published entries of a template |
+| `client.getEntry(contentType, slug, options?)` | Get a single entry by slug |
+| `client.getEntryOrNull(contentType, slug, options?)` | Return `null` instead of throwing on 404 |
+| `client.getSingleton(contentType, options?)` | Fetch the first published entry for a singleton-like content type |
+| `client.getRequiredSingleton(contentType, options?)` | Like `getSingleton()` but throws a 404-style `NoMessError` when missing |
+| `getShopifyHandle(ref)` | Extract a Shopify handle from a raw ref |
+
+For content reads, `options.fetch` forwards cache-related `fetch` options and
+`options.fresh` explicitly appends `fresh=true` to bypass no-mess-side GET
+caches.
 
 ### Preview / Live Edit
 

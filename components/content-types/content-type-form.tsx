@@ -1,5 +1,14 @@
 "use client";
 
+import type {
+  FieldDefinition,
+  FieldType,
+  FragmentDefinition,
+  NamedFieldDefinition,
+  SchemaKind,
+  SelectChoice,
+  TemplateMode,
+} from "@no-mess/client/schema";
 import { useQuery } from "convex/react";
 import { Copy, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -19,15 +28,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import type {
-  FieldDefinition,
-  FieldType,
-  FragmentDefinition,
-  NamedFieldDefinition,
-  SchemaKind,
-  SelectChoice,
-  TemplateMode,
-} from "@/packages/no-mess-client/src/schema";
 
 const FIELD_TYPE_OPTIONS: { label: string; value: FieldType }[] = [
   { value: "text", label: "Text" },

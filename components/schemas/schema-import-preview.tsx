@@ -1,5 +1,6 @@
 "use client";
 
+import type { NamedFieldDefinition } from "@no-mess/client/schema";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SchemaDiff } from "@/lib/schema-diff";
@@ -36,7 +37,7 @@ export function SchemaImportPreview({ diff }: SchemaImportPreviewProps) {
           </CardHeader>
           <CardContent>
             <ul className="space-y-1">
-              {ct.fields.map((f) => (
+              {ct.fields.map((f: NamedFieldDefinition) => (
                 <li
                   key={f.name}
                   className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400"

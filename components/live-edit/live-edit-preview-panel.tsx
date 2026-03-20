@@ -435,8 +435,8 @@ export const LiveEditPreviewPanel = forwardRef<
   const savedUrls = routes ?? [];
 
   return (
-    <div className="flex h-full flex-col border-l bg-background">
-      <div className="border-b px-3 py-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l bg-background">
+      <div className="shrink-0 border-b px-3 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground">
@@ -545,7 +545,7 @@ export const LiveEditPreviewPanel = forwardRef<
         )}
       </div>
 
-      <div className="relative flex-1">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         {error && (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6">
             <p className="text-sm text-destructive">{error}</p>

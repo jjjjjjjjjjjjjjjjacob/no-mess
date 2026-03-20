@@ -11,6 +11,7 @@ interface LiveEditToolbarProps {
   entryTitle: string;
   entryStatus: string;
   isDirty: boolean;
+  isPublishing: boolean;
   isSaving: boolean;
   onSave: () => void;
   onPublish: () => void;
@@ -21,6 +22,7 @@ export function LiveEditToolbar({
   entryTitle,
   entryStatus,
   isDirty,
+  isPublishing,
   isSaving,
   onSave,
   onPublish,
@@ -54,16 +56,16 @@ export function LiveEditToolbar({
       )}
 
       <div className="ml-auto flex items-center gap-2">
-        <Button size="sm" onClick={onSave} disabled={isSaving}>
+        <Button size="sm" onClick={onSave} disabled={isSaving || isPublishing}>
           {isSaving ? "Saving..." : "Save Draft"}
         </Button>
         <Button
           variant="outline"
           size="sm"
           onClick={onPublish}
-          disabled={isSaving}
+          disabled={isSaving || isPublishing}
         >
-          Save & Publish
+          {isPublishing ? "Publishing..." : "Save & Publish"}
         </Button>
       </div>
     </div>

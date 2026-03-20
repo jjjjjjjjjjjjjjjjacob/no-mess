@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
 import type {
   ContentTypeDefinition,
   NamedFieldDefinition,
   TemplateDefinition,
-} from "@/packages/no-mess-client/src/schema/schema-types";
+} from "@no-mess/client/schema";
+import { describe, expect, it } from "vitest";
 import { computeSchemaDiff } from "../schema-diff";
 
 interface PrimitiveFieldOverrides {

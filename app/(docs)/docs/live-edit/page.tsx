@@ -37,6 +37,24 @@ export default function LiveEditPage() {
         automatically.
       </p>
 
+      <DocsHeading>Deployed Routes</DocsHeading>
+      <div className="space-y-3 text-muted-foreground">
+        <p>
+          On deployed routes, fetch no-mess content at request time so published
+          updates appear without redeploy and the iframe always opens the
+          current page state.
+        </p>
+      </div>
+      <CodeBlock
+        code={`import { createServerNoMessClient } from "@no-mess/client/next";
+
+export const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});`}
+        language="typescript"
+        filename="lib/cms.ts"
+      />
+
       <DocsHeading>Setup</DocsHeading>
 
       <DocsStep number={1} title="Annotate rendered fields">
@@ -134,6 +152,57 @@ export function ProductStory({ entry }) {
           most recent reported route, the saved-route dropdown lets you switch
           to any stored URL, and <strong>Select to edit</strong> only toggles
           overlay picking without turning off the live draft connection.
+        </p>
+      </DocsStep>
+
+      <DocsStep number={5} title="Allow iframe embedding">
+        <p>
+          Deployed routes must allow the dashboard origin in{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            frame-ancestors
+          </code>{" "}
+          or the live-edit iframe will fail to render. Add that directive to
+          your existing{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            Content-Security-Policy
+          </code>{" "}
+          value instead of replacing the rest of your policy.
+        </p>
+        <CodeBlock
+          code={`// next.config.ts
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value:
+              "default-src 'self'; img-src 'self' data:; frame-ancestors 'self' https://admin.no-mess.xyz;",
+          },
+        ],
+      },
+    ];
+  },
+};
+
+export default nextConfig;`}
+          language="typescript"
+          filename="next.config.ts"
+        />
+        <p>
+          If you already send a CSP header, keep the existing directives and
+          append or merge{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            frame-ancestors 'self' https://admin.no-mess.xyz
+          </code>
+          . For example,{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            default-src 'self'; img-src 'self' data:; frame-ancestors 'self'
+            https://admin.no-mess.xyz;
+          </code>
+          .
         </p>
       </DocsStep>
 
@@ -249,6 +318,14 @@ export function ProductStory({ entry }) {
           If the route opens but the wrong content is shown, verify the route is
           reporting the selected entry ID and that duplicate URLs are not
           pointing at different entry types.
+        </p>
+        <p>
+          If publishes only appear after redeploy, the route is probably still
+          statically rendered. Switch the no-mess server fetch to{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            cache: "no-store"
+          </code>
+          .
         </p>
         <p>
           If <strong>Select to edit</strong> appears inactive, the page is

@@ -8,10 +8,14 @@ import {
 } from "./error-utils.js";
 import { createSdkLogger, warnOnce } from "./logging.js";
 import type {
+  ContentExpandTarget,
+  GetEntriesOptions,
   GetEntryOptions,
   NoMessClientConfig,
   NoMessEntry,
+  NoMessFetchOptions,
   NoMessLogLevel,
+  NoMessNextFetchOptions,
   PreviewExchangeResult,
   PreviewSessionAuth,
   ReportLiveEditRouteOptions,
@@ -20,24 +24,78 @@ import type {
   ShopifyCollection,
   ShopifyProduct,
 } from "./types.js";
-import { DEFAULT_API_URL, type NoMessError } from "./types.js";
+import { DEFAULT_API_URL, NoMessError } from "./types.js";
 
 interface RequestOptions {
   method: "GET" | "POST";
   path: string;
   params?: Record<string, string>;
   body?: unknown;
+  fetch?: NoMessFetchOptions;
+  fresh?: boolean;
+  forceFresh?: boolean;
   operation: string;
+}
+
+const CONTENT_EXPAND_TARGETS = new Set<ContentExpandTarget>(["shopify"]);
+const FRESH_REQUEST_PARAM = "fresh";
+const NO_CACHE_VALUE = "no-store";
+
+type InternalRequestInit = RequestInit & {
+  next?: NoMessNextFetchOptions;
+};
+
+function normalizeExpandTargets(
+  expand?: ContentExpandTarget[],
+): ContentExpandTarget[] {
+  if (!expand) {
+    return [];
+  }
+
+  const targets = new Set<ContentExpandTarget>();
+  for (const target of expand) {
+    if (typeof target !== "string") {
+      continue;
+    }
+
+    const normalized = target.trim() as ContentExpandTarget;
+    if (CONTENT_EXPAND_TARGETS.has(normalized)) {
+      targets.add(normalized);
+    }
+  }
+
+  return [...targets];
+}
+
+function compareEntriesForSingleton(
+  left: NoMessEntry,
+  right: NoMessEntry,
+): number {
+  const leftPublished = left._publishedAt ?? -1;
+  const rightPublished = right._publishedAt ?? -1;
+  if (leftPublished !== rightPublished) {
+    return rightPublished - leftPublished;
+  }
+
+  if (left._createdAt !== right._createdAt) {
+    return right._createdAt - left._createdAt;
+  }
+
+  return right.slug.localeCompare(left.slug);
 }
 
 export class NoMessClient {
   private apiUrl: string;
   private apiKey: string;
+  private defaultFetch?: NoMessFetchOptions;
+  private fresh?: boolean;
   private logger: ReturnType<typeof createSdkLogger>;
 
   constructor(config: NoMessClientConfig) {
     this.apiUrl = (config.apiUrl ?? DEFAULT_API_URL).replace(/\/$/, "");
     this.apiKey = config.apiKey;
+    this.defaultFetch = config.fetch;
+    this.fresh = config.fresh;
     this.logger = createSdkLogger(config.logger);
 
     if (
@@ -58,6 +116,93 @@ export class NoMessClient {
         },
       });
     }
+  }
+
+  private mergeFetchOptions(
+    defaults?: NoMessFetchOptions,
+    overrides?: NoMessFetchOptions,
+  ): NoMessFetchOptions | undefined {
+    if (!defaults && !overrides) {
+      return undefined;
+    }
+
+    const mergedHeaders = this.mergeHeaders(
+      defaults?.headers,
+      overrides?.headers,
+    );
+    const mergedNext =
+      defaults?.next || overrides?.next
+        ? {
+            ...(defaults?.next ?? {}),
+            ...(overrides?.next ?? {}),
+          }
+        : undefined;
+
+    const merged: NoMessFetchOptions = {
+      ...(defaults ?? {}),
+      ...(overrides ?? {}),
+    };
+
+    if (mergedHeaders) {
+      merged.headers = mergedHeaders;
+    } else {
+      delete merged.headers;
+    }
+
+    if (mergedNext) {
+      merged.next = mergedNext;
+    } else {
+      delete merged.next;
+    }
+
+    return Object.keys(merged).length > 0 ? merged : undefined;
+  }
+
+  private mergeHeaders(
+    defaults?: HeadersInit,
+    overrides?: HeadersInit,
+  ): Headers | undefined {
+    if (!defaults && !overrides) {
+      return undefined;
+    }
+
+    const merged = new Headers(defaults);
+    if (overrides) {
+      const overrideHeaders = new Headers(overrides);
+      for (const [key, value] of overrideHeaders.entries()) {
+        merged.set(key, value);
+      }
+    }
+
+    return merged;
+  }
+
+  private shouldUseFreshMode(
+    fetchOptions: NoMessFetchOptions | undefined,
+    fresh: boolean | undefined,
+    forceFresh: boolean,
+  ): boolean {
+    if (forceFresh) {
+      return true;
+    }
+
+    if (typeof fresh === "boolean") {
+      return fresh;
+    }
+
+    if (typeof this.fresh === "boolean") {
+      return this.fresh;
+    }
+
+    if (fetchOptions?.cache === NO_CACHE_VALUE) {
+      return true;
+    }
+
+    if (fetchOptions?.next?.revalidate === 0) {
+      return true;
+    }
+
+    return false;
   }
 
   private emitErrorLog(
@@ -119,23 +264,53 @@ export class NoMessClient {
     path,
     params,
     body,
+    fetch: fetchOptions,
+    fresh,
+    forceFresh = false,
     operation,
   }: RequestOptions): Promise<T> {
     const url = new URL(`${this.apiUrl}${path}`);
+    const requestFetchOptions =
+      method === "GET"
+        ? this.mergeFetchOptions(this.defaultFetch, fetchOptions)
+        : undefined;
+    const isFreshRequest = this.shouldUseFreshMode(
+      requestFetchOptions,
+      fresh,
+      forceFresh,
+    );
+
     if (params) {
       for (const [key, value] of Object.entries(params)) {
         url.searchParams.set(key, value);
       }
     }
+    if (isFreshRequest) {
+      url.searchParams.set(FRESH_REQUEST_PARAM, "true");
+    }
 
     const requestUrl = url.toString();
-    const init: RequestInit = {
+    const init: InternalRequestInit = {
       method,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
       },
     };
+
+    if (requestFetchOptions) {
+      Object.assign(init, requestFetchOptions);
+      const mergedHeaders = this.mergeHeaders(
+        {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        requestFetchOptions.headers,
+      );
+      if (mergedHeaders) {
+        init.headers = mergedHeaders;
+      }
+    }
 
     if (typeof body !== "undefined") {
       init.body = JSON.stringify(body);
@@ -214,6 +389,26 @@ export class NoMessClient {
     return parsed.value as T;
   }
 
+  private buildContentParams(
+    options?: GetEntriesOptions | GetEntryOptions,
+  ): Record<string, string> | undefined {
+    const params: Record<string, string> = {};
+    const expand = normalizeExpandTargets(options?.expand);
+    if (expand.length > 0) {
+      params.expand = expand.join(",");
+    }
+
+    const entryOptions = options as GetEntryOptions | undefined;
+    if (entryOptions?.preview) {
+      params.preview = "true";
+      if (entryOptions.previewSecret) {
+        params.secret = entryOptions.previewSecret;
+      }
+    }
+
+    return Object.keys(params).length > 0 ? params : undefined;
+  }
+
   /**
    * List all content type schemas with fields, TypeScript interfaces, and entry counts.
    */
@@ -241,10 +436,14 @@ export class NoMessClient {
    */
   async getEntries<T extends NoMessEntry = NoMessEntry>(
     contentType: string,
+    options?: GetEntriesOptions,
   ): Promise<T[]> {
     return this.request<T[]>({
       method: "GET",
       path: `/api/content/${contentType}`,
+      params: this.buildContentParams(options),
+      fetch: options?.fetch,
+      fresh: options?.fresh,
       operation: "getEntries",
     });
   }
@@ -258,20 +457,93 @@ export class NoMessClient {
     slug: string,
     options?: GetEntryOptions,
   ): Promise<T> {
-    const params: Record<string, string> = {};
-    if (options?.preview) {
-      params.preview = "true";
-      if (options.previewSecret) {
-        params.secret = options.previewSecret;
-      }
-    }
-
     return this.request<T>({
       method: "GET",
       path: `/api/content/${contentType}/${slug}`,
-      params,
+      params: this.buildContentParams(options),
+      fetch: options?.fetch,
+      fresh: options?.fresh,
+      forceFresh: options?.preview === true,
       operation: "getEntry",
     });
+  }
+
+  async getEntryOrNull<T extends NoMessEntry = NoMessEntry>(
+    contentType: string,
+    slug: string,
+    options?: GetEntryOptions,
+  ): Promise<T | null> {
+    try {
+      return await this.getEntry<T>(contentType, slug, options);
+    } catch (error) {
+      if (error instanceof NoMessError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async getSingleton<T extends NoMessEntry = NoMessEntry>(
+    contentType: string,
+    options?: GetEntriesOptions,
+  ): Promise<T | null> {
+    try {
+      const entries = await this.getEntries<T>(contentType, options);
+      if (entries.length === 0) {
+        return null;
+      }
+
+      const sortedEntries = [...entries].sort(compareEntriesForSingleton);
+      const chosenEntry = sortedEntries[0];
+
+      if (sortedEntries.length > 1) {
+        warnOnce(this.logger, `multiple-singleton-entries:${contentType}`, {
+          level: "warn",
+          code: "multiple_singleton_entries",
+          message:
+            `Content type "${contentType}" is being fetched as a singleton, but multiple published entries were returned. ` +
+            `Using "${chosenEntry.slug}".`,
+          scope: "client",
+          operation: "getSingleton",
+          timestamp: new Date().toISOString(),
+          context: {
+            contentType,
+            chosenSlug: chosenEntry.slug,
+            slugs: sortedEntries.map((entry) => entry.slug),
+          },
+        });
+      }
+
+      return chosenEntry;
+    } catch (error) {
+      if (error instanceof NoMessError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async getRequiredSingleton<T extends NoMessEntry = NoMessEntry>(
+    contentType: string,
+    options?: GetEntriesOptions,
+  ): Promise<T> {
+    const entry = await this.getSingleton<T>(contentType, options);
+    if (entry) {
+      return entry;
+    }
+
+    throw createNoMessHttpError(
+      `Singleton entry for "${contentType}" not found`,
+      {
+        kind: "http",
+        code: "http_error",
+        status: 404,
+        retryable: false,
+        operation: "getRequiredSingleton",
+        method: "GET",
+        url: `${this.apiUrl}/api/content/${contentType}`,
+      },
+    );
   }
 
   /**

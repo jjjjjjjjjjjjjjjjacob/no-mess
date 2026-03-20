@@ -1,16 +1,5 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ChevronDown, Plus, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FieldWrapper } from "@/components/dynamic-form/field-wrapper";
-import { FormProvider } from "@/components/dynamic-form/form-context";
-import { renderField } from "@/components/dynamic-form/render-field";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import type { Id } from "@/convex/_generated/dataModel";
-import { cn } from "@/lib/utils";
 import {
   createEmptyValueForField,
   type FieldDefinition,
@@ -20,7 +9,26 @@ import {
   joinFieldPath,
   type NamedFieldDefinition,
   resolveFragmentFields,
-} from "@/packages/no-mess-client/src/schema";
+} from "@no-mess/client/schema";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  Copy,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FieldWrapper } from "@/components/dynamic-form/field-wrapper";
+import { FormProvider } from "@/components/dynamic-form/form-context";
+import { renderField } from "@/components/dynamic-form/render-field";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import type { Id } from "@/convex/_generated/dataModel";
+import { cloneContentValue } from "@/lib/clone-content-value";
+import { cn } from "@/lib/utils";
 
 interface LiveEditFieldPanelProps {
   fields: NamedFieldDefinition[];
@@ -98,6 +106,21 @@ export function LiveEditFieldPanel({
     value: unknown,
   ) => {
     const items = Array.isArray(value) ? value : [];
+    const isFragmentArray = field.of.type === "fragment";
+    const addItem = (item: unknown) => {
+      onFieldChange(path, [...items, item]);
+    };
+    const addEmptyItem = () => {
+      addItem(createEmptyValueForField(field.of, fragmentsMap));
+    };
+    const duplicatePreviousItem = () => {
+      const previousItem = items[items.length - 1];
+      if (previousItem === undefined) {
+        return;
+      }
+      addItem(cloneContentValue(previousItem));
+    };
+
     return (
       <div key={path} className="space-y-3 rounded-lg border p-4">
         <div className="flex items-center justify-between gap-3">
@@ -109,21 +132,18 @@ export function LiveEditFieldPanel({
               </p>
             )}
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              onFieldChange(path, [
-                ...items,
-                createEmptyValueForField(field.of),
-              ])
-            }
-            disabled={disabled}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
-          </Button>
+          {!isFragmentArray && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addEmptyItem}
+              disabled={disabled}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Button>
+          )}
         </div>
 
         <div className="space-y-3">
@@ -136,56 +156,106 @@ export function LiveEditFieldPanel({
           {items.map((_, index) => {
             const itemPath = joinFieldPath(path, index);
             return (
-              <div key={itemPath} className="space-y-3 rounded-md border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Item {index + 1}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        onFieldChange(path, moveItem(items, index, -1))
-                      }
-                      disabled={disabled || index === 0}
-                    >
-                      <ArrowUp className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        onFieldChange(path, moveItem(items, index, 1))
-                      }
-                      disabled={disabled || index === items.length - 1}
-                    >
-                      <ArrowDown className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        onFieldChange(
-                          path,
-                          items.filter((_, itemIndex) => itemIndex !== index),
-                        )
-                      }
-                      disabled={disabled}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+              <div key={itemPath} className="space-y-2">
+                <div className="space-y-3 rounded-md border p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Item {index + 1}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          onFieldChange(path, moveItem(items, index, -1))
+                        }
+                        disabled={disabled || index === 0}
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          onFieldChange(path, moveItem(items, index, 1))
+                        }
+                        disabled={disabled || index === items.length - 1}
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          onFieldChange(
+                            path,
+                            items.filter((_, itemIndex) => itemIndex !== index),
+                          )
+                        }
+                        disabled={disabled}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
+
+                  {renderArrayItem(field.of, itemPath)}
                 </div>
 
-                {renderArrayItem(field.of, itemPath)}
+                {!isFragmentArray && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    aria-label={`Add item after item ${index + 1}`}
+                    onClick={() => {
+                      const nextItems = [...items];
+                      nextItems.splice(
+                        index + 1,
+                        0,
+                        createEmptyValueForField(field.of, fragmentsMap),
+                      );
+                      onFieldChange(path, nextItems);
+                    }}
+                    disabled={disabled}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Item
+                  </Button>
+                )}
               </div>
             );
           })}
         </div>
+
+        {isFragmentArray && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addEmptyItem}
+              disabled={disabled}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={duplicatePreviousItem}
+              disabled={disabled || items.length === 0}
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Duplicate Previous
+            </Button>
+          </div>
+        )}
       </div>
     );
   };
@@ -386,7 +456,7 @@ export function LiveEditFieldPanel({
   };
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-full min-h-0">
       <div className="space-y-5 p-4">
         <fieldset
           ref={setFieldRef("title")}

@@ -34,8 +34,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run lint
-      - run: tsc --noEmit
       - run: tsc -p packages/no-mess-client
+      - run: tsc --noEmit
       - run: tsc --noEmit -p packages/no-mess-cli
 
   test-root:

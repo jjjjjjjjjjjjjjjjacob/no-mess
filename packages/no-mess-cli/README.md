@@ -20,8 +20,11 @@ no-mess init
 # Edit .env or .env.local with your secret API key
 # NO_MESS_API_KEY=nm_your_secret_key
 
-# Push your schema to the dashboard
+# Push your schema to the dashboard as drafts
 no-mess push
+
+# Generate app-ready types from your local schema file
+no-mess codegen
 
 # Watch for changes and sync on save
 no-mess dev
@@ -52,6 +55,22 @@ no-mess push --schema content/schema.ts
 ```
 
 Returns a list of synced schemas with their action (`created` or `updated`).
+Schema sync only updates dashboard drafts. Published delivery APIs keep serving
+the last published schema until you publish the schema in the dashboard.
+
+### `no-mess codegen`
+
+Generate app-ready TypeScript types and field-path metadata from your local
+schema file.
+
+```bash
+no-mess codegen
+no-mess codegen --schema content/schema.ts
+no-mess codegen --out app/no-mess.generated.ts
+```
+
+The command reads your local schema file directly, never calls the dashboard
+API, and writes `no-mess.generated.ts` by default.
 
 ### `no-mess pull`
 
@@ -73,12 +92,15 @@ no-mess dev --schema content/schema.ts
 ```
 
 Uses a 300ms stability threshold before syncing. Gracefully shuts down on SIGINT/SIGTERM.
+Each successful sync still produces dashboard drafts; publish the schema in the
+dashboard before expecting `/api/content/:type` to serve it.
 
 ## Options
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--schema <path>` | `schema.ts` | Path to the schema file |
+| `--out <path>` | `no-mess.generated.ts` | Output file (`codegen` only) |
 | `--stdout` | — | Print to stdout instead of writing a file (`pull` only) |
 | `--help, -h` | — | Show help |
 | `--version, -v` | — | Show version |
@@ -126,6 +148,7 @@ bunx tsc -w -p packages/no-mess-cli
 cd /Users/jacob/Developer/mershy
 bun ../no-mess/packages/no-mess-cli/dist/cli.js init --schema lib/cms/schema.ts
 bun ../no-mess/packages/no-mess-cli/dist/cli.js push --schema lib/cms/schema.ts
+bun ../no-mess/packages/no-mess-cli/dist/cli.js codegen --schema lib/cms/schema.ts --out lib/cms/no-mess.generated.ts
 bun ../no-mess/packages/no-mess-cli/dist/cli.js dev --schema lib/cms/schema.ts
 ```
 
@@ -182,6 +205,12 @@ new code should prefer `defineTemplate()` and `defineFragment()`.
 
 See the [`@no-mess/client` schema docs](../no-mess-client#schema-builder) for
 the full field builder API.
+
+## Publish Semantics
+
+- `no-mess push` and `no-mess dev` sync schema drafts to the dashboard.
+- `/api/schema` and `/api/content/:type` only expose published schemas and published entries.
+- After syncing a schema change, publish the schema in the dashboard before expecting delivery APIs to reflect it.
 
 ## Development
 

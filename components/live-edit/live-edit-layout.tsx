@@ -1,19 +1,20 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import type {
+  FragmentDefinition,
+  NamedFieldDefinition,
+} from "@no-mess/client/schema";
+import { setValueAtPath } from "@no-mess/client/schema";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { PublishCascadeDialog } from "@/components/publishing/publish-cascade-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useSite } from "@/hooks/use-site";
 import { useBeforeUnload, useKeyboardSave } from "@/hooks/use-unsaved-changes";
-import type {
-  FragmentDefinition,
-  NamedFieldDefinition,
-} from "@/packages/no-mess-client/src/schema";
-import { setValueAtPath } from "@/packages/no-mess-client/src/schema";
 import { LiveEditFieldPanel } from "./live-edit-field-panel";
 import {
   LiveEditPreviewPanel,
@@ -23,6 +24,7 @@ import { LiveEditToolbar } from "./live-edit-toolbar";
 
 export function LiveEditLayout() {
   const { site, siteSlug } = useSite();
+  const convex = useConvex();
   const params = useParams<{ typeSlug: string; entrySlug: string }>();
 
   const contentType = useQuery(
@@ -47,12 +49,24 @@ export function LiveEditLayout() {
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [initialized, setInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [mappedFieldNames, setMappedFieldNames] = useState<string[]>([]);
+  const [showCascadeDialog, setShowCascadeDialog] = useState(false);
+  const [cascadeTargets, setCascadeTargets] = useState<
+    {
+      kind: "template" | "fragment";
+      name: string;
+      slug: string;
+    }[]
+  >([]);
+  const [pendingCascadeSlugs, setPendingCascadeSlugs] = useState<string[]>([]);
 
   const savedTitle = useRef("");
   const savedFormData = useRef<Record<string, unknown>>({});
   const previewPanelRef = useRef<LiveEditPreviewPanelHandle>(null);
+  const publishPreviewInFlightRef = useRef(false);
 
   useEffect(() => {
     if (entry && !initialized) {
@@ -89,16 +103,85 @@ export function LiveEditLayout() {
     }
   }, [entry, title, formData, updateEntry]);
 
+  const publishEntryWithOptions = useCallback(
+    async (options?: {
+      cascade?: boolean;
+      expectedCascadeSlugs?: string[];
+    }) => {
+      if (!entry) return;
+      setIsPublishing(true);
+      try {
+        await handleSave();
+        await publishEntry({
+          entryId: entry._id as Id<"contentEntries">,
+          cascade: options?.cascade,
+          expectedCascadeSlugs: options?.expectedCascadeSlugs,
+        });
+        toast.success("Entry published");
+        setShowCascadeDialog(false);
+        setCascadeTargets([]);
+        setPendingCascadeSlugs([]);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to publish");
+      } finally {
+        setIsPublishing(false);
+      }
+    },
+    [entry, handleSave, publishEntry],
+  );
+
   const handlePublish = useCallback(async () => {
-    if (!entry) return;
-    try {
-      await handleSave();
-      await publishEntry({ entryId: entry._id as Id<"contentEntries"> });
-      toast.success("Entry published");
-    } catch {
-      toast.error("Failed to publish");
+    if (
+      !entry ||
+      publishPreviewInFlightRef.current ||
+      isPreviewingPublish ||
+      isPublishing
+    ) {
+      return;
     }
-  }, [entry, handleSave, publishEntry]);
+
+    publishPreviewInFlightRef.current = true;
+    setIsPreviewingPublish(true);
+
+    try {
+      const plan = await convex.query(api.contentEntries.getPublishPlan, {
+        entryId: entry._id as Id<"contentEntries">,
+      });
+
+      if (plan.cascadeTargets.length > 0) {
+        setCascadeTargets(plan.cascadeTargets);
+        setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+        setShowCascadeDialog(true);
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to load entry publish plan", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load entry publish plan",
+      );
+      return;
+    } finally {
+      publishPreviewInFlightRef.current = false;
+      setIsPreviewingPublish(false);
+    }
+
+    await publishEntryWithOptions();
+  }, [
+    convex,
+    entry,
+    isPreviewingPublish,
+    isPublishing,
+    publishEntryWithOptions,
+  ]);
+
+  const handleCascadeConfirm = useCallback(async () => {
+    await publishEntryWithOptions({
+      cascade: true,
+      expectedCascadeSlugs: pendingCascadeSlugs,
+    });
+  }, [pendingCascadeSlugs, publishEntryWithOptions]);
 
   useBeforeUnload(isDirty);
   useKeyboardSave(handleSave);
@@ -136,11 +219,11 @@ export function LiveEditLayout() {
 
   if (entries === undefined || contentType === undefined) {
     return (
-      <div className="flex h-screen flex-col">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <div className="flex h-12 items-center border-b px-4">
           <Skeleton className="h-5 w-32" />
         </div>
-        <div className="flex flex-1">
+        <div className="flex min-h-0 flex-1">
           <Skeleton className="w-[400px]" />
           <Skeleton className="flex-1" />
         </div>
@@ -150,7 +233,7 @@ export function LiveEditLayout() {
 
   if (!entry || !contentType) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-full min-h-0 items-center justify-center">
         <div className="text-center">
           <h2 className="text-lg font-medium">Entry not found</h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -164,18 +247,19 @@ export function LiveEditLayout() {
   const backHref = `/sites/${siteSlug}/content/${params.typeSlug}/${params.entrySlug}`;
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <LiveEditToolbar
         backHref={backHref}
         entryTitle={title || entry.title}
         entryStatus={entry.status}
         isDirty={isDirty}
+        isPublishing={isPreviewingPublish || isPublishing}
         isSaving={isSaving}
         onSave={handleSave}
         onPublish={handlePublish}
       />
 
-      <div className="grid flex-1 grid-cols-[400px_1fr] overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-cols-[400px_minmax(0,1fr)] overflow-hidden">
         {/* Field editor */}
         <LiveEditFieldPanel
           fields={contentType.fields as NamedFieldDefinition[]}
@@ -206,6 +290,14 @@ export function LiveEditLayout() {
           onFieldClicked={handleFieldClicked}
         />
       </div>
+
+      <PublishCascadeDialog
+        open={showCascadeDialog}
+        onOpenChange={setShowCascadeDialog}
+        targets={cascadeTargets}
+        isConfirming={isPublishing}
+        onConfirm={handleCascadeConfirm}
+      />
     </div>
   );
 }
