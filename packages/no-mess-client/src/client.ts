@@ -77,10 +77,6 @@ function compareEntriesForSingleton(
     return rightPublished - leftPublished;
   }
 
-  if (left._updatedAt !== right._updatedAt) {
-    return right._updatedAt - left._updatedAt;
-  }
-
   if (left._createdAt !== right._createdAt) {
     return right._createdAt - left._createdAt;
   }

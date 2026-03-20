@@ -35,4 +35,10 @@ describe("contentApiResponse", () => {
       "no-store, no-cache, must-revalidate",
     );
   });
+
+  it("passes through custom status codes", () => {
+    const response = contentApiResponse({ ok: true }, {}, 201);
+
+    expect(response.status).toBe(201);
+  });
 });

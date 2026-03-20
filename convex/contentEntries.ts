@@ -85,7 +85,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function getShopifyHandle(value: unknown): string | null {
   if (typeof value === "string" && value.trim().length > 0) {
-    return value;
+    return value.trim();
   }
 
   if (
@@ -93,7 +93,7 @@ function getShopifyHandle(value: unknown): string | null {
     typeof value.handle === "string" &&
     value.handle.trim().length > 0
   ) {
-    return value.handle;
+    return value.handle.trim();
   }
 
   return null;

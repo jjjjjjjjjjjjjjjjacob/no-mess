@@ -230,6 +230,29 @@ describe("proxyToUpstream", () => {
     );
   });
 
+  it("returns no-store Cache-Control for bypassed GET errors", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "Upstream failure" }), {
+        status: 500,
+        statusText: "Internal Server Error",
+      }),
+    );
+
+    const request = new Request(
+      "https://api.nomess.xyz/api/content/blog?preview=true",
+      {
+        method: "GET",
+      },
+    );
+
+    const response = await proxyToUpstream(env, request);
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("Cache-Control")).toBe(
+      "no-store, no-cache, must-revalidate",
+    );
+  });
+
   it("does not add Cache-Control for POST responses", async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: true }), {

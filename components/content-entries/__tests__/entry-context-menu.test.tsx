@@ -8,11 +8,15 @@ const {
   mockPublishEntry,
   mockUnpublishEntry,
   mockRemoveEntry,
+  mockToastError,
+  mockToastSuccess,
 } = vi.hoisted(() => ({
   mockConvexQuery: vi.fn(),
   mockPublishEntry: vi.fn(),
   mockUnpublishEntry: vi.fn(),
   mockRemoveEntry: vi.fn(),
+  mockToastError: vi.fn(),
+  mockToastSuccess: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
@@ -58,12 +62,14 @@ vi.mock("@/components/ui/context-menu", () => ({
   ),
   ContextMenuItem: ({
     children,
+    disabled,
     onClick,
   }: {
     children: ReactNode;
+    disabled?: boolean;
     onClick?: () => void;
   }) => (
-    <button type="button" onClick={onClick}>
+    <button type="button" onClick={onClick} disabled={disabled}>
       {children}
     </button>
   ),
@@ -131,8 +137,8 @@ vi.mock("lucide-react", () => {
 
 vi.mock("sonner", () => ({
   toast: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
 }));
 
@@ -244,5 +250,46 @@ describe("EntryContextMenu", () => {
       });
     });
     expect(mockPublishEntry).not.toHaveBeenCalled();
+  });
+
+  it("shows an error and aborts when the publish plan query fails", async () => {
+    const user = userEvent.setup();
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    mockConvexQuery.mockRejectedValueOnce(new Error("Plan lookup failed"));
+
+    try {
+      render(
+        <EntryContextMenu
+          entry={{
+            _id: "entry_1" as any,
+            slug: "my-post",
+            status: "draft",
+            title: "My Post",
+          }}
+          siteSlug="test-site"
+          typeSlug="blog-post"
+        >
+          <div>Trigger</div>
+        </EntryContextMenu>,
+      );
+
+      await user.click(screen.getByRole("button", { name: /publish/i }));
+
+      await waitFor(() => {
+        expect(mockToastError).toHaveBeenCalledWith("Plan lookup failed");
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Failed to load entry publish plan",
+        expect.any(Error),
+      );
+      expect(mockPublishEntry).not.toHaveBeenCalled();
+      expect(
+        screen.queryByRole("button", { name: "Confirm cascade" }),
+      ).not.toBeInTheDocument();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });

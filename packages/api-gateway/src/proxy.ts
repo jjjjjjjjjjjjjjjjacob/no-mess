@@ -44,14 +44,15 @@ export async function proxyToUpstream(
   responseHeaders.delete("server");
   responseHeaders.delete("x-convex-request-id");
 
-  // Add cache headers for successful GET responses
-  if (upstreamResponse.ok && request.method === "GET") {
-    responseHeaders.set(
-      "Cache-Control",
-      bypassCache
-        ? "no-store, no-cache, must-revalidate"
-        : "public, s-maxage=60, stale-while-revalidate=300",
-    );
+  if (request.method === "GET") {
+    if (bypassCache) {
+      responseHeaders.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    } else if (upstreamResponse.ok) {
+      responseHeaders.set(
+        "Cache-Control",
+        "public, s-maxage=60, stale-while-revalidate=300",
+      );
+    }
   }
 
   return new Response(upstreamResponse.body, {

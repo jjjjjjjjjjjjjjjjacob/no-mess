@@ -70,6 +70,7 @@ export default function EditSchemaPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
   const [showCascadeDialog, setShowCascadeDialog] = useState(false);
   const [cascadeTargets, setCascadeTargets] = useState<
     {
@@ -81,6 +82,7 @@ export default function EditSchemaPage() {
   const [pendingCascadeSlugs, setPendingCascadeSlugs] = useState<string[]>([]);
 
   const formDataRef = useRef<ContentTypeFormData | null>(null);
+  const publishPreviewInFlightRef = useRef(false);
   const [isDirty, setIsDirty] = useState(false);
 
   // Derive status from content type
@@ -233,85 +235,133 @@ export default function EditSchemaPage() {
   useKeyboardSave(handleSaveDraft);
   useBeforeUnload(isDirty);
 
-  const publishCurrentForm = async (options?: {
-    cascade?: boolean;
-    expectedCascadeSlugs?: string[];
-  }) => {
-    if (!contentType || !formDataRef.current) return;
-    setIsPublishing(true);
-    try {
-      // Save draft first, then publish
-      await saveDraftMutation({
-        contentTypeId: contentType._id,
-        name: formDataRef.current.name,
-        slug: formDataRef.current.slug,
-        kind: formDataRef.current.kind,
-        mode:
-          formDataRef.current.kind === "template"
-            ? formDataRef.current.mode
-            : undefined,
-        route:
-          formDataRef.current.kind === "template"
-            ? formDataRef.current.route
-            : undefined,
-        description: formDataRef.current.description,
-        fields: formDataRef.current.fields,
-      });
-      await publishMutation({
-        contentTypeId: contentType._id,
-        cascade: options?.cascade,
-        expectedCascadeSlugs: options?.expectedCascadeSlugs,
-      });
-      setIsDirty(false);
-      analytics.trackSchemaPublished({
-        site_id: site?._id ?? "",
-        field_count: formDataRef.current.fields.length,
-        field_types: formDataRef.current.fields.map((f) => f.type),
-      });
-      toast.success("Schema published");
-      setShowCascadeDialog(false);
-      setCascadeTargets([]);
-      setPendingCascadeSlugs([]);
-      if (formDataRef.current.slug !== contentType.slug) {
-        router.replace(
-          `/sites/${siteSlug}/schemas/${formDataRef.current.slug}`,
-        );
+  const publishCurrentForm = useCallback(
+    async (options?: {
+      cascade?: boolean;
+      expectedCascadeSlugs?: string[];
+    }) => {
+      if (!contentType || !formDataRef.current) return;
+
+      const data = formDataRef.current;
+      setIsPublishing(true);
+      try {
+        await saveDraftMutation({
+          contentTypeId: contentType._id,
+          name: data.name,
+          slug: data.slug,
+          kind: data.kind,
+          mode: data.kind === "template" ? data.mode : undefined,
+          route: data.kind === "template" ? data.route : undefined,
+          description: data.description,
+          fields: data.fields,
+        });
+        await publishMutation({
+          contentTypeId: contentType._id,
+          cascade: options?.cascade,
+          expectedCascadeSlugs: options?.expectedCascadeSlugs,
+        });
+        setIsDirty(false);
+        analytics.trackSchemaPublished({
+          site_id: site?._id ?? "",
+          field_count: data.fields.length,
+          field_types: data.fields.map((field) => field.type),
+        });
+        toast.success("Schema published");
+        setShowCascadeDialog(false);
+        setCascadeTargets([]);
+        setPendingCascadeSlugs([]);
+        if (data.slug !== contentType.slug) {
+          router.replace(`/sites/${siteSlug}/schemas/${data.slug}`);
+        }
+      } finally {
+        setIsPublishing(false);
       }
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to publish schema",
-      );
-    } finally {
-      setIsPublishing(false);
-    }
-  };
+    },
+    [
+      analytics,
+      contentType,
+      publishMutation,
+      router,
+      saveDraftMutation,
+      site?._id,
+      siteSlug,
+    ],
+  );
 
-  // Publish handler
-  const handlePublish = async () => {
-    if (!contentType || !formDataRef.current || !site) return;
+  const previewPublishPlan = useCallback(
+    async (data: ContentTypeFormData) => {
+      if (!contentType || !site) {
+        return null;
+      }
 
-    const data = formDataRef.current;
-    const plan = await convex.query(api.contentTypes.previewPublishPlan, {
-      siteId: site._id,
-      contentTypeId: contentType._id,
-      name: data.name,
-      slug: data.slug,
-      kind: data.kind,
-      mode: data.kind === "template" ? data.mode : undefined,
-      route: data.kind === "template" ? data.route : undefined,
-      description: data.description,
-      fields: data.fields,
-    });
+      return await convex.query(api.contentTypes.previewPublishPlan, {
+        siteId: site._id,
+        contentTypeId: contentType._id,
+        name: data.name,
+        slug: data.slug,
+        kind: data.kind,
+        mode: data.kind === "template" ? data.mode : undefined,
+        route: data.kind === "template" ? data.route : undefined,
+        description: data.description,
+        fields: data.fields,
+      });
+    },
+    [contentType, convex, site],
+  );
 
-    if (plan.cascadeTargets.length > 0) {
-      setCascadeTargets(plan.cascadeTargets);
-      setPendingCascadeSlugs(plan.expectedCascadeSlugs);
-      setShowCascadeDialog(true);
+  const handlePublish = useCallback(async () => {
+    if (
+      !contentType ||
+      !formDataRef.current ||
+      !site ||
+      publishPreviewInFlightRef.current ||
+      isPreviewingPublish ||
+      isPublishing
+    ) {
       return;
     }
 
-    await publishCurrentForm();
-  };
+    const data = formDataRef.current;
+    publishPreviewInFlightRef.current = true;
+    setIsPreviewingPublish(true);
+
+    try {
+      const plan = await previewPublishPlan(data);
+
+      if (plan && plan.cascadeTargets.length > 0) {
+        setCascadeTargets(plan.cascadeTargets);
+        setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+        setShowCascadeDialog(true);
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to load schema publish plan", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load schema publish plan",
+      );
+      return;
+    } finally {
+      publishPreviewInFlightRef.current = false;
+      setIsPreviewingPublish(false);
+    }
+
+    try {
+      await publishCurrentForm();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to publish schema",
+      );
+    }
+  }, [
+    contentType,
+    isPreviewingPublish,
+    isPublishing,
+    previewPublishPlan,
+    publishCurrentForm,
+    site,
+  ]);
 
   // Legacy submit handler (used by the form's built-in submit)
   const handleSubmit = async (data: ContentTypeFormData) => {
@@ -320,10 +370,20 @@ export default function EditSchemaPage() {
   };
 
   const handleCascadeConfirm = async () => {
-    await publishCurrentForm({
-      cascade: true,
-      expectedCascadeSlugs: pendingCascadeSlugs,
-    });
+    if (isPublishing) {
+      return;
+    }
+
+    try {
+      await publishCurrentForm({
+        cascade: true,
+        expectedCascadeSlugs: pendingCascadeSlugs,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to publish schema",
+      );
+    }
   };
 
   // Discard draft handler
@@ -441,7 +501,9 @@ export default function EditSchemaPage() {
             variant="outline"
             size="sm"
             onClick={handleSaveDraft}
-            disabled={isSavingDraft || isPublishing || !isDirty}
+            disabled={
+              isSavingDraft || isPublishing || isPreviewingPublish || !isDirty
+            }
           >
             <Save className="mr-2 h-3 w-3" />
             {isSavingDraft ? "Saving..." : "Save Draft"}
@@ -449,7 +511,7 @@ export default function EditSchemaPage() {
           <Button
             size="sm"
             onClick={handlePublish}
-            disabled={isPublishing || isSavingDraft}
+            disabled={isPublishing || isSavingDraft || isPreviewingPublish}
           >
             <Upload className="mr-2 h-3 w-3" />
             {isPublishing ? "Publishing..." : "Publish"}
@@ -459,7 +521,7 @@ export default function EditSchemaPage() {
               variant="outline"
               size="sm"
               onClick={() => setShowDiscardDialog(true)}
-              disabled={isSavingDraft || isPublishing}
+              disabled={isSavingDraft || isPublishing || isPreviewingPublish}
             >
               <Undo2 className="mr-2 h-3 w-3" />
               Discard Draft

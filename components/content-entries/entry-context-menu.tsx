@@ -9,7 +9,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { PublishCascadeDialog } from "@/components/publishing/publish-cascade-dialog";
 import {
@@ -75,6 +75,8 @@ export function EntryContextMenu({
   >([]);
   const [pendingCascadeSlugs, setPendingCascadeSlugs] = useState<string[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
+  const publishFlowInFlightRef = useRef(false);
 
   const editPath = `/sites/${siteSlug}/content/${typeSlug}/${entry.slug}`;
   const hasDraftChanges =
@@ -126,23 +128,41 @@ export function EntryContextMenu({
   };
 
   const handlePublishToggle = async () => {
-    if (!canPublishDraft) {
+    if (publishFlowInFlightRef.current || isPreviewingPublish || isPublishing) {
+      return;
+    }
+
+    publishFlowInFlightRef.current = true;
+    setIsPreviewingPublish(true);
+    try {
+      if (!canPublishDraft) {
+        await publishEntryWithOptions();
+        return;
+      }
+
+      const plan = await convex.query(api.contentEntries.getPublishPlan, {
+        entryId: entry._id,
+      });
+
+      if (plan.cascadeTargets.length > 0) {
+        setCascadeTargets(plan.cascadeTargets);
+        setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+        setShowCascadeDialog(true);
+        return;
+      }
+
       await publishEntryWithOptions();
-      return;
+    } catch (error) {
+      console.error("Failed to load entry publish plan", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load entry publish plan",
+      );
+    } finally {
+      publishFlowInFlightRef.current = false;
+      setIsPreviewingPublish(false);
     }
-
-    const plan = await convex.query(api.contentEntries.getPublishPlan, {
-      entryId: entry._id,
-    });
-
-    if (plan.cascadeTargets.length > 0) {
-      setCascadeTargets(plan.cascadeTargets);
-      setPendingCascadeSlugs(plan.expectedCascadeSlugs);
-      setShowCascadeDialog(true);
-      return;
-    }
-
-    await publishEntryWithOptions();
   };
 
   const handleCascadeConfirm = async () => {
@@ -190,7 +210,10 @@ export function EntryContextMenu({
               Open Live Edit
             </ContextMenuItem>
           )}
-          <ContextMenuItem onClick={handlePublishToggle}>
+          <ContextMenuItem
+            onClick={handlePublishToggle}
+            disabled={isPreviewingPublish || isPublishing}
+          >
             <Upload className="h-4 w-4" />
             {entry.status === "draft"
               ? "Publish"

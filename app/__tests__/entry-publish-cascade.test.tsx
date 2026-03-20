@@ -8,12 +8,16 @@ const {
   mockPublishEntry,
   mockUnpublishEntry,
   mockRemoveEntry,
+  mockToastError,
+  mockToastSuccess,
 } = vi.hoisted(() => ({
   mockConvexQuery: vi.fn(),
   mockUpdateEntry: vi.fn(),
   mockPublishEntry: vi.fn(),
   mockUnpublishEntry: vi.fn(),
   mockRemoveEntry: vi.fn(),
+  mockToastError: vi.fn(),
+  mockToastSuccess: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
@@ -204,8 +208,8 @@ vi.mock("lucide-react", () => {
 
 vi.mock("sonner", () => ({
   toast: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
 }));
 
@@ -243,10 +247,45 @@ describe("EditEntryPage publish cascade", () => {
       });
     });
 
-    expect(mockPublishEntry).toHaveBeenCalledWith({
-      entryId: "entry_1",
-      cascade: true,
-      expectedCascadeSlugs: ["draft-fragment"],
+    await waitFor(() => {
+      expect(mockPublishEntry).toHaveBeenCalledWith({
+        entryId: "entry_1",
+        cascade: true,
+        expectedCascadeSlugs: ["draft-fragment"],
+      });
     });
+  });
+
+  it("shows an error and aborts when the publish plan query fails", async () => {
+    const user = userEvent.setup();
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    mockConvexQuery.mockRejectedValueOnce(new Error("Plan lookup failed"));
+
+    try {
+      const { default: EditEntryPage } = await import(
+        "../(dashboard)/sites/[siteSlug]/content/[typeSlug]/[entrySlug]/page"
+      );
+
+      render(<EditEntryPage />);
+
+      await user.click(screen.getByRole("button", { name: "Save & Publish" }));
+
+      await waitFor(() => {
+        expect(mockToastError).toHaveBeenCalledWith("Plan lookup failed");
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Failed to load entry publish plan",
+        expect.any(Error),
+      );
+      expect(mockUpdateEntry).not.toHaveBeenCalled();
+      expect(mockPublishEntry).not.toHaveBeenCalled();
+      expect(
+        screen.queryByRole("button", { name: "Confirm cascade" }),
+      ).not.toBeInTheDocument();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });

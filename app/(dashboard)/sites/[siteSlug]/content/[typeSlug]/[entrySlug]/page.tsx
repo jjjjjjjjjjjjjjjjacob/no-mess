@@ -71,6 +71,8 @@ export default function EditEntryPage() {
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [initialized, setInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -102,6 +104,7 @@ export default function EditEntryPage() {
   const savedTitle = useRef("");
   const savedFormData = useRef<Record<string, unknown>>({});
   const previewRef = useRef<PreviewPanelRef>(null);
+  const publishPreviewInFlightRef = useRef(false);
 
   useEffect(() => {
     if (entry && contentType && !initialized) {
@@ -203,6 +206,7 @@ export default function EditEntryPage() {
     cascade?: boolean;
     expectedCascadeSlugs?: string[];
   }) => {
+    setIsPublishing(true);
     try {
       await handleSave();
       await publishEntry({
@@ -216,19 +220,45 @@ export default function EditEntryPage() {
       setPendingCascadeSlugs([]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to publish");
+    } finally {
+      setIsPublishing(false);
     }
   };
 
   const handlePublish = async () => {
-    const plan = await convex.query(api.contentEntries.getPublishPlan, {
-      entryId: entry._id as Id<"contentEntries">,
-    });
-
-    if (plan.cascadeTargets.length > 0) {
-      setCascadeTargets(plan.cascadeTargets);
-      setPendingCascadeSlugs(plan.expectedCascadeSlugs);
-      setShowCascadeDialog(true);
+    if (
+      publishPreviewInFlightRef.current ||
+      isPreviewingPublish ||
+      isPublishing
+    ) {
       return;
+    }
+
+    publishPreviewInFlightRef.current = true;
+    setIsPreviewingPublish(true);
+
+    try {
+      const plan = await convex.query(api.contentEntries.getPublishPlan, {
+        entryId: entry._id as Id<"contentEntries">,
+      });
+
+      if (plan.cascadeTargets.length > 0) {
+        setCascadeTargets(plan.cascadeTargets);
+        setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+        setShowCascadeDialog(true);
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to load entry publish plan", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load entry publish plan",
+      );
+      return;
+    } finally {
+      publishPreviewInFlightRef.current = false;
+      setIsPreviewingPublish(false);
     }
 
     await publishEntryWithOptions();
@@ -326,6 +356,7 @@ export default function EditEntryPage() {
             size="icon"
             className="text-muted-foreground hover:text-destructive"
             onClick={() => setShowDeleteDialog(true)}
+            disabled={isPublishing || isPreviewingPublish}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -366,22 +397,25 @@ export default function EditEntryPage() {
               Unsaved changes
             </span>
           )}
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || isPublishing || isPreviewingPublish}
+          >
             {isSaving ? "Saving..." : "Save Draft"}
           </Button>
           {entry.status === "draft" || hasDraftChanges ? (
             <Button
               variant="outline"
               onClick={handlePublish}
-              disabled={isSaving}
+              disabled={isSaving || isPublishing || isPreviewingPublish}
             >
-              Save & Publish
+              {isPublishing ? "Publishing..." : "Save & Publish"}
             </Button>
           ) : (
             <Button
               variant="outline"
               onClick={handleUnpublish}
-              disabled={isSaving}
+              disabled={isSaving || isPublishing || isPreviewingPublish}
             >
               Unpublish
             </Button>
@@ -442,7 +476,7 @@ export default function EditEntryPage() {
         open={showCascadeDialog}
         onOpenChange={setShowCascadeDialog}
         targets={cascadeTargets}
-        isConfirming={isSaving}
+        isConfirming={isPublishing}
         onConfirm={handleCascadeConfirm}
       />
     </>

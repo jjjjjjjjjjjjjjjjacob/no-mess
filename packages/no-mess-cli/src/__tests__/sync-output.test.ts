@@ -19,11 +19,14 @@ describe("sync-output", () => {
 
   it("prints each draft publish warning line", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      printDraftPublishWarning();
 
-    printDraftPublishWarning();
-
-    expect(warnSpy.mock.calls).toEqual(
-      getDraftPublishWarningLines().map((line) => [line]),
-    );
+      expect(warnSpy.mock.calls).toEqual(
+        getDraftPublishWarningLines().map((line) => [line]),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

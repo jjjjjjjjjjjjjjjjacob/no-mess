@@ -1,8 +1,6 @@
 import type { ShopifyCollectionRef, ShopifyProductRef } from "./types.js";
 
-function isShopifyHandleObject(
-  value: unknown,
-): value is { handle: string } {
+function isShopifyHandleObject(value: unknown): value is { handle: string } {
   return (
     !!value &&
     typeof value === "object" &&
@@ -12,25 +10,22 @@ function isShopifyHandleObject(
 }
 
 export function getShopifyHandle(
-  ref:
-    | ShopifyProductRef
-    | ShopifyCollectionRef
-    | null
-    | undefined
-    | unknown,
+  ref: ShopifyProductRef | ShopifyCollectionRef | null | undefined | unknown,
 ): string | null {
   if (typeof ref === "string" && ref.trim().length > 0) {
-    return ref;
+    return ref.trim();
   }
 
   if (isShopifyHandleObject(ref)) {
-    return ref.handle;
+    return ref.handle.trim();
   }
 
   return null;
 }
 
-export function isShopifyProductRef(value: unknown): value is ShopifyProductRef {
+export function isShopifyProductRef(
+  value: unknown,
+): value is ShopifyProductRef {
   return getShopifyHandle(value) !== null;
 }
 

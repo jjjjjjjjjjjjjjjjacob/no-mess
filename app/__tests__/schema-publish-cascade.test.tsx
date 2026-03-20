@@ -9,6 +9,8 @@ const {
   mockPublishSchema,
   mockRouter,
   mockContentType,
+  mockToastError,
+  mockToastSuccess,
 } = vi.hoisted(() => ({
   mockConvexQuery: vi.fn(),
   mockCreateDraft: vi.fn(),
@@ -19,6 +21,8 @@ const {
     replace: vi.fn(),
   },
   mockContentType: vi.fn(),
+  mockToastError: vi.fn(),
+  mockToastSuccess: vi.fn(),
 }));
 
 let capturedOnSubmit: ((data: any) => Promise<void>) | null = null;
@@ -202,8 +206,8 @@ vi.mock("lucide-react", () => {
 
 vi.mock("sonner", () => ({
   toast: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
 }));
 
@@ -268,10 +272,12 @@ describe("schema publish cascade flows", () => {
       });
     });
 
-    expect(mockPublishSchema).toHaveBeenCalledWith({
-      contentTypeId: "ct_new",
-      cascade: true,
-      expectedCascadeSlugs: ["draft-fragment"],
+    await waitFor(() => {
+      expect(mockPublishSchema).toHaveBeenCalledWith({
+        contentTypeId: "ct_new",
+        cascade: true,
+        expectedCascadeSlugs: ["draft-fragment"],
+      });
     });
   });
 
@@ -327,5 +333,169 @@ describe("schema publish cascade flows", () => {
         fields: [{ name: "headline", type: "text", required: false }],
       },
     );
+  });
+
+  it("shows an error and aborts new schema publish when preview fails", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    mockConvexQuery.mockRejectedValueOnce(new Error("Plan lookup failed"));
+
+    try {
+      const { default: NewSchemaPage } = await import(
+        "../(dashboard)/sites/[siteSlug]/schemas/new/page"
+      );
+
+      render(<NewSchemaPage />);
+
+      await act(async () => {
+        await capturedOnSubmit?.({
+          kind: "template",
+          mode: "collection",
+          name: "Landing Page",
+          slug: "landing-page",
+          description: "A landing page",
+          fields: [{ name: "hero", type: "text", required: false }],
+        });
+      });
+
+      await waitFor(() => {
+        expect(mockToastError).toHaveBeenCalledWith("Plan lookup failed");
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Failed to load schema publish plan",
+        expect.any(Error),
+      );
+      expect(mockCreateDraft).not.toHaveBeenCalled();
+      expect(mockPublishSchema).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("cascade-dialog")).not.toBeInTheDocument();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it("shows an error and aborts edit schema publish when preview fails", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    mockContentType.mockReturnValue({
+      _id: "ct_1",
+      name: "Blog Post",
+      slug: "blog-post",
+      kind: "template",
+      mode: "collection",
+      fields: [{ name: "title", type: "text", required: false }],
+      status: "published",
+      draft: undefined,
+    });
+    mockConvexQuery.mockRejectedValueOnce(new Error("Plan lookup failed"));
+
+    try {
+      const { default: EditSchemaPage } = await import(
+        "../(dashboard)/sites/[siteSlug]/schemas/[typeSlug]/page"
+      );
+
+      render(<EditSchemaPage />);
+
+      const editedData = {
+        kind: "template",
+        mode: "collection",
+        name: "Renamed Blog Post",
+        slug: "renamed-blog-post",
+        description: "Edited description",
+        fields: [{ name: "headline", type: "text", required: false }],
+      };
+
+      act(() => {
+        capturedOnChange?.(editedData);
+      });
+      await act(async () => {
+        await capturedOnSubmit?.(editedData);
+      });
+
+      await waitFor(() => {
+        expect(mockToastError).toHaveBeenCalledWith("Plan lookup failed");
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Failed to load schema publish plan",
+        expect.any(Error),
+      );
+      expect(mockSaveDraft).not.toHaveBeenCalled();
+      expect(mockPublishSchema).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("cascade-dialog")).not.toBeInTheDocument();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it("prevents duplicate edit schema publish preflights while the first request is pending", async () => {
+    mockContentType.mockReturnValue({
+      _id: "ct_1",
+      name: "Blog Post",
+      slug: "blog-post",
+      kind: "template",
+      mode: "collection",
+      fields: [{ name: "title", type: "text", required: false }],
+      status: "published",
+      draft: undefined,
+    });
+
+    let resolvePlan = (_value: {
+      cascadeTargets: unknown[];
+      expectedCascadeSlugs: string[];
+    }) => {};
+    mockConvexQuery.mockImplementationOnce(
+      () =>
+        new Promise<{
+          cascadeTargets: unknown[];
+          expectedCascadeSlugs: string[];
+        }>((resolve) => {
+          resolvePlan = resolve;
+        }),
+    );
+
+    const { default: EditSchemaPage } = await import(
+      "../(dashboard)/sites/[siteSlug]/schemas/[typeSlug]/page"
+    );
+
+    render(<EditSchemaPage />);
+
+    const editedData = {
+      kind: "template",
+      mode: "collection",
+      name: "Renamed Blog Post",
+      slug: "renamed-blog-post",
+      description: "Edited description",
+      fields: [{ name: "headline", type: "text", required: false }],
+    };
+
+    act(() => {
+      capturedOnChange?.(editedData);
+    });
+
+    let firstSubmit: Promise<void> | null = null;
+    let secondSubmit: Promise<void> | null = null;
+
+    await act(async () => {
+      firstSubmit = capturedOnSubmit?.(editedData) ?? null;
+      secondSubmit = capturedOnSubmit?.(editedData) ?? null;
+    });
+
+    expect(mockConvexQuery).toHaveBeenCalledTimes(1);
+
+    resolvePlan({
+      cascadeTargets: [],
+      expectedCascadeSlugs: [],
+    });
+
+    await act(async () => {
+      await firstSubmit;
+      await secondSubmit;
+    });
+
+    await waitFor(() => {
+      expect(mockSaveDraft).toHaveBeenCalledTimes(1);
+      expect(mockPublishSchema).toHaveBeenCalledTimes(1);
+    });
   });
 });

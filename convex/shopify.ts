@@ -9,6 +9,16 @@ import {
 import { requireSiteAccess } from "./lib/access";
 import { fetchCollections, fetchProducts, testConnection } from "./lib/shopify";
 
+const HANDLE_LOOKUP_BATCH_SIZE = 25;
+
+function chunkValues<T>(values: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
 /**
  * Verify that the calling user has access to a site.
  * Used by actions which cannot use ctx.db directly.
@@ -385,17 +395,25 @@ export const getProductsByHandlesInternal = internalQuery({
   },
   handler: async (ctx, args) => {
     const uniqueHandles = [...new Set(args.handles)];
-    const products = await Promise.all(
-      uniqueHandles.map(async (handle) => {
-        const product = await ctx.db
-          .query("shopifyProducts")
-          .withIndex("by_handle", (q) =>
-            q.eq("siteId", args.siteId).eq("handle", handle),
-          )
-          .first();
-        return [handle, product] as const;
-      }),
-    );
+    const products: Array<readonly [string, unknown]> = [];
+
+    for (const handleBatch of chunkValues(
+      uniqueHandles,
+      HANDLE_LOOKUP_BATCH_SIZE,
+    )) {
+      const batchProducts = await Promise.all(
+        handleBatch.map(async (handle) => {
+          const product = await ctx.db
+            .query("shopifyProducts")
+            .withIndex("by_handle", (q) =>
+              q.eq("siteId", args.siteId).eq("handle", handle),
+            )
+            .first();
+          return [handle, product] as const;
+        }),
+      );
+      products.push(...batchProducts);
+    }
 
     return Object.fromEntries(products);
   },
@@ -437,17 +455,25 @@ export const getCollectionsByHandlesInternal = internalQuery({
   },
   handler: async (ctx, args) => {
     const uniqueHandles = [...new Set(args.handles)];
-    const collections = await Promise.all(
-      uniqueHandles.map(async (handle) => {
-        const collection = await ctx.db
-          .query("shopifyCollections")
-          .withIndex("by_handle", (q) =>
-            q.eq("siteId", args.siteId).eq("handle", handle),
-          )
-          .first();
-        return [handle, collection] as const;
-      }),
-    );
+    const collections: Array<readonly [string, unknown]> = [];
+
+    for (const handleBatch of chunkValues(
+      uniqueHandles,
+      HANDLE_LOOKUP_BATCH_SIZE,
+    )) {
+      const batchCollections = await Promise.all(
+        handleBatch.map(async (handle) => {
+          const collection = await ctx.db
+            .query("shopifyCollections")
+            .withIndex("by_handle", (q) =>
+              q.eq("siteId", args.siteId).eq("handle", handle),
+            )
+            .first();
+          return [handle, collection] as const;
+        }),
+      );
+      collections.push(...batchCollections);
+    }
 
     return Object.fromEntries(collections);
   },

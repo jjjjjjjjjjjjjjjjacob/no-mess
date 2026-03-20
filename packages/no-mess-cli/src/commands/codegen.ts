@@ -6,14 +6,30 @@ import { generateTypesSource } from "../codegen/generate-types.js";
 export async function codegenCommand(args: string[]): Promise<void> {
   const schemaFlag = args.indexOf("--schema");
   const outFlag = args.indexOf("--out");
-  const schemaPath = resolve(
-    process.cwd(),
-    schemaFlag !== -1 ? args[schemaFlag + 1] : "schema.ts",
-  );
-  const outPath = resolve(
-    process.cwd(),
-    outFlag !== -1 ? args[outFlag + 1] : "no-mess.generated.ts",
-  );
+  const schemaArg =
+    schemaFlag !== -1
+      ? args[schemaFlag + 1] && !args[schemaFlag + 1].startsWith("-")
+        ? args[schemaFlag + 1]
+        : null
+      : "schema.ts";
+  if (schemaArg === null) {
+    console.error("Error: --schema requires a value.");
+    process.exit(1);
+  }
+
+  const outArg =
+    outFlag !== -1
+      ? args[outFlag + 1] && !args[outFlag + 1].startsWith("-")
+        ? args[outFlag + 1]
+        : null
+      : "no-mess.generated.ts";
+  if (outArg === null) {
+    console.error("Error: --out requires a value.");
+    process.exit(1);
+  }
+
+  const schemaPath = resolve(process.cwd(), schemaArg);
+  const outPath = resolve(process.cwd(), outArg);
 
   let source: string;
   try {

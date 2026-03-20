@@ -17,7 +17,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PublishCascadeDialog } from "@/components/publishing/publish-cascade-dialog";
 import { SchemaExportPanel } from "@/components/schemas/schema-export-panel";
@@ -130,6 +130,9 @@ export function ContentTypeContextMenu({
     }[]
   >([]);
   const [pendingCascadeSlugs, setPendingCascadeSlugs] = useState<string[]>([]);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
+  const publishPlanInFlightRef = useRef(false);
 
   const source = useMemo<ContentTypeDefinition>(() => {
     if (!contentType) {
@@ -206,6 +209,7 @@ export function ContentTypeContextMenu({
     cascade?: boolean;
     expectedCascadeSlugs?: string[];
   }) => {
+    setIsPublishing(true);
     try {
       await publishMutation({
         contentTypeId: type._id,
@@ -225,19 +229,41 @@ export function ContentTypeContextMenu({
       toast.error(
         error instanceof Error ? error.message : "Failed to publish schema",
       );
+    } finally {
+      setIsPublishing(false);
     }
   };
 
   const handlePublish = async () => {
-    const plan = await convex.query(api.contentTypes.getPublishPlan, {
-      contentTypeId: type._id,
-    });
-
-    if (plan.cascadeTargets.length > 0) {
-      setCascadeTargets(plan.cascadeTargets);
-      setPendingCascadeSlugs(plan.expectedCascadeSlugs);
-      setShowCascadeDialog(true);
+    if (publishPlanInFlightRef.current || isPreviewingPublish || isPublishing) {
       return;
+    }
+
+    publishPlanInFlightRef.current = true;
+    setIsPreviewingPublish(true);
+
+    try {
+      const plan = await convex.query(api.contentTypes.getPublishPlan, {
+        contentTypeId: type._id,
+      });
+
+      if (plan.cascadeTargets.length > 0) {
+        setCascadeTargets(plan.cascadeTargets);
+        setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+        setShowCascadeDialog(true);
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to load schema publish plan", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load schema publish plan",
+      );
+      return;
+    } finally {
+      publishPlanInFlightRef.current = false;
+      setIsPreviewingPublish(false);
     }
 
     await publishSchema();
@@ -309,7 +335,10 @@ export function ContentTypeContextMenu({
           )}
 
           {(type.status === "draft" || type.hasDraft) && (
-            <ContextMenuItem onClick={handlePublish}>
+            <ContextMenuItem
+              onClick={handlePublish}
+              disabled={isPreviewingPublish || isPublishing}
+            >
               <Upload className="h-4 w-4" />
               {type.status === "draft" ? "Publish Schema" : "Publish Changes"}
             </ContextMenuItem>
@@ -400,6 +429,7 @@ export function ContentTypeContextMenu({
         open={showCascadeDialog}
         onOpenChange={setShowCascadeDialog}
         targets={cascadeTargets}
+        isConfirming={isPublishing}
         onConfirm={handleCascadeConfirm}
       />
 

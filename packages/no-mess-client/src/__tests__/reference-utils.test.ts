@@ -8,10 +8,12 @@ import {
 describe("reference-utils", () => {
   it("extracts a handle from string refs", () => {
     expect(getShopifyHandle("classic-tee")).toBe("classic-tee");
+    expect(getShopifyHandle("  classic-tee  ")).toBe("classic-tee");
   });
 
   it("extracts a handle from object refs", () => {
     expect(getShopifyHandle({ handle: "summer-sale" })).toBe("summer-sale");
+    expect(getShopifyHandle({ handle: "  summer-sale  " })).toBe("summer-sale");
   });
 
   it("returns null for nullish or invalid refs", () => {

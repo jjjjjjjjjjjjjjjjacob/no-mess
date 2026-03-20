@@ -81,6 +81,8 @@ describe("docs content", () => {
     expect(text).toContain("useNoMessEditableEntry");
     expect(text).toContain('cache: "no-store"');
     expect(text).toContain("frame-ancestors");
+    expect(text).toContain("Content-Security-Policy");
+    expect(text).toContain("append or merge");
   });
 
   it("documents fresh content reads as uncached runtime requests", () => {

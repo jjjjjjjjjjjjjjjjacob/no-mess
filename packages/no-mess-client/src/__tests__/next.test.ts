@@ -1,15 +1,22 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_API_URL, NoMessError } from "../index.js";
 import {
   createBrowserNoMessClient,
   createServerNoMessClient,
 } from "../next/index.js";
 
+const originalFetch = globalThis.fetch;
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
 describe("@no-mess/client/next", () => {
   const originalEnv = { ...process.env };
+
+  afterAll(() => {
+    process.env = originalEnv;
+    globalThis.fetch = originalFetch;
+    mockFetch.mockReset();
+  });
 
   beforeEach(() => {
     process.env = { ...originalEnv };

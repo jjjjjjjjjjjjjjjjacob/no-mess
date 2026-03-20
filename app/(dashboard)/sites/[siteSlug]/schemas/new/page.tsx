@@ -27,6 +27,7 @@ export default function NewSchemaPage() {
   const formDataRef = useRef<ContentTypeFormData | null>(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showCascadeDialog, setShowCascadeDialog] = useState(false);
   const [cascadeTargets, setCascadeTargets] = useState<
@@ -38,6 +39,7 @@ export default function NewSchemaPage() {
   >([]);
   const [pendingCascadeSlugs, setPendingCascadeSlugs] = useState<string[]>([]);
   const pendingPublishDataRef = useRef<ContentTypeFormData | null>(null);
+  const publishPreviewInFlightRef = useRef(false);
 
   if (!site) return null;
 
@@ -83,8 +85,8 @@ export default function NewSchemaPage() {
     data: ContentTypeFormData,
     options?: { cascade?: boolean; expectedCascadeSlugs?: string[] },
   ) => {
-    setIsPublishing(true);
     let contentTypeId: Id<"contentTypes"> | null = null;
+    setIsPublishing(true);
     try {
       contentTypeId = await createDraft({
         siteId: site._id,
@@ -120,35 +122,75 @@ export default function NewSchemaPage() {
             : `/sites/${siteSlug}/schemas`,
         );
       }
-      toast.error(
-        err instanceof Error ? err.message : "Failed to publish schema",
-      );
+      throw err;
     } finally {
       setIsPublishing(false);
     }
   };
 
-  const handlePublish = async (data: ContentTypeFormData) => {
-    const plan = await convex.query(api.contentTypes.previewPublishPlan, {
-      siteId: site._id,
-      name: data.name,
-      slug: data.slug,
-      kind: data.kind,
-      mode: data.kind === "template" ? data.mode : undefined,
-      route: data.kind === "template" ? data.route : undefined,
-      description: data.description,
-      fields: data.fields,
-    });
-
-    if (plan.cascadeTargets.length > 0) {
-      pendingPublishDataRef.current = data;
-      setCascadeTargets(plan.cascadeTargets);
-      setPendingCascadeSlugs(plan.expectedCascadeSlugs);
-      setShowCascadeDialog(true);
+  const runPublishFlow = async (
+    data: ContentTypeFormData,
+    options?: { cascade?: boolean; expectedCascadeSlugs?: string[] },
+  ) => {
+    if (isPublishing) {
       return;
     }
 
-    await publishSchema(data);
+    if (
+      !options?.cascade &&
+      (publishPreviewInFlightRef.current || isPreviewingPublish)
+    ) {
+      return;
+    }
+
+    if (!options?.cascade) {
+      publishPreviewInFlightRef.current = true;
+      setIsPreviewingPublish(true);
+
+      try {
+        const plan = await convex.query(api.contentTypes.previewPublishPlan, {
+          siteId: site._id,
+          name: data.name,
+          slug: data.slug,
+          kind: data.kind,
+          mode: data.kind === "template" ? data.mode : undefined,
+          route: data.kind === "template" ? data.route : undefined,
+          description: data.description,
+          fields: data.fields,
+        });
+
+        if (plan.cascadeTargets.length > 0) {
+          pendingPublishDataRef.current = data;
+          setCascadeTargets(plan.cascadeTargets);
+          setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+          setShowCascadeDialog(true);
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to load schema publish plan", error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to load schema publish plan",
+        );
+        return;
+      } finally {
+        publishPreviewInFlightRef.current = false;
+        setIsPreviewingPublish(false);
+      }
+    }
+
+    try {
+      await publishSchema(data, options);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to publish schema",
+      );
+    }
+  };
+
+  const handlePublish = async (data: ContentTypeFormData) => {
+    await runPublishFlow(data);
   };
 
   const handleCascadeConfirm = async () => {
@@ -156,7 +198,7 @@ export default function NewSchemaPage() {
       return;
     }
 
-    await publishSchema(pendingPublishDataRef.current, {
+    await runPublishFlow(pendingPublishDataRef.current, {
       cascade: true,
       expectedCascadeSlugs: pendingCascadeSlugs,
     });
@@ -187,7 +229,7 @@ export default function NewSchemaPage() {
             variant="outline"
             size="sm"
             onClick={handleSaveAsDraft}
-            disabled={isSavingDraft || isPublishing}
+            disabled={isSavingDraft || isPublishing || isPreviewingPublish}
           >
             <Save className="mr-2 h-3 w-3" />
             {isSavingDraft ? "Saving..." : "Save as Draft"}
@@ -196,7 +238,7 @@ export default function NewSchemaPage() {
             type="submit"
             form="schema-create-form"
             size="sm"
-            disabled={isPublishing || isSavingDraft}
+            disabled={isPublishing || isSavingDraft || isPreviewingPublish}
           >
             <Upload className="mr-2 h-3 w-3" />
             {isPublishing ? "Publishing..." : "Publish"}

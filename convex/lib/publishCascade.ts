@@ -121,6 +121,20 @@ function getSchemaDisplay<TId>(
   };
 }
 
+function getEffectiveSchemaIdentity<TId>(schema: PublishCascadeSchema<TId>) {
+  if (schema.draft) {
+    return {
+      slug: schema.draft.slug,
+      kind: schema.draft.kind,
+    };
+  }
+
+  return {
+    slug: schema.slug,
+    kind: schema.kind,
+  };
+}
+
 function getSchemaFields<TId>(
   schema: PublishCascadeSchema<TId>,
   useDraftFields: boolean,
@@ -169,13 +183,24 @@ function listAvailableFragments<TId>(
   rootSchema: PublishCascadeSchema<TId>,
   schemas: PublishCascadeSchema<TId>[],
 ) {
-  const fragments = schemas.filter((schema) => schema.kind === "fragment");
+  const fragments = schemas
+    .filter((schema) => getEffectiveSchemaIdentity(schema).kind === "fragment")
+    .map((schema) => ({
+      schema,
+      slug: getEffectiveSchemaIdentity(schema).slug,
+    }));
 
-  if (rootSchema.kind !== "fragment") {
+  if (getEffectiveSchemaIdentity(rootSchema).kind !== "fragment") {
     return fragments;
   }
 
-  return [rootSchema, ...fragments];
+  return [
+    {
+      schema: rootSchema,
+      slug: getEffectiveSchemaIdentity(rootSchema).slug,
+    },
+    ...fragments,
+  ];
 }
 
 export function resolvePublishCascadeTargets<TId>({
@@ -194,8 +219,9 @@ export function resolvePublishCascadeTargets<TId>({
       useDraftFields: boolean;
     },
   ) => {
+    const effectiveIdentity = getEffectiveSchemaIdentity(schema);
     const display = getSchemaDisplay(schema, options.useDraftFields);
-    const visitKey = display.slug || schema.slug;
+    const visitKey = effectiveIdentity.slug || display.slug || schema.slug;
 
     if (path.has(visitKey)) {
       return;
@@ -211,9 +237,9 @@ export function resolvePublishCascadeTargets<TId>({
         continue;
       }
 
-      visit(fragment, {
+      visit(fragment.schema, {
         includeIfDraft: true,
-        useDraftFields: fragment.status === "draft",
+        useDraftFields: fragment.schema.status === "draft",
       });
     }
 
@@ -223,12 +249,17 @@ export function resolvePublishCascadeTargets<TId>({
       return;
     }
 
-    if (seenTargets.has(display.slug)) {
+    const targetSlug = effectiveIdentity.slug || display.slug;
+    if (seenTargets.has(targetSlug)) {
       return;
     }
 
-    seenTargets.add(display.slug);
-    cascadeTargets.push(display);
+    seenTargets.add(targetSlug);
+    cascadeTargets.push({
+      ...display,
+      slug: targetSlug,
+      kind: effectiveIdentity.kind,
+    });
   };
 
   visit(root.schema, {

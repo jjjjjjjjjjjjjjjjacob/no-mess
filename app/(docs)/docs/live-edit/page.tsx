@@ -161,7 +161,12 @@ export function ProductStory({ entry }) {
           <code className="rounded bg-muted px-1 font-mono text-xs">
             frame-ancestors
           </code>{" "}
-          or the live-edit iframe will fail to render.
+          or the live-edit iframe will fail to render. Add that directive to
+          your existing{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            Content-Security-Policy
+          </code>{" "}
+          value instead of replacing the rest of your policy.
         </p>
         <CodeBlock
           code={`// next.config.ts
@@ -173,7 +178,8 @@ const nextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value: "frame-ancestors 'self' https://admin.no-mess.xyz",
+            value:
+              "default-src 'self'; img-src 'self' data:; frame-ancestors 'self' https://admin.no-mess.xyz;",
           },
         ],
       },
@@ -185,6 +191,19 @@ export default nextConfig;`}
           language="typescript"
           filename="next.config.ts"
         />
+        <p>
+          If you already send a CSP header, keep the existing directives and
+          append or merge{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            frame-ancestors 'self' https://admin.no-mess.xyz
+          </code>
+          . For example,{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            default-src 'self'; img-src 'self' data:; frame-ancestors 'self'
+            https://admin.no-mess.xyz;
+          </code>
+          .
+        </p>
       </DocsStep>
 
       <DocsHeading>React APIs</DocsHeading>

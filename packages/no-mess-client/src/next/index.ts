@@ -50,10 +50,23 @@ export function createServerNoMessClient(options?: NoMessNextClientOverrides) {
 }
 
 export function createBrowserNoMessClient(options?: NoMessNextClientOverrides) {
-  const apiKey = requireEnv(
-    "NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY",
-    "Set NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY to your publishable key (nm_pub_...) in your browser environment.",
-  );
+  const browserApiKey = process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY;
+  if (typeof browserApiKey !== "string" || browserApiKey.trim().length === 0) {
+    throw new NoMessError(
+      "Missing required no-mess configuration: NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY. Set NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY to your publishable key (nm_pub_...) in your browser environment.",
+      {
+        kind: "config",
+        code: "missing_configuration",
+        retryable: false,
+        operation: "createNoMessClient",
+        details: {
+          envVar: "NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY",
+        },
+      },
+    );
+  }
+
+  const apiKey = browserApiKey.trim();
   const apiUrl =
     options?.apiUrl?.trim() ||
     process.env.NEXT_PUBLIC_NO_MESS_API_URL?.trim() ||

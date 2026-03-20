@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { useQuery } from "convex/react";
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 import { vi } from "vitest";
 import { DashboardBreadcrumb } from "../dashboard-breadcrumb";
 
@@ -15,7 +16,7 @@ vi.mock("next/link", () => ({
     href,
     ...props
   }: {
-    children?: React.ReactNode;
+    children?: ReactNode;
     href: string;
     [key: string]: unknown;
   }) => (

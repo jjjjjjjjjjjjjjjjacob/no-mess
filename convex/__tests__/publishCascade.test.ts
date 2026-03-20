@@ -210,4 +210,93 @@ describe("resolvePublishCascadeTargets", () => {
       "root-fragment",
     ]);
   });
+
+  it("matches downstream fragments by their draft slug and draft kind", () => {
+    const root: PublishCascadeSchema = {
+      name: "Landing Page",
+      slug: "landing-page",
+      kind: "template",
+      status: "published",
+      fields: [fragmentField("promo", "draft-fragment")],
+    };
+
+    const schemas: PublishCascadeSchema[] = [
+      {
+        _id: "fragment_draft_identity",
+        name: "Legacy Template",
+        slug: "legacy-template",
+        kind: "template",
+        status: "draft",
+        fields: [textField("body")],
+        draft: {
+          name: "Draft Fragment",
+          slug: "draft-fragment",
+          kind: "fragment",
+          fields: [textField("body")],
+        },
+      },
+    ];
+
+    const result = resolvePublishCascadeTargets({
+      schemas,
+      root: {
+        schema: root,
+        includeRootIfDraft: false,
+        useDraftFields: true,
+      },
+    });
+
+    expect(result.cascadeTargets.map((target) => target.slug)).toEqual([
+      "draft-fragment",
+    ]);
+  });
+
+  it("treats the root schema as a fragment when its draft kind changes", () => {
+    const root: PublishCascadeSchema = {
+      _id: "fragment_root",
+      name: "Root Template",
+      slug: "root-template",
+      kind: "template",
+      status: "draft",
+      fields: [],
+      draft: {
+        name: "Root Fragment",
+        slug: "root-fragment",
+        kind: "fragment",
+        fields: [fragmentField("child", "child-fragment")],
+      },
+    };
+
+    const schemas: PublishCascadeSchema[] = [
+      root,
+      {
+        _id: "fragment_child",
+        name: "Child Fragment",
+        slug: "child-fragment",
+        kind: "fragment",
+        status: "draft",
+        fields: [textField("copy")],
+        draft: {
+          name: "Child Fragment",
+          slug: "child-fragment",
+          kind: "fragment",
+          fields: [textField("copy")],
+        },
+      },
+    ];
+
+    const result = resolvePublishCascadeTargets({
+      schemas,
+      root: {
+        schema: root,
+        includeRootIfDraft: true,
+        useDraftFields: true,
+      },
+    });
+
+    expect(result.cascadeTargets.map((target) => target.slug)).toEqual([
+      "child-fragment",
+      "root-fragment",
+    ]);
+  });
 });

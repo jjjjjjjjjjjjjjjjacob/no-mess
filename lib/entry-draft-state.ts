@@ -39,6 +39,10 @@ export function hasPendingEntryDraft(
     return true;
   }
 
+  if (entry.draft === undefined) {
+    return false;
+  }
+
   return (
     JSON.stringify(normalizeForComparison(entry.draft)) !==
     JSON.stringify(normalizeForComparison(entry.published))

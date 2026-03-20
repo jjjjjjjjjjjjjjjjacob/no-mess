@@ -502,44 +502,77 @@ describe("NoMessClient", () => {
 
     it("sorts competing singleton entries deterministically and warns once", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const entries = [
-        {
-          slug: "older",
-          title: "Older",
-          _id: "1",
-          _createdAt: 1,
-          _updatedAt: 10,
-          _publishedAt: 20,
-        },
-        {
+      try {
+        const entries = [
+          {
+            slug: "older",
+            title: "Older",
+            _id: "1",
+            _createdAt: 1,
+            _updatedAt: 10,
+            _publishedAt: 20,
+          },
+          {
+            slug: "newer",
+            title: "Newer",
+            _id: "2",
+            _createdAt: 2,
+            _updatedAt: 11,
+            _publishedAt: 21,
+          },
+        ];
+        mockFetch.mockResolvedValueOnce(
+          createMockResponse({
+            body: entries,
+          }),
+        );
+        mockFetch.mockResolvedValueOnce(
+          createMockResponse({
+            body: entries,
+          }),
+        );
+
+        await expect(client.getSingleton("home-page")).resolves.toMatchObject({
           slug: "newer",
-          title: "Newer",
-          _id: "2",
-          _createdAt: 2,
-          _updatedAt: 11,
-          _publishedAt: 21,
-        },
-      ];
+        });
+        await client.getSingleton("home-page");
+
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy.mock.calls[0]?.[0]).toContain(
+          'Content type "home-page" is being fetched as a singleton',
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it("prefers published time, then created time, then slug for singleton ties", async () => {
       mockFetch.mockResolvedValueOnce(
         createMockResponse({
-          body: entries,
-        }),
-      );
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse({
-          body: entries,
+          body: [
+            {
+              slug: "alpha",
+              title: "Alpha",
+              _id: "1",
+              _createdAt: 1,
+              _updatedAt: 100,
+              _publishedAt: 10,
+            },
+            {
+              slug: "beta",
+              title: "Beta",
+              _id: "2",
+              _createdAt: 2,
+              _updatedAt: 1,
+              _publishedAt: 10,
+            },
+          ],
         }),
       );
 
       await expect(client.getSingleton("home-page")).resolves.toMatchObject({
-        slug: "newer",
+        slug: "beta",
       });
-      await client.getSingleton("home-page");
-
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy.mock.calls[0]?.[0]).toContain(
-        'Content type "home-page" is being fetched as a singleton',
-      );
     });
 
     it("throws a 404 from getRequiredSingleton when no singleton exists", async () => {

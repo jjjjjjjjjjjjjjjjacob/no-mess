@@ -49,6 +49,8 @@ export function LiveEditLayout() {
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [initialized, setInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [mappedFieldNames, setMappedFieldNames] = useState<string[]>([]);
   const [showCascadeDialog, setShowCascadeDialog] = useState(false);
@@ -64,6 +66,7 @@ export function LiveEditLayout() {
   const savedTitle = useRef("");
   const savedFormData = useRef<Record<string, unknown>>({});
   const previewPanelRef = useRef<LiveEditPreviewPanelHandle>(null);
+  const publishPreviewInFlightRef = useRef(false);
 
   useEffect(() => {
     if (entry && !initialized) {
@@ -106,6 +109,7 @@ export function LiveEditLayout() {
       expectedCascadeSlugs?: string[];
     }) => {
       if (!entry) return;
+      setIsPublishing(true);
       try {
         await handleSave();
         await publishEntry({
@@ -119,27 +123,58 @@ export function LiveEditLayout() {
         setPendingCascadeSlugs([]);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to publish");
+      } finally {
+        setIsPublishing(false);
       }
     },
     [entry, handleSave, publishEntry],
   );
 
   const handlePublish = useCallback(async () => {
-    if (!entry) return;
-
-    const plan = await convex.query(api.contentEntries.getPublishPlan, {
-      entryId: entry._id as Id<"contentEntries">,
-    });
-
-    if (plan.cascadeTargets.length > 0) {
-      setCascadeTargets(plan.cascadeTargets);
-      setPendingCascadeSlugs(plan.expectedCascadeSlugs);
-      setShowCascadeDialog(true);
+    if (
+      !entry ||
+      publishPreviewInFlightRef.current ||
+      isPreviewingPublish ||
+      isPublishing
+    ) {
       return;
     }
 
+    publishPreviewInFlightRef.current = true;
+    setIsPreviewingPublish(true);
+
+    try {
+      const plan = await convex.query(api.contentEntries.getPublishPlan, {
+        entryId: entry._id as Id<"contentEntries">,
+      });
+
+      if (plan.cascadeTargets.length > 0) {
+        setCascadeTargets(plan.cascadeTargets);
+        setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+        setShowCascadeDialog(true);
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to load entry publish plan", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load entry publish plan",
+      );
+      return;
+    } finally {
+      publishPreviewInFlightRef.current = false;
+      setIsPreviewingPublish(false);
+    }
+
     await publishEntryWithOptions();
-  }, [convex, entry, publishEntryWithOptions]);
+  }, [
+    convex,
+    entry,
+    isPreviewingPublish,
+    isPublishing,
+    publishEntryWithOptions,
+  ]);
 
   const handleCascadeConfirm = useCallback(async () => {
     await publishEntryWithOptions({
@@ -218,6 +253,7 @@ export function LiveEditLayout() {
         entryTitle={title || entry.title}
         entryStatus={entry.status}
         isDirty={isDirty}
+        isPublishing={isPreviewingPublish || isPublishing}
         isSaving={isSaving}
         onSave={handleSave}
         onPublish={handlePublish}
@@ -259,7 +295,7 @@ export function LiveEditLayout() {
         open={showCascadeDialog}
         onOpenChange={setShowCascadeDialog}
         targets={cascadeTargets}
-        isConfirming={isSaving}
+        isConfirming={isPublishing}
         onConfirm={handleCascadeConfirm}
       />
     </div>

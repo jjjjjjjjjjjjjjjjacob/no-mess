@@ -1,5 +1,6 @@
 "use client";
 
+import { type MouseEvent, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,11 +34,29 @@ export function PublishCascadeDialog({
   open,
   targets,
 }: PublishCascadeDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const count = targets.length;
+  const isBusy = isConfirming || isSubmitting;
   const confirmLabel =
     count === 1
       ? "Publish Schema and Continue"
       : `Publish ${count} Schemas and Continue`;
+
+  const handleConfirmClick = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    if (isBusy) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onConfirm();
+    } catch (error) {
+      console.error("Failed to confirm cascade publish", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -70,9 +89,9 @@ export function PublishCascadeDialog({
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isConfirming}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} disabled={isConfirming}>
-            {isConfirming ? "Publishing..." : confirmLabel}
+          <AlertDialogCancel disabled={isBusy}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmClick} disabled={isBusy}>
+            {isBusy ? "Publishing..." : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
