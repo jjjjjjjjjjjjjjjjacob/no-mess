@@ -252,6 +252,7 @@ async function buildAssetUrlMap(
   getAsset: (assetId: Id<"assets">) => Promise<{
     siteId: Id<"sites">;
     url: string;
+    optimizedUrl?: string;
   } | null>,
   siteId: Id<"sites">,
   assetIds: Iterable<string>,
@@ -271,11 +272,172 @@ async function buildAssetUrlMap(
   const assetUrls = new Map<string, string>();
   for (const [assetId, asset] of assets) {
     if (asset?.siteId === siteId && asset.url) {
-      assetUrls.set(assetId, asset.url);
+      assetUrls.set(assetId, asset.optimizedUrl ?? asset.url);
     }
   }
 
   return assetUrls;
+}
+
+// Rich image data for ?images=rich API mode
+interface AssetVariantData {
+  url: string;
+  width: number;
+  height: number;
+}
+
+interface AssetData {
+  url: string;
+  width?: number;
+  height?: number;
+  mimeType: string;
+  size: number;
+  originalUrl?: string;
+  originalMimeType?: string;
+  variants?: AssetVariantData[];
+}
+
+async function buildAssetDataMap(
+  ctx: QueryCtx,
+  siteId: Id<"sites">,
+  assetIds: Iterable<string>,
+) {
+  const uniqueAssetIds = [...new Set(assetIds)];
+  if (uniqueAssetIds.length === 0) {
+    return new Map<string, AssetData>();
+  }
+
+  const assets = await Promise.all(
+    uniqueAssetIds.map(async (assetId) => {
+      const asset = await ctx.db.get(assetId as Id<"assets">);
+      return [assetId, asset] as const;
+    }),
+  );
+
+  // Batch-fetch variants for all asset IDs
+  const variantsByAsset = new Map<string, AssetVariantData[]>();
+  const variantResults = await Promise.all(
+    uniqueAssetIds.map(async (assetId) => {
+      const variants = await ctx.db
+        .query("assetVariants")
+        .withIndex("by_asset", (q) => q.eq("assetId", assetId as Id<"assets">))
+        .collect();
+      return [assetId, variants] as const;
+    }),
+  );
+  for (const [assetId, variants] of variantResults) {
+    if (variants.length > 0) {
+      variantsByAsset.set(
+        assetId,
+        variants
+          .sort((a, b) => a.width - b.width)
+          .map((v) => ({ url: v.url, width: v.width, height: v.height })),
+      );
+    }
+  }
+
+  const assetDataMap = new Map<string, AssetData>();
+  for (const [assetId, asset] of assets) {
+    if (asset?.siteId === siteId && asset.url) {
+      const variants = variantsByAsset.get(assetId);
+      const optimizedUrl = asset.optimizedUrl;
+      const optimizedMimeType = asset.optimizedMimeType;
+      const isOptimized =
+        optimizedUrl !== undefined && optimizedMimeType !== undefined;
+      assetDataMap.set(assetId, {
+        url: isOptimized ? optimizedUrl : asset.url,
+        width: asset.width,
+        height: asset.height,
+        mimeType: isOptimized ? optimizedMimeType : asset.mimeType,
+        size: asset.optimizedSize ?? asset.size,
+        ...(isOptimized
+          ? { originalUrl: asset.url, originalMimeType: asset.mimeType }
+          : {}),
+        ...(variants ? { variants } : {}),
+      });
+    }
+  }
+
+  return assetDataMap;
+}
+
+function resolveAnonymousFieldValueRich(
+  field: FieldDefinition,
+  value: unknown,
+  assetData: Map<string, AssetData>,
+  fragments: Map<string, NormalizedContentType>,
+): unknown {
+  switch (field.type) {
+    case "image":
+      return typeof value === "string"
+        ? (assetData.get(value) ?? value)
+        : value;
+    case "gallery":
+      return Array.isArray(value)
+        ? value.map((item) =>
+            typeof item === "string" ? (assetData.get(item) ?? item) : item,
+          )
+        : value;
+    case "object":
+      return isRecord(value)
+        ? resolveAssetBackedContentRich(
+            field.fields,
+            value,
+            assetData,
+            fragments,
+          )
+        : value;
+    case "array":
+      return Array.isArray(value)
+        ? value.map((item) =>
+            resolveAnonymousFieldValueRich(
+              field.of,
+              item,
+              assetData,
+              fragments,
+            ),
+          )
+        : value;
+    case "fragment": {
+      const fragment = resolveFragmentReferenceFromMap(
+        field.fragment,
+        fragments,
+      );
+      return fragment && isRecord(value)
+        ? resolveAssetBackedContentRich(
+            fragment.fields,
+            value,
+            assetData,
+            fragments,
+          )
+        : value;
+    }
+    default:
+      return value;
+  }
+}
+
+function resolveAssetBackedContentRich(
+  fields: Field[],
+  content: Record<string, unknown> | null | undefined,
+  assetData: Map<string, AssetData>,
+  fragments: Map<string, NormalizedContentType>,
+): Record<string, unknown> {
+  if (!content) {
+    return {};
+  }
+
+  const resolvedContent: Record<string, unknown> = { ...content };
+  for (const field of fields) {
+    resolvedContent[field.name] = resolveAnonymousFieldValueRich(
+      field,
+      content[field.name],
+      assetData,
+      fragments,
+    );
+  }
+
+  return resolvedContent;
 }
 
 async function buildShopifyMaps(
@@ -515,6 +677,38 @@ function assertExpectedCascadeSlugs(
   }
 }
 
+async function resolvePublishSource(
+  ctx: MutationCtx,
+  entry: {
+    _id: Id<"contentEntries">;
+    siteId: Id<"sites">;
+    title: string;
+    draft: unknown;
+  },
+  draftId?: Id<"contentEntryDrafts">,
+) {
+  if (!draftId) {
+    return {
+      title: entry.title,
+      draft: entry.draft,
+    };
+  }
+
+  const savedDraft = await ctx.db.get(draftId);
+  if (!savedDraft || savedDraft.entryId !== entry._id) {
+    throw new ConvexError("Saved draft not found");
+  }
+
+  if (savedDraft.siteId !== entry.siteId) {
+    throw new ConvexError("Saved draft does not belong to this entry");
+  }
+
+  return {
+    title: savedDraft.title,
+    draft: savedDraft.draft,
+  };
+}
+
 async function getEntryPublishPlan(
   ctx: QueryCtx | MutationCtx,
   entryId: Id<"contentEntries">,
@@ -719,12 +913,18 @@ export const update = mutation({
 export const publish = mutation({
   args: {
     entryId: v.id("contentEntries"),
+    draftId: v.optional(v.id("contentEntryDrafts")),
     cascade: v.optional(v.boolean()),
     expectedCascadeSlugs: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const plan = await getEntryPublishPlan(ctx, args.entryId);
     const { user } = await requireSiteAccess(ctx, plan.entry.siteId);
+    const publishSource = await resolvePublishSource(
+      ctx,
+      plan.entry,
+      args.draftId,
+    );
 
     if (plan.cascadeTargets.length > 0 && !args.cascade) {
       throw new ConvexError(
@@ -750,7 +950,9 @@ export const publish = mutation({
     const now = Date.now();
 
     await ctx.db.patch(args.entryId, {
-      published: plan.entry.draft,
+      title: publishSource.title,
+      draft: publishSource.draft,
+      published: publishSource.draft,
       status: "published",
       publishedAt: now,
       publishedBy: user._id,
@@ -792,6 +994,26 @@ export const remove = mutation({
     }
 
     await requireSiteAccess(ctx, entry.siteId);
+
+    const [savedDrafts, routes] = await Promise.all([
+      ctx.db
+        .query("contentEntryDrafts")
+        .withIndex("by_entry", (q) => q.eq("entryId", args.entryId))
+        .collect(),
+      ctx.db
+        .query("contentEntryRoutes")
+        .withIndex("by_entry", (q) => q.eq("entryId", args.entryId))
+        .collect(),
+    ]);
+
+    for (const savedDraft of savedDrafts) {
+      await ctx.db.delete(savedDraft._id);
+    }
+
+    for (const route of routes) {
+      await ctx.db.delete(route._id);
+    }
+
     await ctx.db.delete(args.entryId);
   },
 });
@@ -898,6 +1120,7 @@ export const listPublishedByType = internalQuery({
     contentTypeId: v.id("contentTypes"),
     siteId: v.id("sites"),
     expand: v.optional(v.array(v.literal("shopify"))),
+    images: v.optional(v.literal("rich")),
   },
   handler: async (ctx, args) => {
     const contentType = normalizeContentType(
@@ -913,17 +1136,18 @@ export const listPublishedByType = internalQuery({
       (entry) => entry.status === "published",
     );
     const shouldExpandShopify = args.expand?.includes("shopify") ?? false;
-    const assetUrls = await buildAssetUrlMap(
-      async (assetId) => await ctx.db.get(assetId),
-      args.siteId,
-      publishedEntries.flatMap((entry) =>
-        collectAssetIds(
-          contentType?.fields ?? [],
-          (entry.published as Record<string, unknown>) ?? {},
-          fragments,
-        ),
+    const allAssetIds = publishedEntries.flatMap((entry) =>
+      collectAssetIds(
+        contentType?.fields ?? [],
+        (entry.published as Record<string, unknown>) ?? {},
+        fragments,
       ),
     );
+    const getAsset = async (assetId: Id<"assets">) => await ctx.db.get(assetId);
+    const assetUrls =
+      args.images === "rich"
+        ? await buildAssetDataMap(ctx, args.siteId, allAssetIds)
+        : await buildAssetUrlMap(getAsset, args.siteId, allAssetIds);
     const shopifyMaps = shouldExpandShopify
       ? await buildShopifyMaps(
           ctx,
@@ -948,26 +1172,39 @@ export const listPublishedByType = internalQuery({
           collections: new Map<string, unknown>(),
         };
 
-    return publishedEntries.map((entry) => ({
-      slug: entry.slug,
-      title: entry.title,
-      ...resolveExpandedContent(
-        contentType?.fields ?? [],
-        resolveAssetBackedContent(
+    return publishedEntries.map((entry) => {
+      const content = (entry.published as Record<string, unknown>) ?? {};
+      const resolvedContent =
+        assetUrls instanceof Map && args.images === "rich"
+          ? resolveAssetBackedContentRich(
+              contentType?.fields ?? [],
+              content,
+              assetUrls as Map<string, AssetData>,
+              fragments,
+            )
+          : resolveAssetBackedContent(
+              contentType?.fields ?? [],
+              content,
+              assetUrls as Map<string, string>,
+              fragments,
+            );
+
+      return {
+        slug: entry.slug,
+        title: entry.title,
+        ...resolveExpandedContent(
           contentType?.fields ?? [],
-          (entry.published as Record<string, unknown>) ?? {},
-          assetUrls,
+          resolvedContent,
           fragments,
+          shopifyMaps.products,
+          shopifyMaps.collections,
         ),
-        fragments,
-        shopifyMaps.products,
-        shopifyMaps.collections,
-      ),
-      _id: entry._id,
-      _createdAt: entry.createdAt,
-      _updatedAt: entry.updatedAt,
-      _publishedAt: entry.publishedAt,
-    }));
+        _id: entry._id,
+        _createdAt: entry.createdAt,
+        _updatedAt: entry.updatedAt,
+        _publishedAt: entry.publishedAt,
+      };
+    });
   },
 });
 
@@ -978,6 +1215,7 @@ export const getBySlugInternal = internalQuery({
     slug: v.string(),
     preview: v.optional(v.boolean()),
     expand: v.optional(v.array(v.literal("shopify"))),
+    images: v.optional(v.literal("rich")),
   },
   handler: async (ctx, args) => {
     const entry = await ctx.db
@@ -1009,11 +1247,16 @@ export const getBySlugInternal = internalQuery({
       ? await getSiteFragments(ctx, args.siteId)
       : await getPublishedSiteFragments(ctx, args.siteId);
     const shouldExpandShopify = args.expand?.includes("shopify") ?? false;
-    const assetUrls = await buildAssetUrlMap(
-      async (assetId) => await ctx.db.get(assetId),
-      args.siteId,
-      collectAssetIds(contentType?.fields ?? [], content, fragments),
+    const allAssetIds = collectAssetIds(
+      contentType?.fields ?? [],
+      content,
+      fragments,
     );
+    const getAsset = async (assetId: Id<"assets">) => await ctx.db.get(assetId);
+    const assetUrls =
+      args.images === "rich"
+        ? await buildAssetDataMap(ctx, args.siteId, allAssetIds)
+        : await buildAssetUrlMap(getAsset, args.siteId, allAssetIds);
     const shopifyMaps = shouldExpandShopify
       ? await buildShopifyMaps(
           ctx,
@@ -1025,17 +1268,27 @@ export const getBySlugInternal = internalQuery({
           collections: new Map<string, unknown>(),
         };
 
+    const resolvedContent =
+      args.images === "rich"
+        ? resolveAssetBackedContentRich(
+            contentType?.fields ?? [],
+            content,
+            assetUrls as Map<string, AssetData>,
+            fragments,
+          )
+        : resolveAssetBackedContent(
+            contentType?.fields ?? [],
+            content,
+            assetUrls as Map<string, string>,
+            fragments,
+          );
+
     return {
       slug: entry.slug,
       title: entry.title,
       ...resolveExpandedContent(
         contentType?.fields ?? [],
-        resolveAssetBackedContent(
-          contentType?.fields ?? [],
-          content,
-          assetUrls,
-          fragments,
-        ),
+        resolvedContent,
         fragments,
         shopifyMaps.products,
         shopifyMaps.collections,

@@ -178,6 +178,20 @@ const mockDraftEntry = {
   publishedBy: undefined,
 };
 
+const mockSavedDraftVariant = {
+  _id: "draft_saved_1" as any,
+  siteId: "site_1" as any,
+  entryId: "entry_2" as any,
+  name: "Variant A",
+  nameLower: "variant a",
+  title: "Variant Title",
+  draft: { title: "Variant Title", body: "Variant content" },
+  createdAt: 1000,
+  createdBy: "user_1",
+  updatedAt: 1000,
+  updatedBy: "user_1",
+};
+
 const mockShopifyContentType = {
   _id: "ct_shopify" as any,
   siteId: "site_1",
@@ -614,6 +628,53 @@ describe("contentEntries.publish", () => {
     expect(patchCall.publishedAt).toBeLessThanOrEqual(after);
   });
 
+  it("publishes a saved draft variant into both draft and production", async () => {
+    const ctx = createMockMutationCtx();
+    ctx.db.get.mockImplementation(async (id) => {
+      if (id === "entry_2") return mockDraftEntry;
+      if (id === "ct_1") return mockContentType;
+      if (id === "draft_saved_1") return mockSavedDraftVariant;
+      return null;
+    });
+    ctx.db.query.mockImplementation((table: string) => {
+      if (table === "contentTypes") {
+        return {
+          withIndex: () => ({
+            collect: vi.fn().mockResolvedValue([mockContentType]),
+            first: vi.fn().mockResolvedValue(mockContentType),
+          }),
+        };
+      }
+
+      return {
+        withIndex: () => ({
+          collect: vi.fn().mockResolvedValue([]),
+          first: vi.fn().mockResolvedValue(null),
+        }),
+      };
+    });
+    mockRequireSiteAccess.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+
+    await getHandler(contentEntries.publish)(ctx, {
+      entryId: "entry_2",
+      draftId: "draft_saved_1",
+    });
+
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "entry_2",
+      expect.objectContaining({
+        title: "Variant Title",
+        draft: mockSavedDraftVariant.draft,
+        published: mockSavedDraftVariant.draft,
+        status: "published",
+      }),
+    );
+  });
+
   it("blocks publish when downstream schemas still need publishing", async () => {
     const ctx = createMockMutationCtx();
     const draftTemplate = {
@@ -876,6 +937,31 @@ describe("contentEntries.remove", () => {
   it("deletes the entry", async () => {
     const ctx = createMockMutationCtx();
     ctx.db.get.mockResolvedValue(mockEntry);
+    ctx.db.query.mockImplementation((table: string) => {
+      if (table === "contentEntryDrafts") {
+        return {
+          withIndex: () => ({
+            collect: vi
+              .fn()
+              .mockResolvedValue([{ _id: "draft_a" }, { _id: "draft_b" }]),
+          }),
+        };
+      }
+
+      if (table === "contentEntryRoutes") {
+        return {
+          withIndex: () => ({
+            collect: vi.fn().mockResolvedValue([{ _id: "route_a" }]),
+          }),
+        };
+      }
+
+      return {
+        withIndex: () => ({
+          collect: vi.fn().mockResolvedValue([]),
+        }),
+      };
+    });
     mockRequireSiteAccess.mockResolvedValue({
       user: mockUser,
       site: mockSite,
@@ -885,6 +971,9 @@ describe("contentEntries.remove", () => {
     const handler = getHandler(contentEntries.remove);
     await handler(ctx, { entryId: "entry_1" });
 
+    expect(ctx.db.delete).toHaveBeenCalledWith("draft_a");
+    expect(ctx.db.delete).toHaveBeenCalledWith("draft_b");
+    expect(ctx.db.delete).toHaveBeenCalledWith("route_a");
     expect(ctx.db.delete).toHaveBeenCalledWith("entry_1");
   });
 

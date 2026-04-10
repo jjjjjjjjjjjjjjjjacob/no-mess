@@ -305,6 +305,12 @@ export default function EditEntryPage() {
             {entry.status}
           </Badge>
         </div>
+        {canPreview && (
+          <p className="text-sm text-muted-foreground">
+            Live Edit is the primary authoring workspace for this entry. Use
+            details, URLs, and publish controls here when you need them.
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           {canPreview ? (
             <Button

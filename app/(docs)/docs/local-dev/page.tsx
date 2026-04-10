@@ -37,10 +37,10 @@ NEXT_PUBLIC_NO_MESS_API_URL=https://your-convex-dev.convex.site`}
         </p>
       </DocsCallout>
 
-      <DocsHeading>Set Local Preview URL</DocsHeading>
+      <DocsHeading>Set Local Preview and Live Edit Base URL</DocsHeading>
       <p className="text-muted-foreground">
-        In the no-mess dashboard, set the site preview URL to your local site
-        origin, for example{" "}
+        In the no-mess dashboard, set the site preview and Live Edit base URL to
+        your local site origin, for example{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">
           http://localhost:3001
         </code>

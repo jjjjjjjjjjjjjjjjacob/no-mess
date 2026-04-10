@@ -88,9 +88,28 @@ export function isSecretKey(key: string): boolean {
 }
 
 export type ContentExpandTarget = "shopify";
+export type ContentImageMode = "rich";
+
+export interface NoMessImageVariant {
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface NoMessImage {
+  url: string;
+  width?: number;
+  height?: number;
+  mimeType: string;
+  size: number;
+  originalUrl?: string;
+  originalMimeType?: string;
+  variants?: NoMessImageVariant[];
+}
 
 export interface GetEntriesOptions {
   expand?: ContentExpandTarget[];
+  images?: ContentImageMode;
   fetch?: NoMessFetchOptions;
   fresh?: boolean;
 }

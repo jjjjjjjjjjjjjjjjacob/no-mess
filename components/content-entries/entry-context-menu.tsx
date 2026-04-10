@@ -78,7 +78,8 @@ export function EntryContextMenu({
   const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
   const publishFlowInFlightRef = useRef(false);
 
-  const editPath = `/sites/${siteSlug}/content/${typeSlug}/${entry.slug}`;
+  const detailsPath = `/sites/${siteSlug}/content/${typeSlug}/${entry.slug}`;
+  const liveEditPath = `/sites/${siteSlug}/live-edit/${typeSlug}/${entry.slug}`;
   const hasDraftChanges =
     entry.hasDraftChanges ??
     hasPendingEntryDraft({
@@ -89,11 +90,15 @@ export function EntryContextMenu({
   const canPublishDraft = entry.status === "draft" || hasDraftChanges;
 
   const openEntry = () => {
-    router.push(editPath);
+    router.push(previewUrl ? liveEditPath : detailsPath);
   };
 
   const openLiveEdit = () => {
-    router.push(`/sites/${siteSlug}/live-edit/${typeSlug}/${entry.slug}`);
+    router.push(liveEditPath);
+  };
+
+  const openDetails = () => {
+    router.push(detailsPath);
   };
 
   const publishEntryWithOptions = async (options?: {
@@ -178,7 +183,7 @@ export function EntryContextMenu({
   };
 
   const handleCopyUrl = async () => {
-    await copy(`${window.location.origin}${editPath}`);
+    await copy(`${window.location.origin}${detailsPath}`);
     toast.success("Entry URL copied");
   };
 
@@ -202,12 +207,18 @@ export function EntryContextMenu({
         <ContextMenuContent className="w-56">
           <ContextMenuItem onClick={openEntry}>
             <ArrowRight className="h-4 w-4" />
-            Open Entry
+            {previewUrl ? "Open Live Edit" : "Open Entry"}
           </ContextMenuItem>
           {previewUrl && (
             <ContextMenuItem onClick={openLiveEdit}>
               <MousePointerClick className="h-4 w-4" />
               Open Live Edit
+            </ContextMenuItem>
+          )}
+          {previewUrl && (
+            <ContextMenuItem onClick={openDetails}>
+              <ArrowRight className="h-4 w-4" />
+              Open Details
             </ContextMenuItem>
           )}
           <ContextMenuItem

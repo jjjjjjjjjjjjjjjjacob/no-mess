@@ -63,6 +63,8 @@ export function GalleryField({ value, onChange, disabled }: GalleryFieldProps) {
                         src={asset.url}
                         alt={asset.filename}
                         className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
                       />
                     ) : (
                       <Video className="h-6 w-6 text-muted-foreground" />

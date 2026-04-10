@@ -122,9 +122,9 @@ export function LiveEditFieldPanel({
     };
 
     return (
-      <div key={path} className="space-y-3 rounded-lg border p-4">
+      <div key={path} className="min-w-0 space-y-3 rounded-lg border p-4">
         <div className="flex items-center justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-medium">{label}</p>
             {field.description && (
               <p className="text-xs text-muted-foreground">
@@ -146,7 +146,7 @@ export function LiveEditFieldPanel({
           )}
         </div>
 
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           {items.length === 0 && (
             <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
               No items yet.
@@ -156,8 +156,8 @@ export function LiveEditFieldPanel({
           {items.map((_, index) => {
             const itemPath = joinFieldPath(path, index);
             return (
-              <div key={itemPath} className="space-y-2">
-                <div className="space-y-3 rounded-md border p-3">
+              <div key={itemPath} className="min-w-0 space-y-2">
+                <div className="min-w-0 space-y-3 rounded-md border p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Item {index + 1}
@@ -305,7 +305,7 @@ export function LiveEditFieldPanel({
   const renderArrayItem = (field: FieldDefinition, itemPath: string) => {
     if (field.type === "object") {
       return (
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {field.fields.map((childField) =>
             renderNamedField(childField, itemPath),
           )}
@@ -324,7 +324,7 @@ export function LiveEditFieldPanel({
       }
 
       return (
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {fragmentFields.map((childField) =>
             renderNamedField(childField, itemPath),
           )}
@@ -345,7 +345,7 @@ export function LiveEditFieldPanel({
       <fieldset
         ref={setFieldRef(itemPath)}
         className={cn(
-          "rounded-md border-0 p-3 transition-colors",
+          "min-w-0 rounded-md border-0 p-3 transition-colors",
           focusedField === itemPath && "bg-accent",
         )}
         onFocus={() => onFieldFocus(itemPath)}
@@ -374,8 +374,8 @@ export function LiveEditFieldPanel({
 
     if (field.type === "object") {
       return (
-        <div key={path} className="space-y-4 rounded-lg border p-4">
-          <div>
+        <div key={path} className="min-w-0 space-y-4 rounded-lg border p-4">
+          <div className="min-w-0">
             <p className="text-sm font-medium">{label}</p>
             {field.description && (
               <p className="text-xs text-muted-foreground">
@@ -383,7 +383,7 @@ export function LiveEditFieldPanel({
               </p>
             )}
           </div>
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             {field.fields.map((childField) =>
               renderNamedField(childField, path),
             )}
@@ -406,8 +406,8 @@ export function LiveEditFieldPanel({
       }
 
       return (
-        <div key={path} className="space-y-4 rounded-lg border p-4">
-          <div>
+        <div key={path} className="min-w-0 space-y-4 rounded-lg border p-4">
+          <div className="min-w-0">
             <p className="text-sm font-medium">{label}</p>
             {field.description && (
               <p className="text-xs text-muted-foreground">
@@ -415,7 +415,7 @@ export function LiveEditFieldPanel({
               </p>
             )}
           </div>
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             {fragmentFields.map((childField) =>
               renderNamedField(childField, path),
             )}
@@ -433,7 +433,7 @@ export function LiveEditFieldPanel({
         key={path}
         ref={setFieldRef(path)}
         className={cn(
-          "rounded-md border-0 p-3 transition-colors",
+          "min-w-0 rounded-md border-0 p-3 transition-colors",
           focusedField === path && "bg-accent",
         )}
         onFocus={() => onFieldFocus(path)}
@@ -456,12 +456,28 @@ export function LiveEditFieldPanel({
   };
 
   return (
-    <ScrollArea className="h-full min-h-0">
-      <div className="space-y-5 p-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background">
+      <div className="shrink-0 border-b px-4 py-4">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              Entry Fields
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              The title stays pinned while the rest of the schema scrolls.
+            </p>
+          </div>
+          {mappedFieldNames.length > 0 && (
+            <p className="shrink-0 text-xs text-muted-foreground">
+              {mappedFieldNames.length} mapped on page
+            </p>
+          )}
+        </div>
+
         <fieldset
           ref={setFieldRef("title")}
           className={cn(
-            "rounded-md border-0 p-3 transition-colors",
+            "min-w-0 rounded-lg border bg-card/40 p-3 transition-colors",
             focusedField === "title" && "bg-accent",
           )}
           onFocus={() => onFieldFocus("title")}
@@ -477,34 +493,38 @@ export function LiveEditFieldPanel({
             />
           </div>
         </fieldset>
-
-        <FormProvider siteId={siteId}>
-          {displayMapped.map((field) => renderNamedField(field))}
-
-          {displayUnmapped.length > 0 && (
-            <div className="border-t pt-3">
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 py-2 text-xs font-medium text-muted-foreground hover:text-foreground"
-                onClick={() => setShowUnmapped(!showUnmapped)}
-              >
-                <ChevronDown
-                  className={cn(
-                    "h-3 w-3 transition-transform",
-                    !showUnmapped && "-rotate-90",
-                  )}
-                />
-                Unmapped fields ({displayUnmapped.length})
-              </button>
-              {showUnmapped && (
-                <div className="space-y-4 pt-2">
-                  {displayUnmapped.map((field) => renderNamedField(field))}
-                </div>
-              )}
-            </div>
-          )}
-        </FormProvider>
       </div>
-    </ScrollArea>
+
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="min-w-0 space-y-5 p-4">
+          <FormProvider siteId={siteId}>
+            {displayMapped.map((field) => renderNamedField(field))}
+
+            {displayUnmapped.length > 0 && (
+              <div className="border-t pt-3">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 py-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowUnmapped(!showUnmapped)}
+                >
+                  <ChevronDown
+                    className={cn(
+                      "h-3 w-3 transition-transform",
+                      !showUnmapped && "-rotate-90",
+                    )}
+                  />
+                  Unmapped fields ({displayUnmapped.length})
+                </button>
+                {showUnmapped && (
+                  <div className="min-w-0 space-y-4 pt-2">
+                    {displayUnmapped.map((field) => renderNamedField(field))}
+                  </div>
+                )}
+              </div>
+            )}
+          </FormProvider>
+        </div>
+      </ScrollArea>
+    </div>
   );
 }

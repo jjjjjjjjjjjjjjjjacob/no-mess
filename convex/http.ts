@@ -312,6 +312,8 @@ http.route({
     const entrySlug = pathParts[1]; // undefined if listing
     const previewRequested = url.searchParams.get("preview") === "true";
     const fresh = url.searchParams.get("fresh") === "true";
+    const images =
+      url.searchParams.get("images") === "rich" ? ("rich" as const) : undefined;
     const expandResult = parseExpandTargets(url);
     if (!expandResult.ok) {
       return expandResult.error;
@@ -344,6 +346,7 @@ http.route({
           slug: entrySlug,
           preview: isPreview,
           expand: expandResult.expand,
+          images,
         },
       );
 
@@ -363,6 +366,7 @@ http.route({
         // biome-ignore lint/suspicious/noExplicitAny: Convex ID type coercion
         siteId: site._id as any,
         expand: expandResult.expand,
+        images,
       },
     );
 

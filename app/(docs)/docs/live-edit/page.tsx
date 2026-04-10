@@ -9,9 +9,9 @@ export default function LiveEditPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Live Edit</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Edit fields in the dashboard, see unsaved changes instantly inside the
-          iframe only, and jump from the rendered page back to the matching
-          field.
+          Live Edit is the primary place to author delivered content. Edit the
+          autosaved working draft, save named draft variations, and switch the
+          iframe between Draft and Production on the real page.
         </p>
       </div>
 
@@ -24,8 +24,8 @@ export default function LiveEditPage() {
 
       <DocsHeading>How It Works</DocsHeading>
       <p className="text-muted-foreground">
-        The route-aware provider exchanges draft content in the iframe, then
-        overlays editable DOM targets marked with{" "}
+        The route-aware provider exchanges the current working draft for the
+        iframe session, then overlays editable DOM targets marked with{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">
           data-no-mess-field
         </code>
@@ -33,8 +33,10 @@ export default function LiveEditPage() {
         <code className="rounded bg-muted px-1 font-mono text-xs">
           postMessage
         </code>
-        , and uses reported delivery URLs to reopen the correct route
-        automatically.
+        , and uses reported page URLs to reopen the correct route automatically.
+        In Draft view, the iframe safely replaces production content only inside
+        the iframe. In Production view, the dashboard loads the real published
+        page without draft overrides.
       </p>
 
       <DocsHeading>Deployed Routes</DocsHeading>
@@ -122,9 +124,9 @@ export default function SiteLayout({
           <code className="rounded bg-muted px-1 font-mono text-xs">
             useNoMessEditableEntry()
           </code>{" "}
-          anywhere a route renders an entry. It swaps in draft content, applies
-          unsaved field overrides, reports the current URL, and emits the
-          entry-bound handshake used by the dashboard warning states.
+          anywhere a route renders an entry. It swaps in the current working
+          draft, applies live field overrides, reports the current page URL, and
+          emits the entry-bound handshake used by the dashboard warning states.
         </p>
         <CodeBlock
           code={`"use client";
@@ -148,10 +150,12 @@ export function ProductStory({ entry }) {
 
       <DocsStep number={4} title="Open Live Edit from the dashboard">
         <p>
-          The iframe always starts in Live Edit. The dashboard URL bar opens the
-          most recent reported route, the saved-route dropdown lets you switch
-          to any stored URL, and <strong>Select to edit</strong> only toggles
-          overlay picking without turning off the live draft connection.
+          Live Edit is the default authoring flow. The iframe opens the most
+          recent reported page URL, autosaves the shared working draft, lets you
+          save named checkpoints with <strong>Save As Draft</strong>, and lets
+          you publish either the working draft or a saved draft from the publish
+          picker. <strong>Select to edit</strong> only toggles overlay picking
+          without turning off the draft connection.
         </p>
       </DocsStep>
 
@@ -206,6 +210,30 @@ export default nextConfig;`}
         </p>
       </DocsStep>
 
+      <DocsHeading>Draft Lifecycle</DocsHeading>
+      <div className="space-y-3 text-muted-foreground">
+        <p>
+          Every entry has one shared working draft. Live Edit autosaves that
+          working draft while editors type so the iframe and the form stay in
+          sync.
+        </p>
+        <p>
+          Saved drafts are named shared checkpoints or variants. Loading a saved
+          draft copies it into the working draft and refreshes the iframe with
+          that variation.
+        </p>
+        <p>
+          Publishing can use either the current working draft or a saved draft.
+          If you publish a saved draft, that content also becomes the new
+          working draft so the editor and production stay aligned.
+        </p>
+        <p>
+          Use the <strong>Draft</strong> and <strong>Production</strong> toggle
+          to compare staged changes against the live page. Desktop, tablet, and
+          mobile presets, manual resize, and zoom all apply inside the iframe.
+        </p>
+      </div>
+
       <DocsHeading>React APIs</DocsHeading>
       <div className="overflow-x-auto">
         <table className="mt-2 w-full text-sm">
@@ -254,15 +282,19 @@ export default nextConfig;`}
       <DocsHeading>Dashboard Behavior</DocsHeading>
       <div className="space-y-3 text-muted-foreground">
         <p>
-          The URL bar persists the last route used for the entry. Reported URLs
-          from public page views and manually added URLs both appear in the
+          The URL bar persists the last page URL used for the entry. Reported
+          page URLs from public views and manually added URLs both appear in the
           dropdown.
         </p>
         <p>
+          Live Edit can switch between Draft and Production without leaving the
+          page, so editors can compare staged changes against production in the
+          same workspace.
+        </p>
+        <p>
           The standard content editor exposes an <strong>Advanced</strong> /
-          <strong>Delivery URLs</strong> section where editors can add, remove,
-          and reorder the Live Edit default route without leaving the entry
-          page.
+          <strong>Page URLs</strong> section where editors can add, remove, and
+          reorder the default Live Edit route without leaving the entry page.
         </p>
       </div>
 
@@ -307,8 +339,8 @@ export default nextConfig;`}
       <DocsHeading>Troubleshooting</DocsHeading>
       <div className="space-y-3 text-muted-foreground">
         <p>
-          If the iframe updates only after save, confirm the page renders the
-          entry through{" "}
+          If draft changes do not appear immediately, confirm the page renders
+          the entry through{" "}
           <code className="rounded bg-muted px-1 font-mono text-xs">
             useNoMessEditableEntry()
           </code>{" "}
@@ -316,7 +348,7 @@ export default nextConfig;`}
         </p>
         <p>
           If the route opens but the wrong content is shown, verify the route is
-          reporting the selected entry ID and that duplicate URLs are not
+          reporting the selected entry ID and that duplicate page URLs are not
           pointing at different entry types.
         </p>
         <p>

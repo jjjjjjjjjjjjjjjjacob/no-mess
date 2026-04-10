@@ -60,8 +60,8 @@ export default function PreviewPage() {
 
       <DocsHeading>Route-Aware Live Edit</DocsHeading>
       <p className="text-muted-foreground">
-        The canonical deployed-site shape is a server component that fetches
-        with{" "}
+        Live Edit is the primary authoring flow. The canonical deployed-site
+        shape is a server component that fetches with{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">
           cache: "no-store"
         </code>{" "}
@@ -69,7 +69,8 @@ export default function PreviewPage() {
         <code className="rounded bg-muted px-1 font-mono text-xs">
           useNoMessEditableEntry()
         </code>
-        .
+        . The dashboard uses that bridge to swap in the current working draft on
+        real routes without changing production until publish.
       </p>
 
       <DocsStep number={1} title="Server component">
@@ -149,7 +150,8 @@ export function BlogArticle({ entry }) {
         <code className="rounded bg-muted px-1 font-mono text-xs">
           useNoMessEditableEntry()
         </code>
-        . If you need to report manually, use the client method below:
+        . It stores the current page URL so Live Edit can reopen the correct
+        route. If you need to report manually, use the client method below:
       </p>
       <CodeBlock
         code={`import { createBrowserNoMessClient } from "@no-mess/client/next";
@@ -223,8 +225,8 @@ await client.reportLiveEditRoute({
                 </code>
               </td>
               <td className="py-2">
-                Binds the current route to an entry and returns draft/override
-                content when active.
+                Binds the current route to an entry, returns working-draft
+                content when active, and reports the page URL.
               </td>
             </tr>
             <tr>

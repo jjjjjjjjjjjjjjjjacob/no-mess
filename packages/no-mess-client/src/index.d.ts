@@ -1,5 +1,5 @@
 export { NoMessClient } from "./client.js";
-export type { GetEntryOptions, NoMessClientConfig, NoMessEntry, PreviewExchangeResult, PreviewHandlerConfig, PreviewSessionAuth, ShopifyCollection, ShopifyProduct, UseNoMessPreviewConfig, UseNoMessPreviewResult, } from "./types.js";
+export type { ContentImageMode, GetEntryOptions, NoMessClientConfig, NoMessEntry, NoMessImage, NoMessImageVariant, PreviewExchangeResult, PreviewHandlerConfig, PreviewSessionAuth, ShopifyCollection, ShopifyProduct, UseNoMessPreviewConfig, UseNoMessPreviewResult, } from "./types.js";
 export { DEFAULT_ADMIN_ORIGIN, DEFAULT_API_URL, NoMessError } from "./types.js";
 import { NoMessClient } from "./client.js";
 import type { NoMessClientConfig, PreviewHandlerConfig } from "./types.js";
@@ -27,4 +27,9 @@ export declare function createPreviewHandler(config: PreviewHandlerConfig): {
     start: () => void;
     cleanup: () => void;
 };
+import type { NoMessImage } from "./types.js";
+/**
+ * Build an HTML srcset string from a NoMessImage returned by the `?images=rich` API.
+ */
+export declare function buildSrcSet(image: NoMessImage): string;
 //# sourceMappingURL=index.d.ts.map

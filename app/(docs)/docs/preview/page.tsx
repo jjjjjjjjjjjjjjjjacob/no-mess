@@ -19,15 +19,15 @@ export default function PreviewPage() {
         </p>
       </div>
 
-      <DocsCallout type="info" title="Preview URL">
+      <DocsCallout type="info" title="Preview and Live Edit Base URL">
         <p>
-          In site settings, <strong>Preview URL</strong> is the base URL of your
-          site, for example{" "}
+          In site settings, <strong>Preview and Live Edit Base URL</strong> is
+          the base URL of your site, for example{" "}
           <code className="rounded bg-muted px-1 font-mono text-xs">
             https://mysite.com
           </code>
-          . no-mess uses it to build preview and Live Edit iframe URLs. It is no
-          longer just a preview-only endpoint.
+          . no-mess uses it to build preview and Live Edit iframe URLs, validate
+          saved page URLs, and normalize route reports.
         </p>
       </DocsCallout>
 
@@ -87,8 +87,8 @@ export default function MarketingLayout({
           <code className="rounded bg-muted px-1 font-mono text-xs">
             useNoMessEditableEntry()
           </code>
-          . This swaps in the active draft when the iframe session targets that
-          entry and reports the current route back to no-mess.
+          . This swaps in the current working draft when the iframe session
+          targets that entry and reports the current page URL back to no-mess.
         </p>
         <CodeBlock
           code={`"use client";
@@ -169,7 +169,7 @@ export default nextConfig;`}
         <code className="rounded bg-muted px-1 font-mono text-xs">
           useNoMessPreview
         </code>
-        . Live Edit falls back to this route when no real delivery URL has been
+        . Live Edit falls back to this route when no real page URL has been
         reported yet.
       </p>
       <CodeBlock
@@ -197,7 +197,7 @@ export default function PreviewPage() {
       <DocsHeading>Fallback Behavior</DocsHeading>
       <p className="text-muted-foreground">
         no-mess chooses the most recent reported route for an entry when Live
-        Edit opens. If no route has been reported, it falls back to{" "}
+        Edit opens. If no page URL has been reported, it falls back to{" "}
         <code className="rounded bg-muted px-1 font-mono text-xs">
           /no-mess-preview
         </code>
@@ -217,8 +217,8 @@ export default function PreviewPage() {
         </p>
         <p>
           If you do nothing, preview-only routes continue to work exactly as
-          before. You only miss real-route auto-navigation, stored delivery
-          URLs, and iframe-only unsaved updates on production routes.
+          before. You only miss real-route auto-navigation, stored page URLs,
+          and working-draft updates on production routes inside the iframe.
         </p>
         <p>
           Runtime delivery does not override framework routing limits. If you

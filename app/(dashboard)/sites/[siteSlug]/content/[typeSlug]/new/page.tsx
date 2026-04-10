@@ -14,6 +14,13 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useSite } from "@/hooks/use-site";
 
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export default function NewEntryPage() {
   const router = useRouter();
   const { site, siteSlug } = useSite();
@@ -93,10 +100,15 @@ export default function NewEntryPage() {
         title: nextTitle,
         draft: formData,
       });
+      const nextEntrySlug = isSingletonTemplate
+        ? contentType.slug
+        : slugify(nextTitle);
       router.push(
-        isSingletonTemplate
-          ? `/sites/${siteSlug}/content/${params.typeSlug}/${contentType.slug}`
-          : `/sites/${siteSlug}/content/${params.typeSlug}`,
+        site.previewUrl
+          ? `/sites/${siteSlug}/live-edit/${params.typeSlug}/${nextEntrySlug}`
+          : isSingletonTemplate
+            ? `/sites/${siteSlug}/content/${params.typeSlug}/${contentType.slug}`
+            : `/sites/${siteSlug}/content/${params.typeSlug}`,
       );
       toast.success("Entry created successfully");
     } catch (err) {

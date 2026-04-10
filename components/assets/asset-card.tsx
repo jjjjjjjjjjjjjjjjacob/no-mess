@@ -48,6 +48,8 @@ export function AssetCard({ asset, isSelected, onClick }: AssetCardProps) {
             src={asset.url}
             alt={asset.filename}
             className="h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
           />
         ) : (
           <FileText className="h-10 w-10 text-muted-foreground" />

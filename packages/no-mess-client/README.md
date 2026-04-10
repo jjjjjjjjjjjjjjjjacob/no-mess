@@ -184,8 +184,8 @@ export default function PreviewPage() {
 ## Route-Aware Preview and Live Edit
 
 This is the recommended integration path. It lets the dashboard open real site
-routes, apply unsaved iframe-only edits before publish, and store reported
-delivery URLs per entry.
+routes, overlay the current working draft before publish, and store reported
+page URLs per entry.
 
 ### 1. Wrap the route tree
 
@@ -240,8 +240,8 @@ delivery and pass it to a client component that calls
 `useNoMessEditableEntry(entry)`.
 
 `useNoMessEditableEntry()` automatically:
-- swaps in draft content for the active iframe session
-- applies unsaved field overrides from Live Edit
+- swaps in the current working draft for the active iframe session
+- applies live field overrides from Live Edit before publish
 - reports the current URL for route-aware reopening
 - emits the entry-bound signal used by dashboard warnings
 
@@ -304,7 +304,7 @@ caches.
 | Method | Description |
 |--------|-------------|
 | `client.exchangePreviewSession(session)` | Exchange a preview session token for draft content |
-| `client.reportLiveEditRoute({ entryId, url? })` | Report the current delivery URL for route-aware Live Edit |
+| `client.reportLiveEditRoute({ entryId, url? })` | Report the current page URL for route-aware Live Edit |
 
 ### React (`@no-mess/client/react`)
 
@@ -329,7 +329,7 @@ If you already use `useNoMessPreview()` and `useNoMessLiveEdit()` on
 4. Add `data-no-mess-field` annotations or `NoMessField` wrappers.
 
 If you do nothing, the legacy preview route keeps working. You only miss the
-route-aware Live Edit workflow.
+route-aware Live Edit workflow with working-draft previews on real routes.
 
 ## License
 

@@ -63,7 +63,7 @@ export function DeliveryUrlsCard({
   const handleSetDefault = async (url: string) => {
     try {
       await selectRoute({ entryId, url });
-      toast.success("Live Edit default route updated");
+      toast.success("Default page URL updated");
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to update route",
@@ -83,16 +83,16 @@ export function DeliveryUrlsCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Delivery URLs</CardTitle>
+        <CardTitle>Page URLs</CardTitle>
         <CardDescription>
-          Reported and manual routes for this entry. Live Edit opens the most
-          recent default route first.
+          Reported and manual page routes for this entry. Live Edit opens the
+          default page URL first and uses it for draft and production views.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {!previewUrl && (
           <p className="text-sm text-muted-foreground">
-            Configure a site preview URL before adding or using delivery URLs.
+            Configure the site base URL before adding or using page URLs.
           </p>
         )}
 
@@ -115,8 +115,8 @@ export function DeliveryUrlsCard({
           <p className="text-sm text-muted-foreground">Loading URLs...</p>
         ) : routes.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No delivery URLs yet. Once a route is reported from the site, it
-            will appear here.
+            No page URLs yet. Once a route is reported from the site, it will
+            appear here.
           </p>
         ) : (
           <div className="space-y-3">
@@ -147,7 +147,7 @@ export function DeliveryUrlsCard({
                     onClick={() => handleSetDefault(route.url)}
                     disabled={index === 0}
                   >
-                    Use in Live Edit
+                    Use as Default
                   </Button>
                   <Button
                     variant="ghost"

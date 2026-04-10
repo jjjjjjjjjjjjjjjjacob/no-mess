@@ -91,6 +91,8 @@ export function ShopifyCollectionField({
             src={selectedCollection.image}
             alt={selectedCollection.title}
             className="h-10 w-10 rounded object-cover"
+            loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className="flex h-10 w-10 items-center justify-center rounded bg-muted">
@@ -165,6 +167,8 @@ export function ShopifyCollectionField({
                   src={collection.image}
                   alt={collection.title}
                   className="h-8 w-8 rounded object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
               ) : (
                 <div className="flex h-8 w-8 items-center justify-center rounded bg-muted">

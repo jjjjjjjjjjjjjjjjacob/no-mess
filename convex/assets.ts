@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { internalQuery, mutation, query } from "./_generated/server";
 import { requireSiteAccess } from "./lib/access";
 import { getCurrentUser } from "./lib/auth";
 
@@ -44,6 +45,11 @@ export const create = mutation({
       throw new ConvexError("Failed to get storage URL");
     }
 
+    const isOptimizable =
+      args.mimeType.startsWith("image/") &&
+      !args.mimeType.includes("svg") &&
+      args.mimeType !== "image/gif";
+
     const assetId = await ctx.db.insert("assets", {
       siteId: args.siteId,
       storageId: args.storageId,
@@ -56,7 +62,16 @@ export const create = mutation({
       url,
       uploadedAt: Date.now(),
       uploadedBy: user._id,
+      optimizationStatus: isOptimizable ? "pending" : "skipped",
     });
+
+    if (isOptimizable) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.imageOptimization.optimizeImage,
+        { assetId },
+      );
+    }
 
     return assetId;
   },
@@ -92,6 +107,18 @@ export const remove = mutation({
     await requireSiteAccess(ctx, asset.siteId);
 
     await ctx.storage.delete(asset.storageId);
+    if (asset.optimizedStorageId) {
+      await ctx.storage.delete(asset.optimizedStorageId);
+    }
+    // Delete responsive variants
+    const variants = await ctx.db
+      .query("assetVariants")
+      .withIndex("by_asset", (q) => q.eq("assetId", args.assetId))
+      .collect();
+    for (const variant of variants) {
+      await ctx.storage.delete(variant.storageId);
+      await ctx.db.delete(variant._id);
+    }
     await ctx.db.delete(args.assetId);
   },
 });
@@ -125,5 +152,14 @@ export const listBySite = query({
       .collect();
 
     return assets.sort((a, b) => b.uploadedAt - a.uploadedAt);
+  },
+});
+
+export const getInternal = internalQuery({
+  args: {
+    assetId: v.id("assets"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.assetId);
   },
 });
