@@ -4,6 +4,8 @@ import { internalQuery, mutation, query } from "./_generated/server";
 import { requireSiteAccess } from "./lib/access";
 import { getCurrentUser } from "./lib/auth";
 
+const SKIP_OPTIMIZATION_MIME_TYPES = new Set(["image/svg+xml", "image/gif"]);
+
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
@@ -47,8 +49,7 @@ export const create = mutation({
 
     const isOptimizable =
       args.mimeType.startsWith("image/") &&
-      !args.mimeType.includes("svg") &&
-      args.mimeType !== "image/gif";
+      !SKIP_OPTIMIZATION_MIME_TYPES.has(args.mimeType);
 
     const assetId = await ctx.db.insert("assets", {
       siteId: args.siteId,

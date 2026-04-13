@@ -249,11 +249,7 @@ function collectShopifyHandles(
 }
 
 async function buildAssetUrlMap(
-  getAsset: (assetId: Id<"assets">) => Promise<{
-    siteId: Id<"sites">;
-    url: string;
-    optimizedUrl?: string;
-  } | null>,
+  ctx: QueryCtx,
   siteId: Id<"sites">,
   assetIds: Iterable<string>,
 ) {
@@ -264,7 +260,7 @@ async function buildAssetUrlMap(
 
   const assets = await Promise.all(
     uniqueAssetIds.map(async (assetId) => {
-      const asset = await getAsset(assetId as Id<"assets">);
+      const asset = await ctx.db.get(assetId as Id<"assets">);
       return [assetId, asset] as const;
     }),
   );
@@ -296,6 +292,10 @@ interface AssetData {
   originalMimeType?: string;
   variants?: AssetVariantData[];
 }
+
+type AssetContentMap =
+  | { kind: "plain"; map: Map<string, string> }
+  | { kind: "rich"; map: Map<string, AssetData> };
 
 async function buildAssetDataMap(
   ctx: QueryCtx,
@@ -359,6 +359,48 @@ async function buildAssetDataMap(
   }
 
   return assetDataMap;
+}
+
+async function buildAssetContentMap(
+  ctx: QueryCtx,
+  siteId: Id<"sites">,
+  assetIds: Iterable<string>,
+  images?: "rich",
+): Promise<AssetContentMap> {
+  if (images === "rich") {
+    return {
+      kind: "rich",
+      map: await buildAssetDataMap(ctx, siteId, assetIds),
+    };
+  }
+
+  return {
+    kind: "plain",
+    map: await buildAssetUrlMap(ctx, siteId, assetIds),
+  };
+}
+
+function resolveAssetBackedEntryContent(
+  fields: Field[],
+  content: Record<string, unknown> | null | undefined,
+  assetContentMap: AssetContentMap,
+  fragments: Map<string, NormalizedContentType>,
+) {
+  if (assetContentMap.kind === "rich") {
+    return resolveAssetBackedContentRich(
+      fields,
+      content,
+      assetContentMap.map,
+      fragments,
+    );
+  }
+
+  return resolveAssetBackedContent(
+    fields,
+    content,
+    assetContentMap.map,
+    fragments,
+  );
 }
 
 function resolveAnonymousFieldValueRich(
@@ -766,7 +808,7 @@ export const getByIdInternal = internalQuery({
     const fragments = await getSiteFragments(ctx, entry.siteId);
     const draftContent = (entry.draft as Record<string, unknown>) ?? {};
     const assetUrls = await buildAssetUrlMap(
-      async (assetId) => await ctx.db.get(assetId),
+      ctx,
       entry.siteId,
       collectAssetIds(contentType?.fields ?? [], draftContent, fragments),
     );
@@ -1143,11 +1185,12 @@ export const listPublishedByType = internalQuery({
         fragments,
       ),
     );
-    const getAsset = async (assetId: Id<"assets">) => await ctx.db.get(assetId);
-    const assetUrls =
-      args.images === "rich"
-        ? await buildAssetDataMap(ctx, args.siteId, allAssetIds)
-        : await buildAssetUrlMap(getAsset, args.siteId, allAssetIds);
+    const assetContentMap = await buildAssetContentMap(
+      ctx,
+      args.siteId,
+      allAssetIds,
+      args.images,
+    );
     const shopifyMaps = shouldExpandShopify
       ? await buildShopifyMaps(
           ctx,
@@ -1174,20 +1217,12 @@ export const listPublishedByType = internalQuery({
 
     return publishedEntries.map((entry) => {
       const content = (entry.published as Record<string, unknown>) ?? {};
-      const resolvedContent =
-        assetUrls instanceof Map && args.images === "rich"
-          ? resolveAssetBackedContentRich(
-              contentType?.fields ?? [],
-              content,
-              assetUrls as Map<string, AssetData>,
-              fragments,
-            )
-          : resolveAssetBackedContent(
-              contentType?.fields ?? [],
-              content,
-              assetUrls as Map<string, string>,
-              fragments,
-            );
+      const resolvedContent = resolveAssetBackedEntryContent(
+        contentType?.fields ?? [],
+        content,
+        assetContentMap,
+        fragments,
+      );
 
       return {
         slug: entry.slug,
@@ -1252,11 +1287,12 @@ export const getBySlugInternal = internalQuery({
       content,
       fragments,
     );
-    const getAsset = async (assetId: Id<"assets">) => await ctx.db.get(assetId);
-    const assetUrls =
-      args.images === "rich"
-        ? await buildAssetDataMap(ctx, args.siteId, allAssetIds)
-        : await buildAssetUrlMap(getAsset, args.siteId, allAssetIds);
+    const assetContentMap = await buildAssetContentMap(
+      ctx,
+      args.siteId,
+      allAssetIds,
+      args.images,
+    );
     const shopifyMaps = shouldExpandShopify
       ? await buildShopifyMaps(
           ctx,
@@ -1268,20 +1304,12 @@ export const getBySlugInternal = internalQuery({
           collections: new Map<string, unknown>(),
         };
 
-    const resolvedContent =
-      args.images === "rich"
-        ? resolveAssetBackedContentRich(
-            contentType?.fields ?? [],
-            content,
-            assetUrls as Map<string, AssetData>,
-            fragments,
-          )
-        : resolveAssetBackedContent(
-            contentType?.fields ?? [],
-            content,
-            assetUrls as Map<string, string>,
-            fragments,
-          );
+    const resolvedContent = resolveAssetBackedEntryContent(
+      contentType?.fields ?? [],
+      content,
+      assetContentMap,
+      fragments,
+    );
 
     return {
       slug: entry.slug,

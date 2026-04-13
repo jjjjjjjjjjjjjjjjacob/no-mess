@@ -142,9 +142,11 @@ export default defineSchema({
         v.literal("skipped"),
       ),
     ),
+    optimizationError: v.optional(v.string()),
   })
     .index("by_site", ["siteId"])
-    .index("by_site_checksum", ["siteId", "checksum"]),
+    .index("by_site_checksum", ["siteId", "checksum"])
+    .index("by_optimization_status", ["optimizationStatus"]),
 
   assetVariants: defineTable({
     assetId: v.id("assets"),

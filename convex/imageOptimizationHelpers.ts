@@ -1,13 +1,11 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 
-// MIME types that should skip optimization
-const SKIP_MIME_TYPES = new Set([
-  "image/svg+xml",
-  "image/gif", // GIFs may be animated — preserve as-is
-]);
-
 const BACKFILL_BATCH_SIZE = 10;
+const IMAGE_MIME_TYPE_PREFIX = "image/";
+const IMAGE_MIME_TYPE_PREFIX_UPPER_BOUND = "image0";
+const SVG_MIME_TYPE = "image/svg+xml";
+const GIF_MIME_TYPE = "image/gif";
 
 // === Internal Mutations ===
 
@@ -26,6 +24,7 @@ export const saveOptimizedResult = internalMutation({
       optimizedSize: args.optimizedSize,
       optimizedMimeType: args.optimizedMimeType,
       optimizationStatus: "completed" as const,
+      optimizationError: undefined,
     });
   },
 });
@@ -40,10 +39,12 @@ export const setOptimizationStatus = internalMutation({
       v.literal("failed"),
       v.literal("skipped"),
     ),
+    error: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.assetId, {
       optimizationStatus: args.status,
+      optimizationError: args.status === "failed" ? args.error : undefined,
     });
   },
 });
@@ -94,14 +95,19 @@ export const deleteVariantsForAsset = internalMutation({
 export const listUnoptimized = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const allAssets = await ctx.db.query("assets").collect();
-    return allAssets
-      .filter(
-        (asset) =>
-          asset.optimizationStatus === undefined &&
-          asset.mimeType.startsWith("image/") &&
-          !SKIP_MIME_TYPES.has(asset.mimeType),
+    return await ctx.db
+      .query("assets")
+      .withIndex("by_optimization_status", (q) =>
+        q.eq("optimizationStatus", undefined),
       )
-      .slice(0, BACKFILL_BATCH_SIZE);
+      .filter((q) =>
+        q.and(
+          q.gte(q.field("mimeType"), IMAGE_MIME_TYPE_PREFIX),
+          q.lt(q.field("mimeType"), IMAGE_MIME_TYPE_PREFIX_UPPER_BOUND),
+          q.neq(q.field("mimeType"), SVG_MIME_TYPE),
+          q.neq(q.field("mimeType"), GIF_MIME_TYPE),
+        ),
+      )
+      .take(BACKFILL_BATCH_SIZE);
   },
 });

@@ -52,7 +52,7 @@ export function DeliveryUrlsCard({
     try {
       await addManualRoute({ entryId, url: newUrl.trim() });
       setNewUrl("");
-      toast.success("Delivery URL added");
+      toast.success("Page URL created");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to add URL");
     } finally {
@@ -63,7 +63,7 @@ export function DeliveryUrlsCard({
   const handleSetDefault = async (url: string) => {
     try {
       await selectRoute({ entryId, url });
-      toast.success("Default page URL updated");
+      toast.success("Page URL updated");
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to update route",
@@ -74,7 +74,7 @@ export function DeliveryUrlsCard({
   const handleRemove = async (routeId: Id<"contentEntryRoutes">) => {
     try {
       await removeRoute({ routeId });
-      toast.success("Delivery URL removed");
+      toast.success("Page URL deleted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to remove URL");
     }

@@ -295,22 +295,24 @@ export default function EditEntryPage() {
   const editorContent = (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">
-            Edit: {entry.title}
-          </h2>
-          <Badge
-            variant={entry.status === "published" ? "default" : "secondary"}
-          >
-            {entry.status}
-          </Badge>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-xl font-semibold tracking-tight">
+              Edit: {entry.title}
+            </h2>
+            <Badge
+              variant={entry.status === "published" ? "default" : "secondary"}
+            >
+              {entry.status}
+            </Badge>
+          </div>
+          {canPreview && (
+            <p className="text-sm text-muted-foreground">
+              Live Edit is the primary authoring workspace for this entry. Use
+              details, URLs, and publish controls here when you need them.
+            </p>
+          )}
         </div>
-        {canPreview && (
-          <p className="text-sm text-muted-foreground">
-            Live Edit is the primary authoring workspace for this entry. Use
-            details, URLs, and publish controls here when you need them.
-          </p>
-        )}
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           {canPreview ? (
             <Button

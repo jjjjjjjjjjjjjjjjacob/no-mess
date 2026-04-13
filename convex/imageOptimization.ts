@@ -14,6 +14,7 @@ async function getSharp() {
 
 const WEBP_QUALITY = 80;
 const BACKFILL_STAGGER_MS = 2_000;
+const FETCH_TIMEOUT_MS = 10_000;
 
 // Responsive breakpoint widths — only generate variants smaller than the original
 const VARIANT_WIDTHS = [320, 640, 1024, 1536, 2048];
@@ -23,6 +24,31 @@ const SKIP_MIME_TYPES = new Set([
   "image/svg+xml",
   "image/gif", // GIFs may be animated — preserve as-is
 ]);
+
+function formatOptimizationError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+  return String(error);
+}
+
+async function fetchAssetWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        `Timed out fetching image after ${FETCH_TIMEOUT_MS}ms: ${url}`,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 // === Internal Actions ===
 
@@ -59,7 +85,7 @@ export const optimizeImage = internalAction({
 
     try {
       // Fetch the original image
-      const response = await fetch(asset.url);
+      const response = await fetchAssetWithTimeout(asset.url);
       if (!response.ok) {
         throw new Error(
           `Failed to fetch image: ${response.status} ${response.statusText}`,
@@ -153,10 +179,19 @@ export const optimizeImage = internalAction({
           size: variantBuffer.byteLength,
         });
       }
-    } catch {
+    } catch (error) {
+      console.error("Image optimization failed", {
+        assetId: args.assetId,
+        assetUrl: asset.url,
+        error,
+      });
       await ctx.runMutation(
         internal.imageOptimizationHelpers.setOptimizationStatus,
-        { assetId: args.assetId, status: "failed" },
+        {
+          assetId: args.assetId,
+          status: "failed",
+          error: formatOptimizationError(error),
+        },
       );
     }
   },

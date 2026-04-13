@@ -42,6 +42,7 @@ export function LiveEditToolbar({
           variant="ghost"
           size="icon"
           className="h-8 w-8"
+          aria-label="Back to entry"
           render={<Link href={backHref} />}
         >
           <ArrowLeft className="h-4 w-4" />

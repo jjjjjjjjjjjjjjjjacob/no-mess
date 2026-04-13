@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { slugify } from "@/lib/slugify";
 
 interface CreateSiteStepProps {
   onComplete: (data: {
@@ -14,13 +15,6 @@ interface CreateSiteStepProps {
     slug: string;
     name: string;
   }) => void;
-}
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 }
 
 export function CreateSiteStep({ onComplete }: CreateSiteStepProps) {

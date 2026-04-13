@@ -90,15 +90,11 @@ export function EntryContextMenu({
   const canPublishDraft = entry.status === "draft" || hasDraftChanges;
 
   const openEntry = () => {
-    router.push(previewUrl ? liveEditPath : detailsPath);
+    router.push(detailsPath);
   };
 
   const openLiveEdit = () => {
     router.push(liveEditPath);
-  };
-
-  const openDetails = () => {
-    router.push(detailsPath);
   };
 
   const publishEntryWithOptions = async (options?: {
@@ -207,18 +203,12 @@ export function EntryContextMenu({
         <ContextMenuContent className="w-56">
           <ContextMenuItem onClick={openEntry}>
             <ArrowRight className="h-4 w-4" />
-            {previewUrl ? "Open Live Edit" : "Open Entry"}
+            Open Entry
           </ContextMenuItem>
           {previewUrl && (
             <ContextMenuItem onClick={openLiveEdit}>
               <MousePointerClick className="h-4 w-4" />
               Open Live Edit
-            </ContextMenuItem>
-          )}
-          {previewUrl && (
-            <ContextMenuItem onClick={openDetails}>
-              <ArrowRight className="h-4 w-4" />
-              Open Details
             </ContextMenuItem>
           )}
           <ContextMenuItem

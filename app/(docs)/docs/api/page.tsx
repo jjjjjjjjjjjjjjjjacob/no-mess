@@ -122,7 +122,7 @@ Content-Type: application/json
             .
           </p>
           <p>
-            The site preview and Live Edit base URL determines which origins and
+            The site preview and Live Edit base URL determine which origins and
             path prefixes are valid.
           </p>
           <p>

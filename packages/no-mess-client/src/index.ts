@@ -84,6 +84,8 @@ export function buildSrcSet(image: NoMessImage): string {
   );
   if (image.width) {
     sources.push(`${image.url} ${image.width}w`);
+  } else {
+    sources.push(image.url);
   }
   return sources.join(", ");
 }

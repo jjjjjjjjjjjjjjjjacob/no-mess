@@ -2,7 +2,10 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ChangeEvent, ReactNode } from "react";
 import { useState } from "react";
+import type { Id } from "@/convex/_generated/dataModel";
 import { LiveEditPreviewPanel } from "../live-edit-preview-panel";
+
+const mockEntryId = "entry_1" as Id<"contentEntries">;
 
 const { mockCreateSession, mockSelectRoute, mockRoutes } = vi.hoisted(() => ({
   mockCreateSession: vi.fn(),
@@ -173,7 +176,7 @@ describe("LiveEditPreviewPanel", () => {
 
     render(
       <LiveEditPreviewPanel
-        entryId={"entry_1" as never}
+        entryId={mockEntryId}
         previewUrl="http://localhost:3456"
         liveValues={{}}
         viewMode="draft"
@@ -210,7 +213,7 @@ describe("LiveEditPreviewPanel", () => {
 
     render(
       <LiveEditPreviewPanel
-        entryId={"entry_1" as never}
+        entryId={mockEntryId}
         previewUrl="http://localhost:3456"
         liveValues={{}}
         viewMode="draft"
@@ -244,7 +247,7 @@ describe("LiveEditPreviewPanel", () => {
 
     render(
       <LiveEditPreviewPanel
-        entryId={"entry_1" as never}
+        entryId={mockEntryId}
         previewUrl="http://localhost:3456"
         liveValues={{}}
         viewMode="draft"
@@ -284,7 +287,7 @@ describe("LiveEditPreviewPanel", () => {
 
       return (
         <LiveEditPreviewPanel
-          entryId={"entry_1" as never}
+          entryId={mockEntryId}
           previewUrl="http://localhost:3456"
           liveValues={{}}
           viewMode={viewMode}

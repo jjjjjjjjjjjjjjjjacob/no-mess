@@ -834,13 +834,19 @@ export function LiveEditLayout() {
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[55vh]">
-            <div className="space-y-3 pr-4">
+            <div
+              role="radiogroup"
+              aria-label="Publish target"
+              className="space-y-3 pr-4"
+            >
               {publishChoices.map((choice) => {
                 const isSelected = selectedPublishTarget === choice.value;
                 return (
                   <button
                     key={String(choice.value)}
                     type="button"
+                    role="radio"
+                    aria-checked={isSelected}
                     className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-colors ${
                       isSelected
                         ? "border-primary bg-primary/5"

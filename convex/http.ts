@@ -264,6 +264,28 @@ function parseExpandTargets(url: URL) {
   };
 }
 
+function parseImagesMode(url: URL) {
+  const images = url.searchParams.get("images");
+  if (!images) {
+    return {
+      ok: true as const,
+      images: undefined,
+    };
+  }
+
+  if (images === "rich") {
+    return {
+      ok: true as const,
+      images: "rich" as const,
+    };
+  }
+
+  return {
+    ok: false as const,
+    error: corsJsonError(`Unsupported images value: ${images}`, 400),
+  };
+}
+
 function getRequestOrigin(request: Request): string | null {
   const origin = request.headers.get("Origin");
   if (origin) {
@@ -312,8 +334,11 @@ http.route({
     const entrySlug = pathParts[1]; // undefined if listing
     const previewRequested = url.searchParams.get("preview") === "true";
     const fresh = url.searchParams.get("fresh") === "true";
-    const images =
-      url.searchParams.get("images") === "rich" ? ("rich" as const) : undefined;
+    const imagesResult = parseImagesMode(url);
+    if (!imagesResult.ok) {
+      return imagesResult.error;
+    }
+    const images = imagesResult.images;
     const expandResult = parseExpandTargets(url);
     if (!expandResult.ok) {
       return expandResult.error;
