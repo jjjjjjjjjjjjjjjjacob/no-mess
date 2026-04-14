@@ -1,6 +1,7 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { generateContentTypeSource } from "@no-mess/client/schema";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { Code, Save, Trash2, Undo2, Upload } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -9,6 +10,7 @@ import {
   ContentTypeForm,
   type ContentTypeFormData,
 } from "@/components/content-types/content-type-form";
+import { PublishCascadeDialog } from "@/components/publishing/publish-cascade-dialog";
 import { SchemaExportPanel } from "@/components/schemas/schema-export-panel";
 import { SchemaImportDialog } from "@/components/schemas/schema-import-dialog";
 import {
@@ -35,7 +37,6 @@ import { useAnalytics } from "@/hooks/use-analytics";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { useSite } from "@/hooks/use-site";
 import { useBeforeUnload, useKeyboardSave } from "@/hooks/use-unsaved-changes";
-import { generateContentTypeSource } from "@/packages/no-mess-client/src/schema";
 
 function formatTimeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -51,6 +52,7 @@ function formatTimeAgo(timestamp: number): string {
 export default function EditSchemaPage() {
   const router = useRouter();
   const { site, siteSlug } = useSite();
+  const convex = useConvex();
   const params = useParams<{ typeSlug: string }>();
   const contentType = useQuery(
     api.contentTypes.getBySlug,
@@ -68,8 +70,19 @@ export default function EditSchemaPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
+  const [showCascadeDialog, setShowCascadeDialog] = useState(false);
+  const [cascadeTargets, setCascadeTargets] = useState<
+    {
+      kind: "template" | "fragment";
+      name: string;
+      slug: string;
+    }[]
+  >([]);
+  const [pendingCascadeSlugs, setPendingCascadeSlugs] = useState<string[]>([]);
 
   const formDataRef = useRef<ContentTypeFormData | null>(null);
+  const publishPreviewInFlightRef = useRef(false);
   const [isDirty, setIsDirty] = useState(false);
 
   // Derive status from content type
@@ -222,54 +235,155 @@ export default function EditSchemaPage() {
   useKeyboardSave(handleSaveDraft);
   useBeforeUnload(isDirty);
 
-  // Publish handler
-  const handlePublish = async () => {
-    if (!contentType || !formDataRef.current) return;
-    setIsPublishing(true);
-    try {
-      // Save draft first, then publish
-      await saveDraftMutation({
-        contentTypeId: contentType._id,
-        name: formDataRef.current.name,
-        slug: formDataRef.current.slug,
-        kind: formDataRef.current.kind,
-        mode:
-          formDataRef.current.kind === "template"
-            ? formDataRef.current.mode
-            : undefined,
-        route:
-          formDataRef.current.kind === "template"
-            ? formDataRef.current.route
-            : undefined,
-        description: formDataRef.current.description,
-        fields: formDataRef.current.fields,
-      });
-      await publishMutation({ contentTypeId: contentType._id });
-      setIsDirty(false);
-      analytics.trackSchemaPublished({
-        site_id: site?._id ?? "",
-        field_count: formDataRef.current.fields.length,
-        field_types: formDataRef.current.fields.map((f) => f.type),
-      });
-      toast.success("Schema published");
-      if (formDataRef.current.slug !== contentType.slug) {
-        router.replace(
-          `/sites/${siteSlug}/schemas/${formDataRef.current.slug}`,
-        );
+  const publishCurrentForm = useCallback(
+    async (options?: {
+      cascade?: boolean;
+      expectedCascadeSlugs?: string[];
+    }) => {
+      if (!contentType || !formDataRef.current) return;
+
+      const data = formDataRef.current;
+      setIsPublishing(true);
+      try {
+        await saveDraftMutation({
+          contentTypeId: contentType._id,
+          name: data.name,
+          slug: data.slug,
+          kind: data.kind,
+          mode: data.kind === "template" ? data.mode : undefined,
+          route: data.kind === "template" ? data.route : undefined,
+          description: data.description,
+          fields: data.fields,
+        });
+        await publishMutation({
+          contentTypeId: contentType._id,
+          cascade: options?.cascade,
+          expectedCascadeSlugs: options?.expectedCascadeSlugs,
+        });
+        setIsDirty(false);
+        analytics.trackSchemaPublished({
+          site_id: site?._id ?? "",
+          field_count: data.fields.length,
+          field_types: data.fields.map((field) => field.type),
+        });
+        toast.success("Schema published");
+        setShowCascadeDialog(false);
+        setCascadeTargets([]);
+        setPendingCascadeSlugs([]);
+        if (data.slug !== contentType.slug) {
+          router.replace(`/sites/${siteSlug}/schemas/${data.slug}`);
+        }
+      } finally {
+        setIsPublishing(false);
       }
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to publish schema",
-      );
-    } finally {
-      setIsPublishing(false);
+    },
+    [
+      analytics,
+      contentType,
+      publishMutation,
+      router,
+      saveDraftMutation,
+      site?._id,
+      siteSlug,
+    ],
+  );
+
+  const previewPublishPlan = useCallback(
+    async (data: ContentTypeFormData) => {
+      if (!contentType || !site) {
+        return null;
+      }
+
+      return await convex.query(api.contentTypes.previewPublishPlan, {
+        siteId: site._id,
+        contentTypeId: contentType._id,
+        name: data.name,
+        slug: data.slug,
+        kind: data.kind,
+        mode: data.kind === "template" ? data.mode : undefined,
+        route: data.kind === "template" ? data.route : undefined,
+        description: data.description,
+        fields: data.fields,
+      });
+    },
+    [contentType, convex, site],
+  );
+
+  const handlePublish = useCallback(async () => {
+    if (
+      !contentType ||
+      !formDataRef.current ||
+      !site ||
+      publishPreviewInFlightRef.current ||
+      isPreviewingPublish ||
+      isPublishing
+    ) {
+      return;
     }
-  };
+
+    const data = formDataRef.current;
+    publishPreviewInFlightRef.current = true;
+    setIsPreviewingPublish(true);
+
+    try {
+      const plan = await previewPublishPlan(data);
+
+      if (plan && plan.cascadeTargets.length > 0) {
+        setCascadeTargets(plan.cascadeTargets);
+        setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+        setShowCascadeDialog(true);
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to load schema publish plan", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load schema publish plan",
+      );
+      return;
+    } finally {
+      publishPreviewInFlightRef.current = false;
+      setIsPreviewingPublish(false);
+    }
+
+    try {
+      await publishCurrentForm();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to publish schema",
+      );
+    }
+  }, [
+    contentType,
+    isPreviewingPublish,
+    isPublishing,
+    previewPublishPlan,
+    publishCurrentForm,
+    site,
+  ]);
 
   // Legacy submit handler (used by the form's built-in submit)
   const handleSubmit = async (data: ContentTypeFormData) => {
     formDataRef.current = data;
     await handlePublish();
+  };
+
+  const handleCascadeConfirm = async () => {
+    if (isPublishing) {
+      return;
+    }
+
+    try {
+      await publishCurrentForm({
+        cascade: true,
+        expectedCascadeSlugs: pendingCascadeSlugs,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to publish schema",
+      );
+    }
   };
 
   // Discard draft handler
@@ -303,7 +417,7 @@ export default function EditSchemaPage() {
 
   if (contentType === undefined) {
     return (
-      <div className="max-w-2xl space-y-6">
+      <div className="max-w-5xl space-y-6">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -330,37 +444,35 @@ export default function EditSchemaPage() {
     ) : null;
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div>
+    <div className="max-w-5xl space-y-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0 space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-xl font-semibold tracking-tight">
               Edit: {contentType.name}
             </h2>
-            <div className="flex items-center gap-2">
-              <p className="text-sm text-muted-foreground">
-                {contentType.slug}
-              </p>
-              <Badge variant="outline">
-                {contentType.kind === "fragment"
-                  ? "Fragment"
-                  : contentType.mode === "singleton"
-                    ? "Singleton Template"
-                    : "Collection Template"}
-              </Badge>
-              {contentType.kind === "template" && contentType.route && (
-                <Badge variant="outline">{contentType.route}</Badge>
-              )}
-              {lastSavedAt && (
-                <p className="text-xs text-muted-foreground">
-                  Draft saved {formatTimeAgo(lastSavedAt)}
-                </p>
-              )}
-            </div>
+            {statusBadge}
           </div>
-          {statusBadge}
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm text-muted-foreground">{contentType.slug}</p>
+            <Badge variant="outline">
+              {contentType.kind === "fragment"
+                ? "Fragment"
+                : contentType.mode === "singleton"
+                  ? "Singleton Template"
+                  : "Collection Template"}
+            </Badge>
+            {contentType.kind === "template" && contentType.route && (
+              <Badge variant="outline">{contentType.route}</Badge>
+            )}
+            {lastSavedAt && (
+              <p className="text-xs text-muted-foreground">
+                Draft saved {formatTimeAgo(lastSavedAt)}
+              </p>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 xl:max-w-[40rem] xl:justify-end">
           <Button
             variant="outline"
             size="sm"
@@ -389,7 +501,9 @@ export default function EditSchemaPage() {
             variant="outline"
             size="sm"
             onClick={handleSaveDraft}
-            disabled={isSavingDraft || isPublishing || !isDirty}
+            disabled={
+              isSavingDraft || isPublishing || isPreviewingPublish || !isDirty
+            }
           >
             <Save className="mr-2 h-3 w-3" />
             {isSavingDraft ? "Saving..." : "Save Draft"}
@@ -397,7 +511,7 @@ export default function EditSchemaPage() {
           <Button
             size="sm"
             onClick={handlePublish}
-            disabled={isPublishing || isSavingDraft}
+            disabled={isPublishing || isSavingDraft || isPreviewingPublish}
           >
             <Upload className="mr-2 h-3 w-3" />
             {isPublishing ? "Publishing..." : "Publish"}
@@ -407,7 +521,7 @@ export default function EditSchemaPage() {
               variant="outline"
               size="sm"
               onClick={() => setShowDiscardDialog(true)}
-              disabled={isSavingDraft || isPublishing}
+              disabled={isSavingDraft || isPublishing || isPreviewingPublish}
             >
               <Undo2 className="mr-2 h-3 w-3" />
               Discard Draft
@@ -498,6 +612,14 @@ export default function EditSchemaPage() {
           siteId={site._id}
         />
       )}
+
+      <PublishCascadeDialog
+        open={showCascadeDialog}
+        onOpenChange={setShowCascadeDialog}
+        targets={cascadeTargets}
+        isConfirming={isPublishing}
+        onConfirm={handleCascadeConfirm}
+      />
     </div>
   );
 }

@@ -1,6 +1,11 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import {
+  type ContentTypeDefinition,
+  generateContentTypeSource,
+  type NamedFieldDefinition,
+} from "@no-mess/client/schema";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import {
   ArrowRight,
   Code,
@@ -12,8 +17,9 @@ import {
   Upload,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { PublishCascadeDialog } from "@/components/publishing/publish-cascade-dialog";
 import { SchemaExportPanel } from "@/components/schemas/schema-export-panel";
 import {
   AlertDialog,
@@ -42,11 +48,6 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import {
-  type ContentTypeDefinition,
-  generateContentTypeSource,
-  type NamedFieldDefinition,
-} from "@/packages/no-mess-client/src/schema";
 
 interface ContentTypeContextMenuProps {
   children: React.ReactNode;
@@ -107,6 +108,7 @@ export function ContentTypeContextMenu({
   type,
 }: ContentTypeContextMenuProps) {
   const router = useRouter();
+  const convex = useConvex();
   const analytics = useAnalytics();
   const { copy } = useCopyToClipboard();
   const contentType = useQuery(api.contentTypes.get, {
@@ -119,6 +121,18 @@ export function ContentTypeContextMenu({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showCascadeDialog, setShowCascadeDialog] = useState(false);
+  const [cascadeTargets, setCascadeTargets] = useState<
+    {
+      kind: "template" | "fragment";
+      name: string;
+      slug: string;
+    }[]
+  >([]);
+  const [pendingCascadeSlugs, setPendingCascadeSlugs] = useState<string[]>([]);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
+  const publishPlanInFlightRef = useRef(false);
 
   const source = useMemo<ContentTypeDefinition>(() => {
     if (!contentType) {
@@ -191,20 +205,75 @@ export function ContentTypeContextMenu({
     toast.success("Schema code copied");
   };
 
-  const handlePublish = async () => {
+  const publishSchema = async (options?: {
+    cascade?: boolean;
+    expectedCascadeSlugs?: string[];
+  }) => {
+    setIsPublishing(true);
     try {
-      await publishMutation({ contentTypeId: type._id });
+      await publishMutation({
+        contentTypeId: type._id,
+        cascade: options?.cascade,
+        expectedCascadeSlugs: options?.expectedCascadeSlugs,
+      });
       analytics.trackSchemaPublished({
         site_id: siteId,
         field_count: source.fields.length,
         field_types: source.fields.map((field) => field.type),
       });
       toast.success("Schema published");
+      setShowCascadeDialog(false);
+      setCascadeTargets([]);
+      setPendingCascadeSlugs([]);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to publish schema",
       );
+    } finally {
+      setIsPublishing(false);
     }
+  };
+
+  const handlePublish = async () => {
+    if (publishPlanInFlightRef.current || isPreviewingPublish || isPublishing) {
+      return;
+    }
+
+    publishPlanInFlightRef.current = true;
+    setIsPreviewingPublish(true);
+
+    try {
+      const plan = await convex.query(api.contentTypes.getPublishPlan, {
+        contentTypeId: type._id,
+      });
+
+      if (plan.cascadeTargets.length > 0) {
+        setCascadeTargets(plan.cascadeTargets);
+        setPendingCascadeSlugs(plan.expectedCascadeSlugs);
+        setShowCascadeDialog(true);
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to load schema publish plan", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load schema publish plan",
+      );
+      return;
+    } finally {
+      publishPlanInFlightRef.current = false;
+      setIsPreviewingPublish(false);
+    }
+
+    await publishSchema();
+  };
+
+  const handleCascadeConfirm = async () => {
+    await publishSchema({
+      cascade: true,
+      expectedCascadeSlugs: pendingCascadeSlugs,
+    });
   };
 
   const handleDiscardDraft = async () => {
@@ -266,7 +335,10 @@ export function ContentTypeContextMenu({
           )}
 
           {(type.status === "draft" || type.hasDraft) && (
-            <ContextMenuItem onClick={handlePublish}>
+            <ContextMenuItem
+              onClick={handlePublish}
+              disabled={isPreviewingPublish || isPublishing}
+            >
               <Upload className="h-4 w-4" />
               {type.status === "draft" ? "Publish Schema" : "Publish Changes"}
             </ContextMenuItem>
@@ -352,6 +424,14 @@ export function ContentTypeContextMenu({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PublishCascadeDialog
+        open={showCascadeDialog}
+        onOpenChange={setShowCascadeDialog}
+        targets={cascadeTargets}
+        isConfirming={isPublishing}
+        onConfirm={handleCascadeConfirm}
+      />
 
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
         <DialogContent className="sm:max-w-[90vw] max-h-[90vh]">

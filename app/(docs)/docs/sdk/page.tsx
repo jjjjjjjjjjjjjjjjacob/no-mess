@@ -18,14 +18,20 @@ export default function SdkPage() {
       </div>
 
       <DocsHeading>Server-Side Content Fetching</DocsHeading>
+      <p className="text-muted-foreground">
+        For deployed routes that should update immediately after publish and
+        support route-aware Live Edit, fetch content at request time.
+      </p>
       <CodeBlock
-        code={`import { createNoMessClient } from "@no-mess/client";
+        code={`import { createServerNoMessClient } from "@no-mess/client/next";
+import { getShopifyHandle } from "@no-mess/client";
 
-export const cms = createNoMessClient({
-  apiKey: process.env.NO_MESS_API_KEY!,
+export const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
 });
 
-const post = await cms.getEntry("blog-post", "hello-world");`}
+const homePage = await cms.getSingleton("home-page");
+const featuredHandle = getShopifyHandle(homePage?.featuredProduct);`}
         language="typescript"
         filename="lib/cms.ts"
       />
@@ -53,8 +59,40 @@ export default function PreviewPage() {
       />
 
       <DocsHeading>Route-Aware Live Edit</DocsHeading>
+      <p className="text-muted-foreground">
+        Live Edit is the primary authoring flow. The canonical deployed-site
+        shape is a server component that fetches with{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          cache: "no-store"
+        </code>{" "}
+        and a client component that calls{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          useNoMessEditableEntry()
+        </code>
+        . The dashboard uses that bridge to swap in the current working draft on
+        real routes without changing production until publish.
+      </p>
 
-      <DocsStep number={1} title="Provider">
+      <DocsStep number={1} title="Server component">
+        <CodeBlock
+          code={`import { createServerNoMessClient } from "@no-mess/client/next";
+import { BlogArticle } from "@/components/blog-article";
+
+const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});
+
+export default async function BlogPage() {
+  const entry = await cms.getEntry("blog-post", "hello-world");
+
+  return <BlogArticle entry={entry} />;
+}`}
+          language="tsx"
+          filename="app/blog/[slug]/page.tsx"
+        />
+      </DocsStep>
+
+      <DocsStep number={2} title="Provider">
         <CodeBlock
           code={`"use client";
 
@@ -78,7 +116,7 @@ export default function SiteLayout({
         />
       </DocsStep>
 
-      <DocsStep number={2} title="Editable entry">
+      <DocsStep number={3} title="Editable entry">
         <CodeBlock
           code={`"use client";
 
@@ -112,12 +150,13 @@ export function BlogArticle({ entry }) {
         <code className="rounded bg-muted px-1 font-mono text-xs">
           useNoMessEditableEntry()
         </code>
-        . If you need to report manually, use the client method below:
+        . It stores the current page URL so Live Edit can reopen the correct
+        route. If you need to report manually, use the client method below:
       </p>
       <CodeBlock
-        code={`const client = createNoMessClient({
-  apiKey: process.env.NEXT_PUBLIC_NO_MESS_PUBLISHABLE_KEY!,
-});
+        code={`import { createBrowserNoMessClient } from "@no-mess/client/next";
+
+const client = createBrowserNoMessClient();
 
 await client.reportLiveEditRoute({
   entryId: "entry_123",
@@ -125,6 +164,23 @@ await client.reportLiveEditRoute({
 });`}
         language="typescript"
       />
+
+      <DocsHeading>Shopify Refs</DocsHeading>
+      <p className="text-muted-foreground">
+        Shopify fields inside CMS entries store raw refs by default. Use{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          getShopifyHandle()
+        </code>{" "}
+        to normalize the handle from either a string or{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          {"{ handle: string }"}
+        </code>
+        . If you want synced Shopify records inline, pass{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">
+          expand: ["shopify"]
+        </code>{" "}
+        to the content fetch call.
+      </p>
 
       <DocsHeading>React API Summary</DocsHeading>
       <div className="overflow-x-auto">
@@ -169,8 +225,8 @@ await client.reportLiveEditRoute({
                 </code>
               </td>
               <td className="py-2">
-                Binds the current route to an entry and returns draft/override
-                content when active.
+                Binds the current route to an entry, returns working-draft
+                content when active, and reports the page URL.
               </td>
             </tr>
             <tr>
@@ -199,7 +255,8 @@ await client.reportLiveEditRoute({
         >
           Live Edit
         </a>{" "}
-        for the route-aware workflow and dashboard behavior.
+        for the route-aware workflow, deployed-route CSP, and runtime delivery
+        behavior.
       </p>
     </div>
   );

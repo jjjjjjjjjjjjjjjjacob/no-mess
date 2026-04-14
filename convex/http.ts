@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { httpAction } from "./_generated/server";
+import { contentApiResponse } from "./lib/contentApiResponse";
 
 const http = httpRouter();
 
@@ -235,6 +236,65 @@ function corsJsonResponseNoCache(data: unknown, status = 200): Response {
   });
 }
 
+function parseExpandTargets(url: URL) {
+  const targets = [
+    ...new Set(
+      url.searchParams
+        .getAll("expand")
+        .flatMap((value) => value.split(","))
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  const invalidTargets = targets.filter((target) => target !== "shopify");
+  if (invalidTargets.length > 0) {
+    return {
+      ok: false as const,
+      error: corsJsonError(
+        `Unsupported expand target${invalidTargets.length !== 1 ? "s" : ""}: ${invalidTargets.join(", ")}`,
+        400,
+      ),
+    };
+  }
+
+  return {
+    ok: true as const,
+    expand: targets as Array<"shopify">,
+  };
+}
+
+function parseImagesMode(url: URL) {
+  if (!url.searchParams.has("images")) {
+    return {
+      ok: true as const,
+      images: undefined,
+    };
+  }
+
+  const values = url.searchParams.getAll("images");
+  const unsupportedImagesValue = (value: string) => ({
+    ok: false as const,
+    error: corsJsonError(`Unsupported images value: ${value}`, 400),
+  });
+
+  if (values.length !== 1) {
+    return unsupportedImagesValue(
+      values.map((value) => JSON.stringify(value)).join(", "),
+    );
+  }
+
+  const [images] = values;
+  if (images === "rich") {
+    return {
+      ok: true as const,
+      images: "rich" as const,
+    };
+  }
+
+  return unsupportedImagesValue(JSON.stringify(images));
+}
+
 function getRequestOrigin(request: Request): string | null {
   const origin = request.headers.get("Origin");
   if (origin) {
@@ -281,6 +341,17 @@ http.route({
 
     const typeSlug = pathParts[0];
     const entrySlug = pathParts[1]; // undefined if listing
+    const previewRequested = url.searchParams.get("preview") === "true";
+    const fresh = url.searchParams.get("fresh") === "true";
+    const imagesResult = parseImagesMode(url);
+    if (!imagesResult.ok) {
+      return imagesResult.error;
+    }
+    const images = imagesResult.images;
+    const expandResult = parseExpandTargets(url);
+    if (!expandResult.ok) {
+      return expandResult.error;
+    }
 
     // Look up content type
     const contentType = await ctx.runQuery(
@@ -295,10 +366,9 @@ http.route({
 
     if (entrySlug) {
       // Single entry
-      const preview = url.searchParams.get("preview") === "true";
       const secret = url.searchParams.get("secret");
 
-      const isPreview = preview && secret === site.previewSecret;
+      const isPreview = previewRequested && secret === site.previewSecret;
 
       const entry = await ctx.runQuery(
         internal.contentEntries.getBySlugInternal,
@@ -309,6 +379,8 @@ http.route({
           contentTypeId: contentType._id as any,
           slug: entrySlug,
           preview: isPreview,
+          expand: expandResult.expand,
+          images,
         },
       );
 
@@ -316,7 +388,7 @@ http.route({
         return corsJsonError(`Entry "${entrySlug}" not found`, 404);
       }
 
-      return corsJsonResponse(entry);
+      return contentApiResponse(entry, { previewRequested, fresh });
     }
 
     // List entries
@@ -327,10 +399,12 @@ http.route({
         contentTypeId: contentType._id as any,
         // biome-ignore lint/suspicious/noExplicitAny: Convex ID type coercion
         siteId: site._id as any,
+        expand: expandResult.expand,
+        images,
       },
     );
 
-    return corsJsonResponse(entries);
+    return contentApiResponse(entries, { previewRequested, fresh });
   }),
 });
 

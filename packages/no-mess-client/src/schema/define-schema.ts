@@ -3,7 +3,7 @@ import type {
   FragmentDefinition,
   SchemaDefinition,
   TemplateDefinition,
-} from "./schema-types";
+} from "./schema-types.js";
 
 export interface SchemaConfig {
   templates?: TemplateDefinition[];

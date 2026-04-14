@@ -97,16 +97,12 @@ describe("generateFieldTypeMap", () => {
 
   it("maps shopifyProduct to known object shape", () => {
     const [entry] = generateFieldTypeMap([shopifyProductField]);
-    expect(entry.tsType).toContain("handle");
-    expect(entry.tsType).toContain("title");
-    expect(entry.tsType).toContain("shopifyId");
+    expect(entry.tsType).toBe("ShopifyProductRef");
   });
 
-  it("maps shopifyCollection to known object shape", () => {
+  it("maps shopifyCollection to the ref contract", () => {
     const [entry] = generateFieldTypeMap([shopifyCollectionField]);
-    expect(entry.tsType).toContain("handle");
-    expect(entry.tsType).toContain("title");
-    expect(entry.tsType).toContain("shopifyId");
+    expect(entry.tsType).toBe("ShopifyCollectionRef");
   });
 
   it("preserves name, type, and required flag", () => {

@@ -1,5 +1,10 @@
 "use client";
 
+import type {
+  ContentTypeDefinition,
+  ParseResult,
+} from "@no-mess/client/schema";
+import { parseSchemaSource } from "@no-mess/client/schema";
 import { useMutation, useQuery } from "convex/react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -18,11 +23,6 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { computeSchemaDiff, type SchemaDiff } from "@/lib/schema-diff";
-import type {
-  ContentTypeDefinition,
-  ParseResult,
-} from "@/packages/no-mess-client/src/schema";
-import { parseSchemaSource } from "@/packages/no-mess-client/src/schema";
 import { SchemaImportDropzone } from "./schema-import-dropzone";
 import { SchemaImportPreview } from "./schema-import-preview";
 

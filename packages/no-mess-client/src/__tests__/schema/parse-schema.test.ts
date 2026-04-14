@@ -166,6 +166,91 @@ describe("parseSchemaSource", () => {
     });
   });
 
+  describe("fragment references", () => {
+    it("resolves typed fragment definition bindings to fragment slugs", () => {
+      const source = `
+        import type { FragmentDefinition } from "@no-mess/client/schema";
+
+        export const imageWithAlt: FragmentDefinition = defineFragment("image-with-alt", {
+          name: "Image With Alt",
+          fields: {
+            image: field.image(),
+            alt: field.text(),
+          },
+        });
+
+        defineTemplate("page", {
+          name: "Page",
+          fields: {
+            sections: field.array({
+              of: field.object({
+                fields: {
+                  images: field.array({ of: field.fragment(imageWithAlt) }),
+                },
+              }),
+            }),
+          },
+        });
+      `;
+
+      const result = parseSchemaSource(source);
+
+      expect(result.success).toBe(true);
+      const template = result.contentTypes.find((ct) => ct.slug === "page");
+      expect(template?.fields[0]).toEqual({
+        name: "sections",
+        type: "array",
+        required: false,
+        of: {
+          type: "object",
+          required: false,
+          fields: [
+            {
+              name: "images",
+              type: "array",
+              required: false,
+              of: {
+                type: "fragment",
+                required: false,
+                fragment: "image-with-alt",
+              },
+            },
+          ],
+        },
+      });
+    });
+
+    it("errors when a fragment field uses an unresolved identifier", () => {
+      const source = `
+        const imageWithAlt = defineFragment("image-with-alt", {
+          name: "Image With Alt",
+          fields: {
+            image: field.image(),
+          },
+        });
+
+        const fragmentSlug = imageWithAlt.slug;
+
+        defineTemplate("page", {
+          name: "Page",
+          fields: {
+            image: field.fragment(fragmentSlug),
+          },
+        });
+      `;
+
+      const result = parseSchemaSource(source);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          message:
+            'Fragment field "image" must use a string slug or a known fragment definition reference',
+        }),
+      );
+    });
+  });
+
   describe("comments", () => {
     it("strips line comments", () => {
       const source = `

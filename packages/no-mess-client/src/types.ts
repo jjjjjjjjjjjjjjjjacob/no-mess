@@ -12,6 +12,8 @@ export type NoMessErrorKind =
 
 export type NoMessErrorCode =
   | "secret_key_in_browser"
+  | "missing_configuration"
+  | "multiple_singleton_entries"
   | "request_failed"
   | "http_error"
   | "invalid_success_response"
@@ -51,6 +53,15 @@ export interface NoMessErrorOptions {
   cause?: unknown;
 }
 
+export interface NoMessNextFetchOptions {
+  revalidate?: number | false;
+  tags?: string[];
+}
+
+export type NoMessFetchOptions = Omit<RequestInit, "method" | "body"> & {
+  next?: NoMessNextFetchOptions;
+};
+
 export interface NoMessClientConfig {
   apiUrl?: string;
   /**
@@ -61,6 +72,8 @@ export interface NoMessClientConfig {
    * - **Publishable key**: Safe for client-side use. Read-only access to published content.
    */
   apiKey: string;
+  fetch?: NoMessFetchOptions;
+  fresh?: boolean;
   logger?: NoMessLogger;
 }
 
@@ -74,10 +87,40 @@ export function isSecretKey(key: string): boolean {
   return key.startsWith("nm_") && !key.startsWith("nm_pub_");
 }
 
-export interface GetEntryOptions {
+export type ContentExpandTarget = "shopify";
+export type ContentImageMode = "rich";
+
+export interface NoMessImageVariant {
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface NoMessImage {
+  url: string;
+  width?: number;
+  height?: number;
+  mimeType: string;
+  size: number;
+  originalUrl?: string;
+  originalMimeType?: string;
+  variants?: NoMessImageVariant[];
+}
+
+export interface GetEntriesOptions {
+  expand?: ContentExpandTarget[];
+  images?: ContentImageMode;
+  fetch?: NoMessFetchOptions;
+  fresh?: boolean;
+}
+
+export interface GetEntryOptions extends GetEntriesOptions {
   preview?: boolean;
   previewSecret?: string;
 }
+
+export type ShopifyProductRef = string | { handle: string };
+export type ShopifyCollectionRef = string | { handle: string };
 
 export interface NoMessEntry {
   slug: string;

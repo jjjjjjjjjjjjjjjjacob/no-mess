@@ -1,5 +1,6 @@
 "use client";
 
+import type { FragmentDefinition } from "@no-mess/client/schema";
 import { useMutation, useQuery } from "convex/react";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -12,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useSite } from "@/hooks/use-site";
-import type { FragmentDefinition } from "@/packages/no-mess-client/src/schema";
+import { slugify } from "@/lib/slugify";
 
 export default function NewEntryPage() {
   const router = useRouter();
@@ -93,10 +94,15 @@ export default function NewEntryPage() {
         title: nextTitle,
         draft: formData,
       });
+      const nextEntrySlug = isSingletonTemplate
+        ? contentType.slug
+        : slugify(nextTitle);
       router.push(
-        isSingletonTemplate
-          ? `/sites/${siteSlug}/content/${params.typeSlug}/${contentType.slug}`
-          : `/sites/${siteSlug}/content/${params.typeSlug}`,
+        site.previewUrl
+          ? `/sites/${siteSlug}/live-edit/${params.typeSlug}/${nextEntrySlug}`
+          : isSingletonTemplate
+            ? `/sites/${siteSlug}/content/${params.typeSlug}/${contentType.slug}`
+            : `/sites/${siteSlug}/content/${params.typeSlug}`,
       );
       toast.success("Entry created successfully");
     } catch (err) {

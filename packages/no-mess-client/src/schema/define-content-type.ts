@@ -1,4 +1,4 @@
-import type { FieldBuilderResult } from "./field-builders";
+import type { FieldBuilderResult } from "./field-builders.js";
 import type {
   ContentTypeDefinition,
   FieldDefinition,
@@ -6,7 +6,7 @@ import type {
   NamedFieldDefinition,
   TemplateDefinition,
   TemplateMode,
-} from "./schema-types";
+} from "./schema-types.js";
 
 export interface BaseSchemaConfig {
   name: string;

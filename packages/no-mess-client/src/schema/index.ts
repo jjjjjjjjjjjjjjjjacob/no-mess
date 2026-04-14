@@ -1,52 +1,55 @@
 export type {
-  PrimitiveFieldType,
-  FieldType,
-  FieldDefinition,
-  NamedFieldDefinition,
-  ContentTypeDefinition,
-  TemplateDefinition,
-  FragmentDefinition,
-  TemplateMode,
-  SchemaKind,
-  SchemaDefinition,
-  SelectChoice,
-} from "./schema-types";
-export { FIELD_TYPES, PRIMITIVE_FIELD_TYPES } from "./schema-types";
-
-export type {
-  FieldBuilderOptions,
-  SelectFieldOptions,
-  ObjectFieldOptions,
-  ArrayFieldOptions,
-  FragmentFieldOptions,
-  FieldBuilderResult,
-} from "./field-builders";
-export { field } from "./field-builders";
-
-export type {
   BaseSchemaConfig,
   ContentTypeConfig,
-  TemplateConfig,
   FragmentConfig,
-} from "./define-content-type";
+  TemplateConfig,
+} from "./define-content-type.js";
 export {
   buildFieldDefinition,
   buildNamedFields,
   defineContentType,
-  defineTemplate,
   defineFragment,
-} from "./define-content-type";
-
-export type { SchemaConfig } from "./define-schema";
-export { defineSchema } from "./define-schema";
-
-export type { ParseError, ParseWarning, ParseResult } from "./parse-schema";
-export { parseSchemaSource } from "./parse-schema";
+  defineTemplate,
+} from "./define-content-type.js";
+export type { SchemaConfig } from "./define-schema.js";
+export { defineSchema } from "./define-schema.js";
+export type {
+  ArrayFieldOptions,
+  FieldBuilderOptions,
+  FieldBuilderResult,
+  FragmentFieldOptions,
+  ObjectFieldOptions,
+  SelectFieldOptions,
+} from "./field-builders.js";
+export { field } from "./field-builders.js";
+export type { ParseError, ParseResult, ParseWarning } from "./parse-schema.js";
+export { parseSchemaSource } from "./parse-schema.js";
+export type {
+  ContentTypeDefinition,
+  FieldDefinition,
+  FieldType,
+  FragmentDefinition,
+  NamedFieldDefinition,
+  PrimitiveFieldType,
+  SchemaDefinition,
+  SchemaKind,
+  SelectChoice,
+  TemplateDefinition,
+  TemplateMode,
+} from "./schema-types.js";
+export { FIELD_TYPES, PRIMITIVE_FIELD_TYPES } from "./schema-types.js";
+export type { GeneratedDefinitionContract } from "./contract-renderer.js";
+export {
+  fieldPathToCamelCase,
+  generateDefinitionContracts,
+  slugToPascalCase,
+  slugToScreamingSnakeCase,
+} from "./contract-renderer.js";
 
 export {
-  generateSchemaSource,
   generateContentTypeSource,
-} from "./serialize-schema";
+  generateSchemaSource,
+} from "./serialize-schema.js";
 
 export {
   appendValueAtPath,
@@ -54,10 +57,11 @@ export {
   createEmptyValueForField,
   getFieldDisplayName,
   getValueAtPath,
+  insertValueAtPath,
   joinFieldPath,
   moveArrayValueAtPath,
   parseFieldPath,
   removeValueAtPath,
   resolveFragmentFields,
   setValueAtPath,
-} from "./tree-utils";
+} from "./tree-utils.js";

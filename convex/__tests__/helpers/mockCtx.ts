@@ -70,6 +70,8 @@ export function createMockMutationCtx() {
       runAfter: vi.fn().mockResolvedValue(undefined),
       runAt: vi.fn().mockResolvedValue(undefined),
     },
+    runMutation: vi.fn().mockResolvedValue(undefined),
+    runQuery: vi.fn().mockResolvedValue(null),
   };
 }
 

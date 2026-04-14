@@ -15,17 +15,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
+import { slugify } from "@/lib/slugify";
 
 interface CreateSiteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 }
 
 export function CreateSiteDialog({

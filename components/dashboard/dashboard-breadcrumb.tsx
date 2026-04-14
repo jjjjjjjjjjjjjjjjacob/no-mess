@@ -71,13 +71,14 @@ function SiteBreadcrumb({
     currentPath += `/${segment}`;
     items.push({ label: getLabel(segment), href: currentPath });
   }
+  const visibleItems = afterSite[0] === "content" ? [] : items;
 
   return (
     <div className="min-w-0 overflow-hidden [direction:rtl]">
       <Breadcrumb className="w-max [direction:ltr]">
         <BreadcrumbList>
           <BreadcrumbItem>
-            {items.length === 0 ? (
+            {visibleItems.length === 0 ? (
               <BreadcrumbPage>
                 <SiteSelectorBreadcrumb
                   currentSiteName={site?.name ?? siteSlug}
@@ -89,8 +90,8 @@ function SiteBreadcrumb({
               />
             )}
           </BreadcrumbItem>
-          {items.map((item, index) => {
-            const isLast = index === items.length - 1;
+          {visibleItems.map((item, index) => {
+            const isLast = index === visibleItems.length - 1;
             return (
               <Fragment key={item.href}>
                 <BreadcrumbSeparator />

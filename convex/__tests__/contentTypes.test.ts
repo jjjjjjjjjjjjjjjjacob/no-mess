@@ -56,6 +56,71 @@ const normalizedMockContentType = {
   draft: undefined,
 };
 
+const mockFragmentSchema = {
+  _id: "ct_fragment" as any,
+  siteId: "site_1" as any,
+  name: "Image With Alt",
+  slug: "image-with-alt",
+  kind: "fragment" as const,
+  fields: [{ name: "image", type: "image", required: false }],
+  createdAt: 1000,
+  updatedAt: 1000,
+};
+
+function mockContentTypeQueries(
+  ctx:
+    | ReturnType<typeof createMockMutationCtx>
+    | ReturnType<typeof createMockQueryCtx>,
+  options: {
+    bySlug?: unknown;
+    bySite?: unknown[];
+    byType?: unknown[];
+  } = {},
+) {
+  ctx.db.query.mockImplementation((table: string) => {
+    if (table === "contentTypes") {
+      return {
+        withIndex: (index: string) => {
+          if (index === "by_slug") {
+            return {
+              first: vi.fn().mockResolvedValue(options.bySlug ?? null),
+              collect: vi.fn().mockResolvedValue([]),
+            };
+          }
+
+          if (index === "by_site") {
+            return {
+              first: vi.fn().mockResolvedValue(null),
+              collect: vi.fn().mockResolvedValue(options.bySite ?? []),
+            };
+          }
+
+          return {
+            first: vi.fn().mockResolvedValue(null),
+            collect: vi.fn().mockResolvedValue([]),
+          };
+        },
+      };
+    }
+
+    if (table === "contentEntries") {
+      return {
+        withIndex: () => ({
+          first: vi.fn().mockResolvedValue(null),
+          collect: vi.fn().mockResolvedValue(options.byType ?? []),
+        }),
+      };
+    }
+
+    return {
+      withIndex: () => ({
+        first: vi.fn().mockResolvedValue(null),
+        collect: vi.fn().mockResolvedValue([]),
+      }),
+    };
+  });
+}
+
 describe("contentTypes.create", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -178,6 +243,48 @@ describe("contentTypes.create", () => {
       "contentTypes",
       expect.objectContaining({
         description: "A blog post content type",
+      }),
+    );
+  });
+
+  it("canonicalizes fragment alias refs on create when the fragment exists", async () => {
+    const ctx = createMockMutationCtx();
+    mockRequireSiteAccess.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+    mockContentTypeQueries(ctx, {
+      bySlug: null,
+      bySite: [mockFragmentSchema],
+    });
+    ctx.db.insert.mockResolvedValue("ct_new");
+
+    await getHandler(contentTypes.create)(ctx, {
+      siteId: "site_1",
+      name: "Landing Page",
+      slug: "landing-page",
+      fields: [
+        {
+          name: "hero",
+          type: "fragment",
+          required: false,
+          fragment: "imageWithAlt",
+        },
+      ],
+    });
+
+    expect(ctx.db.insert).toHaveBeenCalledWith(
+      "contentTypes",
+      expect.objectContaining({
+        fields: [
+          {
+            name: "hero",
+            type: "fragment",
+            required: false,
+            fragment: "image-with-alt",
+          },
+        ],
       }),
     );
   });
@@ -450,6 +557,229 @@ describe("contentTypes.getBySlugInternal", () => {
   });
 });
 
+describe("contentTypes.publish", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("blocks publish when downstream draft-only schemas exist and cascade is not confirmed", async () => {
+    const ctx = createMockMutationCtx();
+    const draftFragment = {
+      _id: "ct_fragment_draft" as any,
+      siteId: "site_1" as any,
+      name: "Draft Fragment",
+      slug: "draft-fragment",
+      kind: "fragment" as const,
+      status: "draft" as const,
+      fields: [{ name: "copy", type: "text", required: false }],
+      draft: {
+        name: "Draft Fragment",
+        slug: "draft-fragment",
+        kind: "fragment" as const,
+        fields: [{ name: "copy", type: "text", required: false }],
+      },
+      createdAt: 1000,
+      updatedAt: 1000,
+    };
+    const publishingSchema = {
+      ...mockContentType,
+      status: "draft" as const,
+      draft: {
+        name: "Landing Page",
+        slug: "landing-page",
+        kind: "template" as const,
+        fields: [
+          {
+            name: "hero",
+            type: "fragment",
+            required: false,
+            fragment: "draft-fragment",
+          },
+        ],
+      },
+    };
+
+    ctx.db.get.mockResolvedValue(publishingSchema);
+    mockRequireSiteAccess.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+    mockContentTypeQueries(ctx, {
+      bySlug: publishingSchema,
+      bySite: [publishingSchema, draftFragment],
+    });
+
+    await expect(
+      getHandler(contentTypes.publish)(ctx, { contentTypeId: "ct_1" }),
+    ).rejects.toThrow(
+      "Cannot publish until these schemas are published: Draft Fragment (draft-fragment)",
+    );
+
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+    expect(ctx.db.patch).not.toHaveBeenCalled();
+  });
+
+  it("rejects stale cascade slugs", async () => {
+    const ctx = createMockMutationCtx();
+    const draftFragment = {
+      _id: "ct_fragment_draft" as any,
+      siteId: "site_1" as any,
+      name: "Draft Fragment",
+      slug: "draft-fragment",
+      kind: "fragment" as const,
+      status: "draft" as const,
+      fields: [{ name: "copy", type: "text", required: false }],
+      draft: {
+        name: "Draft Fragment",
+        slug: "draft-fragment",
+        kind: "fragment" as const,
+        fields: [{ name: "copy", type: "text", required: false }],
+      },
+      createdAt: 1000,
+      updatedAt: 1000,
+    };
+    const publishingSchema = {
+      ...mockContentType,
+      status: "draft" as const,
+      draft: {
+        name: "Landing Page",
+        slug: "landing-page",
+        kind: "template" as const,
+        fields: [
+          {
+            name: "hero",
+            type: "fragment",
+            required: false,
+            fragment: "draft-fragment",
+          },
+        ],
+      },
+    };
+
+    ctx.db.get.mockResolvedValue(publishingSchema);
+    mockRequireSiteAccess.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+    mockContentTypeQueries(ctx, {
+      bySlug: publishingSchema,
+      bySite: [publishingSchema, draftFragment],
+    });
+
+    await expect(
+      getHandler(contentTypes.publish)(ctx, {
+        contentTypeId: "ct_1",
+        cascade: true,
+        expectedCascadeSlugs: [],
+      }),
+    ).rejects.toThrow(
+      "Publish dependencies changed. Review these schemas and try again: Draft Fragment (draft-fragment)",
+    );
+
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+    expect(ctx.db.patch).not.toHaveBeenCalled();
+  });
+
+  it("passes dependency-first cascade ids before publishing the root schema", async () => {
+    const ctx = createMockMutationCtx();
+    const nestedFragment = {
+      _id: "ct_nested" as any,
+      siteId: "site_1" as any,
+      name: "Nested Fragment",
+      slug: "nested-fragment",
+      kind: "fragment" as const,
+      status: "draft" as const,
+      fields: [{ name: "copy", type: "text", required: false }],
+      draft: {
+        name: "Nested Fragment",
+        slug: "nested-fragment",
+        kind: "fragment" as const,
+        fields: [{ name: "copy", type: "text", required: false }],
+      },
+      createdAt: 1000,
+      updatedAt: 1000,
+    };
+    const draftFragment = {
+      _id: "ct_fragment_draft" as any,
+      siteId: "site_1" as any,
+      name: "Draft Fragment",
+      slug: "draft-fragment",
+      kind: "fragment" as const,
+      status: "draft" as const,
+      fields: [{ name: "copy", type: "text", required: false }],
+      draft: {
+        name: "Draft Fragment",
+        slug: "draft-fragment",
+        kind: "fragment" as const,
+        fields: [
+          {
+            name: "nested",
+            type: "fragment",
+            required: false,
+            fragment: "nested-fragment",
+          },
+        ],
+      },
+      createdAt: 1000,
+      updatedAt: 1000,
+    };
+    const publishingSchema = {
+      ...mockContentType,
+      status: "draft" as const,
+      draft: {
+        name: "Landing Page",
+        slug: "landing-page",
+        kind: "template" as const,
+        fields: [
+          {
+            name: "hero",
+            type: "fragment",
+            required: false,
+            fragment: "draft-fragment",
+          },
+        ],
+      },
+    };
+
+    ctx.db.get.mockResolvedValue(publishingSchema);
+    mockRequireSiteAccess.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+    mockContentTypeQueries(ctx, {
+      bySlug: publishingSchema,
+      bySite: [publishingSchema, draftFragment, nestedFragment],
+    });
+
+    await getHandler(contentTypes.publish)(ctx, {
+      contentTypeId: "ct_1",
+      cascade: true,
+      expectedCascadeSlugs: ["nested-fragment", "draft-fragment"],
+    });
+
+    expect(ctx.runMutation).toHaveBeenCalledWith(expect.anything(), {
+      contentTypeIds: ["ct_nested", "ct_fragment_draft"],
+    });
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "ct_1",
+      expect.objectContaining({
+        status: "published",
+        fields: [
+          {
+            name: "hero",
+            type: "fragment",
+            required: false,
+            fragment: "draft-fragment",
+          },
+        ],
+      }),
+    );
+  });
+});
+
 describe("contentTypes.runSchemaModelBackfill", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -501,6 +831,90 @@ describe("contentTypes.runSchemaModelBackfill", () => {
           description: "Draft description",
           fields: mockFields,
         },
+      }),
+    );
+  });
+});
+
+describe("contentTypes.repairFragmentReferences", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("rewrites published and draft fragment alias refs to canonical slugs", async () => {
+    const ctx = createMockMutationCtx();
+    mockRequireSiteOwner.mockResolvedValue({
+      user: mockUser,
+      site: mockSite,
+      role: "owner",
+    } as any);
+
+    const brokenTemplate = {
+      _id: "ct_broken" as any,
+      siteId: "site_1" as any,
+      name: "Landing Page",
+      slug: "landing-page",
+      kind: "template" as const,
+      fields: [
+        {
+          name: "hero",
+          type: "fragment",
+          required: false,
+          fragment: "imageWithAlt",
+        },
+      ],
+      draft: {
+        name: "Landing Page",
+        slug: "landing-page",
+        kind: "template" as const,
+        fields: [
+          {
+            name: "hero",
+            type: "fragment",
+            required: false,
+            fragment: "imageWithAlt",
+          },
+        ],
+      },
+      createdAt: 1000,
+      updatedAt: 1000,
+    };
+
+    mockContentTypeQueries(ctx, {
+      bySite: [brokenTemplate, mockFragmentSchema],
+    });
+
+    const result = await getHandler(contentTypes.repairFragmentReferences)(
+      ctx,
+      {
+        siteId: "site_1",
+      },
+    );
+
+    expect(result.scanned).toBe(2);
+    expect(result.updated).toBe(1);
+    expect(result.unresolved).toEqual([]);
+    expect(ctx.db.patch).toHaveBeenCalledWith(
+      "ct_broken",
+      expect.objectContaining({
+        fields: [
+          {
+            name: "hero",
+            type: "fragment",
+            required: false,
+            fragment: "image-with-alt",
+          },
+        ],
+        draft: expect.objectContaining({
+          fields: [
+            {
+              name: "hero",
+              type: "fragment",
+              required: false,
+              fragment: "image-with-alt",
+            },
+          ],
+        }),
       }),
     );
   });

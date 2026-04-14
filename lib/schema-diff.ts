@@ -2,8 +2,13 @@ import type {
   ContentTypeDefinition,
   FieldDefinition,
   NamedFieldDefinition,
-  PrimitiveFieldDefinition,
-} from "@/packages/no-mess-client/src/schema/schema-types";
+  PrimitiveFieldType,
+} from "@no-mess/client/schema";
+
+type PrimitiveFieldDefinition = Extract<
+  FieldDefinition,
+  { type: PrimitiveFieldType }
+>;
 
 export interface FieldChange {
   action: "added" | "modified" | "unchanged";

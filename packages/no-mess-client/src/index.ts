@@ -1,7 +1,15 @@
 export { NoMessClient } from "./client.js";
 export { createLiveEditHandler } from "./live-edit.js";
+export {
+  getShopifyHandle,
+  isShopifyCollectionRef,
+  isShopifyProductRef,
+} from "./reference-utils.js";
 export type {
+  ContentExpandTarget,
+  ContentImageMode,
   ContentTypeSchema,
+  GetEntriesOptions,
   GetEntryOptions,
   LiveEditConfig,
   LiveEditHandle,
@@ -9,11 +17,15 @@ export type {
   NoMessEntry,
   NoMessErrorCode,
   NoMessErrorKind,
+  NoMessImage,
+  NoMessImageVariant,
   NoMessErrorOptions,
+  NoMessFetchOptions,
   NoMessLiveRouteProviderProps,
   NoMessLogEvent,
   NoMessLogger,
   NoMessLogLevel,
+  NoMessNextFetchOptions,
   NoMessProviderProps,
   PreviewExchangeResult,
   PreviewHandlerConfig,
@@ -22,7 +34,9 @@ export type {
   SchemaGetResponse,
   SchemaListResponse,
   ShopifyCollection,
+  ShopifyCollectionRef,
   ShopifyProduct,
+  ShopifyProductRef,
   UseNoMessEditableEntryOptions,
   UseNoMessLiveEditConfig,
   UseNoMessLiveEditResult,
@@ -48,9 +62,33 @@ import type {
   NoMessClientConfig,
   NoMessEntry,
   NoMessErrorCode,
+  NoMessImage,
   PreviewHandlerConfig,
   PreviewSessionAuth,
 } from "./types.js";
+
+/**
+ * Build an HTML srcset string from a NoMessImage returned by the `?images=rich` API.
+ * The full-resolution URL is always included as the largest source.
+ *
+ * @example
+ * ```ts
+ * const entries = await client.getEntries("pages", { images: "rich" });
+ * const hero = entries[0].heroImage as NoMessImage;
+ * // <img src={hero.url} srcSet={buildSrcSet(hero)} sizes="100vw" />
+ * ```
+ */
+export function buildSrcSet(image: NoMessImage): string {
+  const sources = (image.variants ?? []).map(
+    (v) => `${v.url} ${v.width}w`,
+  );
+  if (image.width) {
+    sources.push(`${image.url} ${image.width}w`);
+  } else {
+    sources.push(image.url);
+  }
+  return sources.join(", ");
+}
 
 /**
  * Create a no-mess client instance.

@@ -17,8 +17,8 @@ export default function GettingStartedPage() {
       <p className="text-muted-foreground">
         no-mess is a headless CMS designed for developers who need to ship
         content management to their clients without complexity. You define
-        content schemas, your clients edit content, and you fetch it all via a
-        TypeScript SDK.
+        content schemas, your clients edit content in Live Edit, and you fetch
+        it all via a TypeScript SDK.
       </p>
 
       <DocsHeading>Quick Start</DocsHeading>
@@ -97,7 +97,8 @@ export default function GettingStartedPage() {
           <code className="rounded bg-muted px-1 font-mono text-xs">
             no-mess push
           </code>{" "}
-          to sync your schema file to the dashboard.
+          to sync your schema file to the dashboard as drafts, then publish the
+          schema in the dashboard before expecting delivery APIs to use it.
         </DocsCallout>
       </DocsStep>
 
@@ -106,15 +107,17 @@ export default function GettingStartedPage() {
           Go to <strong>Content</strong>, pick a collection template, and create
           entries. Singleton templates open directly into their authoring
           screen, and fragments are excluded because they are embedded inside
-          other templates. Each entry starts as a draft. Click{" "}
-          <strong>Publish</strong> when it&apos;s ready.
+          other templates. If the site has a Preview and Live Edit Base URL
+          configured, entry links open Live Edit by default. Each entry keeps an
+          autosaved working draft, and you can save named draft variations
+          before you <strong>Publish</strong>.
         </p>
       </DocsStep>
 
       <DocsStep number={5} title="Connect route-aware preview and Live Edit">
         <p>
-          Set the site <strong>Preview URL</strong> to your site origin, then
-          add{" "}
+          Set the site <strong>Preview and Live Edit Base URL</strong> to your
+          site origin, then add{" "}
           <code className="rounded bg-muted px-1 font-mono text-xs">
             NoMessLiveRouteProvider
           </code>{" "}
@@ -126,6 +129,11 @@ export default function GettingStartedPage() {
           integration path for Live Edit. Preview-only routes remain supported
           as a fallback.
         </p>
+        <p className="mt-2">
+          On deployed routes, fetch CMS content at request time so publishes
+          appear without redeploying and the live editor opens the real route
+          with current content.
+        </p>
       </DocsStep>
 
       <DocsStep number={6} title="Fetch content with the SDK">
@@ -133,10 +141,10 @@ export default function GettingStartedPage() {
         <CodeBlock code="npm install @no-mess/client" language="bash" />
         <p className="mt-4">Then fetch your content:</p>
         <CodeBlock
-          code={`import { createNoMessClient } from "@no-mess/client";
+          code={`import { createServerNoMessClient } from "@no-mess/client/next";
 
-const cms = createNoMessClient({
-  apiKey: process.env.NO_MESS_SECRET_KEY!,
+const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
 });
 
 // Get all published blog posts
@@ -146,6 +154,15 @@ const posts = await cms.getEntries("blog-posts");
 const post = await cms.getEntry("blog-posts", "hello-world");`}
           language="typescript"
         />
+        <p className="mt-4 text-muted-foreground">
+          In Next.js,{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">
+            cache: "no-store"
+          </code>{" "}
+          keeps deployed routes runtime-driven. If you statically export the
+          site or generate all route slugs only at build time, newly created
+          routes still will not exist until redeploy.
+        </p>
       </DocsStep>
 
       <DocsHeading>Full Example</DocsHeading>
@@ -154,9 +171,11 @@ const post = await cms.getEntry("blog-posts", "hello-world");`}
         from no-mess:
       </p>
       <CodeBlock
-        code={`import { createNoMessClient } from "@no-mess/client";
+        code={`import { createServerNoMessClient } from "@no-mess/client/next";
+import { BlogArticle } from "@/components/blog-article";
 
 interface BlogPost {
+  _id: string;
   slug: string;
   title: string;
   body: string;
@@ -164,8 +183,8 @@ interface BlogPost {
   publishedAt: string;
 }
 
-const cms = createNoMessClient({
-  apiKey: process.env.NO_MESS_SECRET_KEY!,
+const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
 });
 
 export default async function BlogPage() {
@@ -175,16 +194,38 @@ export default async function BlogPage() {
     <main>
       <h1>Blog</h1>
       {posts.map((post) => (
-        <article key={post.slug}>
-          <h2>{post.title}</h2>
-          <p>{post.body}</p>
-        </article>
+        <BlogArticle key={post.slug} entry={post} />
       ))}
     </main>
   );
 }`}
         language="tsx"
         filename="app/blog/page.tsx"
+      />
+      <CodeBlock
+        code={`"use client";
+
+import {
+  NoMessField,
+  useNoMessEditableEntry,
+} from "@no-mess/client/react";
+
+export function BlogArticle({ entry }) {
+  const editableEntry = useNoMessEditableEntry(entry);
+
+  return (
+    <article>
+      <NoMessField as="h2" name="title">
+        {editableEntry.title}
+      </NoMessField>
+      <NoMessField as="p" name="body">
+        {editableEntry.body}
+      </NoMessField>
+    </article>
+  );
+}`}
+        language="tsx"
+        filename="components/blog-article.tsx"
       />
 
       <DocsCallout type="tip">
@@ -254,7 +295,8 @@ export default async function BlogPage() {
           >
             Live Edit
           </a>{" "}
-          &mdash; instant iframe-only edits, URL bar, and delivery URLs
+          &mdash; working drafts, saved drafts, page URLs, and production
+          comparisons
         </li>
         <li>
           <a

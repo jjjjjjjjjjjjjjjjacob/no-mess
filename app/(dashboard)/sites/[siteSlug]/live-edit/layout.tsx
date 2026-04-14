@@ -5,5 +5,9 @@ export default function LiveEditLayout({
 }) {
   // Full-viewport overlay that breaks out of the dashboard padding/sidebar.
   // Uses fixed positioning to cover the entire screen.
-  return <div className="fixed inset-0 z-50 bg-background">{children}</div>;
+  return (
+    <div className="fixed inset-0 z-50 overflow-hidden bg-background">
+      {children}
+    </div>
+  );
 }

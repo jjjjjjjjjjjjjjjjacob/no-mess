@@ -68,6 +68,27 @@ bun dev
 
 The admin dashboard runs at [http://localhost:4567](http://localhost:4567).
 
+## Runtime Delivery on Deployed Sites
+
+If a deployed site should reflect CMS publishes immediately and support
+route-aware Live Edit on real routes, fetch no-mess content at request time in
+the consuming app:
+
+```ts
+import { createServerNoMessClient } from "@no-mess/client/next";
+
+export const cms = createServerNoMessClient({
+  fetch: { cache: "no-store" },
+});
+```
+
+That enables `fresh=true` on content reads so no-mess bypasses its published
+GET caches. The public route still needs the existing Live Edit bridge:
+`NoMessLiveRouteProvider`, `useNoMessEditableEntry(entry)`, and a
+`frame-ancestors` CSP that allows `https://admin.no-mess.xyz`. In the
+dashboard, Live Edit overlays the current working draft on the real route
+inside the iframe while keeping production untouched until publish.
+
 ## Scripts
 
 | Command | Description |

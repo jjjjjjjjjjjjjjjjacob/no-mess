@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCacheKey } from "../cache";
+import { buildCacheKey, shouldBypassCache } from "../cache";
 
 describe("buildCacheKey", () => {
   it("includes API key in cache key", () => {
@@ -31,5 +31,29 @@ describe("buildCacheKey", () => {
     const url = new URL(cacheKey.url);
     expect(url.searchParams.get("preview")).toBe("true");
     expect(url.searchParams.get("_ck")).toBe("nm_test");
+  });
+});
+
+describe("shouldBypassCache", () => {
+  it("returns true for preview requests", () => {
+    const request = new Request(
+      "https://api.nomess.xyz/api/content/blog?preview=true",
+    );
+
+    expect(shouldBypassCache(request)).toBe(true);
+  });
+
+  it("returns true for fresh requests", () => {
+    const request = new Request(
+      "https://api.nomess.xyz/api/content/blog?fresh=true",
+    );
+
+    expect(shouldBypassCache(request)).toBe(true);
+  });
+
+  it("returns false for normal GET requests", () => {
+    const request = new Request("https://api.nomess.xyz/api/content/blog");
+
+    expect(shouldBypassCache(request)).toBe(false);
   });
 });

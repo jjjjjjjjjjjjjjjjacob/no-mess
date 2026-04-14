@@ -5,7 +5,7 @@ import {
   type NamedFieldDefinition,
   type SchemaKind,
   type TemplateMode,
-} from "./schema-types";
+} from "./schema-types.js";
 
 export interface ParseError {
   line: number;
@@ -39,7 +39,7 @@ interface DefineContentTypeResult {
 const FIELD_TYPE_SET = new Set<string>(FIELD_TYPES);
 const DEFINITION_CALL_PATTERN = /define(ContentType|Template|Fragment)\s*\(/g;
 const VARIABLE_DEFINITION_PATTERN =
-  /(?:const|let|var|export\s+const)\s+(\w+)\s*=\s*define(ContentType|Template|Fragment)\s*\(/g;
+  /(?:const|let|var|export\s+const)\s+(\w+)(?:\s*:\s*(?:[^=]|=(?!>))+)?\s*=\s*define(ContentType|Template|Fragment)\s*\(/g;
 
 /**
  * Parses schema DSL source text and extracts template/fragment definitions.
@@ -182,9 +182,14 @@ function parseDefinitionArgs(
   const description = parseStringValue(
     findObjectEntry(configEntries, "description")?.value,
   );
-  const route = parseStringValue(findObjectEntry(configEntries, "route")?.value);
-  const rawMode = parseStringValue(findObjectEntry(configEntries, "mode")?.value);
-  const mode: TemplateMode = rawMode === "singleton" ? "singleton" : "collection";
+  const route = parseStringValue(
+    findObjectEntry(configEntries, "route")?.value,
+  );
+  const rawMode = parseStringValue(
+    findObjectEntry(configEntries, "mode")?.value,
+  );
+  const mode: TemplateMode =
+    rawMode === "singleton" ? "singleton" : "collection";
 
   const fieldsEntry = findObjectEntry(configEntries, "fields");
   const fields = fieldsEntry
@@ -368,15 +373,15 @@ function parseFieldExpression(
     const args = splitTopLevel(rawArgs);
     const fragmentToken = args[0]?.trim() ?? "";
     const fragment =
-      parseStringValue(fragmentToken) ??
-      references.get(fragmentToken)?.slug ??
-      fragmentToken.replace(/[^\w-]/g, "");
+      parseStringValue(fragmentToken) ?? references.get(fragmentToken)?.slug;
 
     if (!fragment) {
       errors.push({
         line: baseLine,
         column: 0,
-        message: `Fragment field "${fieldName}" is missing a fragment reference`,
+        message: fragmentToken
+          ? `Fragment field "${fieldName}" must use a string slug or a known fragment definition reference`
+          : `Fragment field "${fieldName}" is missing a fragment reference`,
       });
       return null;
     }
@@ -458,7 +463,9 @@ function parseChoicesArray(value: string | undefined) {
   for (const item of items) {
     const entries = parseObjectEntries(unwrapObjectLiteral(item));
     const label = parseStringValue(findObjectEntry(entries, "label")?.value);
-    const choiceValue = parseStringValue(findObjectEntry(entries, "value")?.value);
+    const choiceValue = parseStringValue(
+      findObjectEntry(entries, "value")?.value,
+    );
 
     if (label !== undefined && choiceValue !== undefined) {
       choices.push({ label, value: choiceValue });

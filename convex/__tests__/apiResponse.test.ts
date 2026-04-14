@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { corsResponse, errorResponse, jsonResponse } from "../lib/apiResponse";
+import {
+  corsResponse,
+  errorResponse,
+  jsonNoStoreResponse,
+  jsonResponse,
+} from "../lib/apiResponse";
 
 describe("jsonResponse", () => {
   it("returns 200 by default", () => {
@@ -62,6 +67,20 @@ describe("errorResponse", () => {
   it("sets CORS allow-origin header", () => {
     const res = errorResponse("err");
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+});
+
+describe("jsonNoStoreResponse", () => {
+  it("returns 200 by default", () => {
+    const res = jsonNoStoreResponse({ ok: true });
+    expect(res.status).toBe(200);
+  });
+
+  it("sets no-store Cache-Control header", () => {
+    const res = jsonNoStoreResponse({});
+    expect(res.headers.get("Cache-Control")).toBe(
+      "no-store, no-cache, must-revalidate",
+    );
   });
 });
 
