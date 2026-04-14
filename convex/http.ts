@@ -265,14 +265,26 @@ function parseExpandTargets(url: URL) {
 }
 
 function parseImagesMode(url: URL) {
-  const images = url.searchParams.get("images");
-  if (!images) {
+  if (!url.searchParams.has("images")) {
     return {
       ok: true as const,
       images: undefined,
     };
   }
 
+  const values = url.searchParams.getAll("images");
+  const unsupportedImagesValue = (value: string) => ({
+    ok: false as const,
+    error: corsJsonError(`Unsupported images value: ${value}`, 400),
+  });
+
+  if (values.length !== 1) {
+    return unsupportedImagesValue(
+      values.map((value) => JSON.stringify(value)).join(", "),
+    );
+  }
+
+  const [images] = values;
   if (images === "rich") {
     return {
       ok: true as const,
@@ -280,10 +292,7 @@ function parseImagesMode(url: URL) {
     };
   }
 
-  return {
-    ok: false as const,
-    error: corsJsonError(`Unsupported images value: ${images}`, 400),
-  };
+  return unsupportedImagesValue(JSON.stringify(images));
 }
 
 function getRequestOrigin(request: Request): string | null {

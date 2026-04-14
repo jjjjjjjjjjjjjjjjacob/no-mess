@@ -1,11 +1,10 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
+import { GIF_MIME_TYPE, SVG_MIME_TYPE } from "./imageConstants";
 
 const BACKFILL_BATCH_SIZE = 10;
 const IMAGE_MIME_TYPE_PREFIX = "image/";
 const IMAGE_MIME_TYPE_PREFIX_UPPER_BOUND = "image0";
-const SVG_MIME_TYPE = "image/svg+xml";
-const GIF_MIME_TYPE = "image/gif";
 
 // === Internal Mutations ===
 

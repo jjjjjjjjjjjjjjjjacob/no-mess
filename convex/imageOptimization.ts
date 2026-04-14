@@ -3,6 +3,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction } from "./_generated/server";
+import { SKIP_OPTIMIZATION_MIME_TYPES } from "./imageConstants";
 
 // Dynamic import to avoid bundler issues with sharp's native bindings
 async function getSharp() {
@@ -18,12 +19,6 @@ const FETCH_TIMEOUT_MS = 10_000;
 
 // Responsive breakpoint widths — only generate variants smaller than the original
 const VARIANT_WIDTHS = [320, 640, 1024, 1536, 2048];
-
-// MIME types that should skip optimization
-const SKIP_MIME_TYPES = new Set([
-  "image/svg+xml",
-  "image/gif", // GIFs may be animated — preserve as-is
-]);
 
 function formatOptimizationError(error: unknown): string {
   if (error instanceof Error) {
@@ -68,7 +63,7 @@ export const optimizeImage = internalAction({
     // Skip non-image or unsupported types
     if (
       !asset.mimeType.startsWith("image/") ||
-      SKIP_MIME_TYPES.has(asset.mimeType)
+      SKIP_OPTIMIZATION_MIME_TYPES.has(asset.mimeType)
     ) {
       await ctx.runMutation(
         internal.imageOptimizationHelpers.setOptimizationStatus,
@@ -158,6 +153,9 @@ export const optimizeImage = internalAction({
           .resize(targetWidth, targetHeight, { fit: "inside" })
           .webp({ quality: WEBP_QUALITY })
           .toBuffer();
+        const variantMetadata = await sharpFn(variantBuffer).metadata();
+        const variantWidth = variantMetadata.width ?? targetWidth;
+        const variantHeight = variantMetadata.height ?? targetHeight;
 
         const variantBlob = new Blob([new Uint8Array(variantBuffer)], {
           type: "image/webp",
@@ -173,8 +171,8 @@ export const optimizeImage = internalAction({
           assetId: args.assetId,
           storageId: variantStorageId,
           url: variantUrl,
-          width: targetWidth,
-          height: targetHeight,
+          width: variantWidth,
+          height: variantHeight,
           mimeType: "image/webp",
           size: variantBuffer.byteLength,
         });

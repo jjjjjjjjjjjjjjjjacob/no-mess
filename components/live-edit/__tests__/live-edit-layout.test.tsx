@@ -13,6 +13,8 @@ const {
   mockLoadSavedDraft,
   mockToastError,
   mockToastSuccess,
+  createDefaultQueryState,
+  queryState,
 } = vi.hoisted(() => ({
   mockConvexQuery: vi.fn(),
   mockUpdateEntry: vi.fn(),
@@ -23,6 +25,48 @@ const {
   mockLoadSavedDraft: vi.fn(),
   mockToastError: vi.fn(),
   mockToastSuccess: vi.fn(),
+  createDefaultQueryState: () => ({
+    contentType: {
+      _id: "ct_1",
+      name: "Blog Post",
+      slug: "blog-post",
+      kind: "template",
+      mode: "collection",
+      fields: [],
+    },
+    entries: [
+      {
+        _id: "entry_1",
+        slug: "my-post",
+        title: "My Post",
+        draft: { body: "Draft content" },
+        status: "draft",
+      },
+    ],
+    contentDefinitions: [],
+    savedDrafts: [],
+  }),
+  queryState: {
+    contentType: {
+      _id: "ct_1",
+      name: "Blog Post",
+      slug: "blog-post",
+      kind: "template",
+      mode: "collection",
+      fields: [],
+    },
+    entries: [
+      {
+        _id: "entry_1",
+        slug: "my-post",
+        title: "My Post",
+        draft: { body: "Draft content" },
+        status: "draft",
+      },
+    ],
+    contentDefinitions: [],
+    savedDrafts: [],
+  },
 }));
 
 vi.mock("convex/react", () => ({
@@ -36,33 +80,21 @@ vi.mock("convex/react", () => ({
     if (fnRef === "contentEntryDrafts:load") return mockLoadSavedDraft;
     return vi.fn();
   },
-  useQuery: (fnRef: string) => {
+  useQuery: (fnRef: string, args?: unknown) => {
+    if (args === "skip") {
+      return undefined;
+    }
     if (fnRef === "contentTypes:getBySlug") {
-      return {
-        _id: "ct_1",
-        name: "Blog Post",
-        slug: "blog-post",
-        kind: "template",
-        mode: "collection",
-        fields: [],
-      };
+      return queryState.contentType;
     }
     if (fnRef === "contentEntries:listByType") {
-      return [
-        {
-          _id: "entry_1",
-          slug: "my-post",
-          title: "My Post",
-          draft: { body: "Draft content" },
-          status: "draft",
-        },
-      ];
+      return queryState.entries;
     }
     if (fnRef === "contentTypes:listBySite") {
-      return [];
+      return queryState.contentDefinitions;
     }
     if (fnRef === "contentEntryDrafts:listByEntry") {
-      return [];
+      return queryState.savedDrafts;
     }
     return undefined;
   },
@@ -213,6 +245,7 @@ vi.mock("sonner", () => ({
 describe("LiveEditLayout publish cascade", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(queryState, createDefaultQueryState());
   });
 
   it("renders the live edit workspace in a resizable split layout", () => {
@@ -294,5 +327,13 @@ describe("LiveEditLayout publish cascade", () => {
     } finally {
       consoleErrorSpy.mockRestore();
     }
+  });
+
+  it("renders the entry-not-found state when the entry query resolves without a match", () => {
+    queryState.entries = [];
+
+    render(<LiveEditLayout />);
+
+    expect(screen.getByText("Entry not found")).toBeInTheDocument();
   });
 });

@@ -28,6 +28,7 @@ import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { useSite } from "@/hooks/use-site";
 import { useBeforeUnload, useKeyboardSave } from "@/hooks/use-unsaved-changes";
+import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import {
   ResizableHandle,
@@ -539,7 +540,7 @@ export function LiveEditLayout() {
   if (
     entries === undefined ||
     contentType === undefined ||
-    savedDrafts === undefined
+    (entry !== undefined && savedDrafts === undefined)
   ) {
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -568,6 +569,7 @@ export function LiveEditLayout() {
   }
 
   const backHref = `/sites/${siteSlug}/content/${params.typeSlug}/${params.entrySlug}`;
+  const entrySavedDrafts = savedDrafts ?? [];
   const publishChoices: Array<{
     value: PublishTargetValue;
     label: string;
@@ -580,7 +582,7 @@ export function LiveEditLayout() {
       description: "The autosaved draft currently open in Live Edit.",
       badge: "Current",
     },
-    ...savedDrafts.map((draft) => ({
+    ...entrySavedDrafts.map((draft) => ({
       value: draft._id,
       label: draft.name,
       description: draft.title,
@@ -595,7 +597,7 @@ export function LiveEditLayout() {
         entryTitle={title || entry.title}
         entryStatus={entry.status}
         saveStateLabel={saveStateLabel}
-        savedDraftCount={savedDrafts.length}
+        savedDraftCount={entrySavedDrafts.length}
         isDirty={isDirty}
         isProductionView={viewMode === "production"}
         isPublishing={isPreviewingPublish || isPublishing}
@@ -710,7 +712,7 @@ export function LiveEditLayout() {
               entry. Loading a saved draft replaces the current working draft.
             </DialogDescription>
           </DialogHeader>
-          {savedDrafts.length === 0 ? (
+          {entrySavedDrafts.length === 0 ? (
             <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
               No saved drafts yet. Use <strong>Save As Draft</strong> to create
               named checkpoints from the autosaved working draft.
@@ -718,7 +720,7 @@ export function LiveEditLayout() {
           ) : (
             <ScrollArea className="max-h-[60vh]">
               <div className="space-y-3 pr-4">
-                {savedDrafts.map((draft) => {
+                {entrySavedDrafts.map((draft) => {
                   const isRenaming = renamingDraftId === draft._id;
                   const isActing = draftActionId === String(draft._id);
                   return (
@@ -847,11 +849,12 @@ export function LiveEditLayout() {
                     type="button"
                     role="radio"
                     aria-checked={isSelected}
-                    className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-colors ${
+                    className={cn(
+                      "flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-colors",
                       isSelected
                         ? "border-primary bg-primary/5"
-                        : "hover:bg-muted/50"
-                    }`}
+                        : "hover:bg-muted/50",
+                    )}
                     onClick={() => setSelectedPublishTarget(choice.value)}
                   >
                     {isSelected ? (

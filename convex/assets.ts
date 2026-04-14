@@ -1,10 +1,20 @@
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { internalQuery, mutation, query } from "./_generated/server";
+import { SKIP_OPTIMIZATION_MIME_TYPES } from "./imageConstants";
 import { requireSiteAccess } from "./lib/access";
 import { getCurrentUser } from "./lib/auth";
 
-const SKIP_OPTIMIZATION_MIME_TYPES = new Set(["image/svg+xml", "image/gif"]);
+const DELETE_BATCH_SIZE = 25;
+
+function chunkValues<T>(values: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
 
 export const generateUploadUrl = mutation({
   args: {},
@@ -106,20 +116,31 @@ export const remove = mutation({
     }
 
     await requireSiteAccess(ctx, asset.siteId);
-
-    await ctx.storage.delete(asset.storageId);
-    if (asset.optimizedStorageId) {
-      await ctx.storage.delete(asset.optimizedStorageId);
-    }
     // Delete responsive variants
     const variants = await ctx.db
       .query("assetVariants")
       .withIndex("by_asset", (q) => q.eq("assetId", args.assetId))
       .collect();
-    for (const variant of variants) {
-      await ctx.storage.delete(variant.storageId);
-      await ctx.db.delete(variant._id);
+
+    const storageIds = [
+      asset.storageId,
+      asset.optimizedStorageId,
+      ...variants.map((variant) => variant.storageId),
+    ].filter((value): value is Id<"_storage"> => value !== undefined);
+    const variantIds = variants.map((variant) => variant._id);
+
+    for (const storageBatch of chunkValues(storageIds, DELETE_BATCH_SIZE)) {
+      await Promise.all(
+        storageBatch.map((storageId) => ctx.storage.delete(storageId)),
+      );
     }
+
+    for (const variantBatch of chunkValues(variantIds, DELETE_BATCH_SIZE)) {
+      await Promise.all(
+        variantBatch.map((variantId) => ctx.db.delete(variantId)),
+      );
+    }
+
     await ctx.db.delete(args.assetId);
   },
 });
