@@ -1,5 +1,19 @@
 ## @no-mess/client [0.1.1](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/compare/@no-mess/client@0.1.0...@no-mess/client@0.1.1) (2026-03-03)
 
+## 0.6.0
+
+### Minor Changes
+
+- [#36](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/pull/36) [`3dc33be`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/3dc33be3ce2501e986aba9939ee2d637f531d006) Thanks [@jjjjjjjjjjjjjjjjacob](https://github.com/jjjjjjjjjjjjjjjjacob)! - Expand the SDK for deployed runtime delivery and route-aware Live Edit.
+  - add `fetch` and `fresh` options for content reads, with automatic `fresh=true`
+    for runtime `cache: "no-store"` and `next.revalidate = 0` requests
+  - allow `@no-mess/client/next` helpers to accept API URL, fetch, logger, and
+    fresh-mode overrides
+  - keep the published SDK declarations aligned with the `index.ts` public exports
+    and ensure `buildSrcSet` always includes the base image URL as a fallback
+  - document deployed runtime delivery, uncached preview/fresh reads, and the
+    route-aware Live Edit integration requirements
+
 ## 0.5.1
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @no-mess/mcp 1.0.0 (2026-03-03)
 
+## 1.0.5
+
+### Patch Changes
+
+- Updated dependencies [[`3dc33be`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/3dc33be3ce2501e986aba9939ee2d637f531d006)]:
+  - @no-mess/client@0.6.0
+
 ## 1.0.4
 
 ### Patch Changes

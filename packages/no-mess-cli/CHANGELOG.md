@@ -1,5 +1,19 @@
 # no-mess
 
+## 0.2.0
+
+### Minor Changes
+
+- [#36](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/pull/36) [`3dc33be`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/3dc33be3ce2501e986aba9939ee2d637f531d006) Thanks [@jjjjjjjjjjjjjjjjacob](https://github.com/jjjjjjjjjjjjjjjjacob)! - Add local schema code generation and clearer draft-sync messaging in the CLI.
+  - add `no-mess codegen` to generate app-ready TypeScript contracts from `schema.ts`
+  - document `--out` support and the generated field-path metadata output
+  - warn after `push` and `dev` that schema syncs create drafts until published in the dashboard
+
+### Patch Changes
+
+- Updated dependencies [[`3dc33be`](https://github.com/jjjjjjjjjjjjjjjjacob/no-mess/commit/3dc33be3ce2501e986aba9939ee2d637f531d006)]:
+  - @no-mess/client@0.6.0
+
 ## 0.1.3
 
 ### Patch Changes
