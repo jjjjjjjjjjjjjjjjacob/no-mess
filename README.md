@@ -85,7 +85,9 @@ export const cms = createServerNoMessClient({
 That enables `fresh=true` on content reads so no-mess bypasses its published
 GET caches. The public route still needs the existing Live Edit bridge:
 `NoMessLiveRouteProvider`, `useNoMessEditableEntry(entry)`, and a
-`frame-ancestors` CSP that allows `https://admin.no-mess.xyz`.
+`frame-ancestors` CSP that allows `https://admin.no-mess.xyz`. In the
+dashboard, Live Edit overlays the current working draft on the real route
+inside the iframe while keeping production untouched until publish.
 
 ## Scripts
 

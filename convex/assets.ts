@@ -1,7 +1,20 @@
 import { ConvexError, v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import { internalQuery, mutation, query } from "./_generated/server";
+import { SKIP_OPTIMIZATION_MIME_TYPES } from "./imageConstants";
 import { requireSiteAccess } from "./lib/access";
 import { getCurrentUser } from "./lib/auth";
+
+const DELETE_BATCH_SIZE = 25;
+
+function chunkValues<T>(values: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
 
 export const generateUploadUrl = mutation({
   args: {},
@@ -44,6 +57,10 @@ export const create = mutation({
       throw new ConvexError("Failed to get storage URL");
     }
 
+    const isOptimizable =
+      args.mimeType.startsWith("image/") &&
+      !SKIP_OPTIMIZATION_MIME_TYPES.has(args.mimeType);
+
     const assetId = await ctx.db.insert("assets", {
       siteId: args.siteId,
       storageId: args.storageId,
@@ -56,7 +73,16 @@ export const create = mutation({
       url,
       uploadedAt: Date.now(),
       uploadedBy: user._id,
+      optimizationStatus: isOptimizable ? "pending" : "skipped",
     });
+
+    if (isOptimizable) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.imageOptimization.optimizeImage,
+        { assetId },
+      );
+    }
 
     return assetId;
   },
@@ -90,8 +116,31 @@ export const remove = mutation({
     }
 
     await requireSiteAccess(ctx, asset.siteId);
+    // Delete responsive variants
+    const variants = await ctx.db
+      .query("assetVariants")
+      .withIndex("by_asset", (q) => q.eq("assetId", args.assetId))
+      .collect();
 
-    await ctx.storage.delete(asset.storageId);
+    const storageIds = [
+      asset.storageId,
+      asset.optimizedStorageId,
+      ...variants.map((variant) => variant.storageId),
+    ].filter((value): value is Id<"_storage"> => value !== undefined);
+    const variantIds = variants.map((variant) => variant._id);
+
+    for (const storageBatch of chunkValues(storageIds, DELETE_BATCH_SIZE)) {
+      await Promise.all(
+        storageBatch.map((storageId) => ctx.storage.delete(storageId)),
+      );
+    }
+
+    for (const variantBatch of chunkValues(variantIds, DELETE_BATCH_SIZE)) {
+      await Promise.all(
+        variantBatch.map((variantId) => ctx.db.delete(variantId)),
+      );
+    }
+
     await ctx.db.delete(args.assetId);
   },
 });
@@ -125,5 +174,14 @@ export const listBySite = query({
       .collect();
 
     return assets.sort((a, b) => b.uploadedAt - a.uploadedAt);
+  },
+});
+
+export const getInternal = internalQuery({
+  args: {
+    assetId: v.id("assets"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.assetId);
   },
 });

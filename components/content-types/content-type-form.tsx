@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { slugify } from "@/lib/slugify";
 
 const FIELD_TYPE_OPTIONS: { label: string; value: FieldType }[] = [
   { value: "text", label: "Text" },
@@ -100,15 +101,6 @@ interface FieldAddControlsProps {
   disabled: boolean;
   onAddPreset: (preset: FieldPreset) => void;
   onAddType: (type: FieldType) => void;
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 }
 
 function parseOptionalNumber(value: string) {

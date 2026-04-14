@@ -27,8 +27,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
-    "test": "vitest run"
+    "build": "if [ -f ./node_modules/typescript/bin/tsc ]; then node ./node_modules/typescript/bin/tsc; else node ../../node_modules/typescript/bin/tsc; fi",
+    "test": "if [ -f ./node_modules/vitest/vitest.mjs ]; then node ./node_modules/vitest/vitest.mjs run; else node ../../node_modules/vitest/vitest.mjs run; fi"
   },
   "peerDependencies": {
     "react": ">=18.0.0"

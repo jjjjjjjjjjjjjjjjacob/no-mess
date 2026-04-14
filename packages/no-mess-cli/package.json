@@ -11,8 +11,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
+    "build": "if [ -f ./node_modules/typescript/bin/tsc ]; then node ./node_modules/typescript/bin/tsc; else node ../../node_modules/typescript/bin/tsc; fi",
+    "dev": "if [ -f ./node_modules/typescript/bin/tsc ]; then node ./node_modules/typescript/bin/tsc --watch; else node ../../node_modules/typescript/bin/tsc --watch; fi"
   },
   "dependencies": {
     "@no-mess/client": "^0.5.0",

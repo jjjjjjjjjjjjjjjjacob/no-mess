@@ -17,8 +17,8 @@ export default function GettingStartedPage() {
       <p className="text-muted-foreground">
         no-mess is a headless CMS designed for developers who need to ship
         content management to their clients without complexity. You define
-        content schemas, your clients edit content, and you fetch it all via a
-        TypeScript SDK.
+        content schemas, your clients edit content in Live Edit, and you fetch
+        it all via a TypeScript SDK.
       </p>
 
       <DocsHeading>Quick Start</DocsHeading>
@@ -107,15 +107,17 @@ export default function GettingStartedPage() {
           Go to <strong>Content</strong>, pick a collection template, and create
           entries. Singleton templates open directly into their authoring
           screen, and fragments are excluded because they are embedded inside
-          other templates. Each entry starts as a draft. Click{" "}
-          <strong>Publish</strong> when it&apos;s ready.
+          other templates. If the site has a Preview and Live Edit Base URL
+          configured, entry links open Live Edit by default. Each entry keeps an
+          autosaved working draft, and you can save named draft variations
+          before you <strong>Publish</strong>.
         </p>
       </DocsStep>
 
       <DocsStep number={5} title="Connect route-aware preview and Live Edit">
         <p>
-          Set the site <strong>Preview URL</strong> to your site origin, then
-          add{" "}
+          Set the site <strong>Preview and Live Edit Base URL</strong> to your
+          site origin, then add{" "}
           <code className="rounded bg-muted px-1 font-mono text-xs">
             NoMessLiveRouteProvider
           </code>{" "}
@@ -293,7 +295,8 @@ export function BlogArticle({ entry }) {
           >
             Live Edit
           </a>{" "}
-          &mdash; instant iframe-only edits, URL bar, and delivery URLs
+          &mdash; working drafts, saved drafts, page URLs, and production
+          comparisons
         </li>
         <li>
           <a

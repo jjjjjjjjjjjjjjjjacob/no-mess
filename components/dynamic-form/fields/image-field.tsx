@@ -42,6 +42,8 @@ export function ImageField({ value, onChange, disabled }: ImageFieldProps) {
               src={asset.url}
               alt={asset.filename}
               className="h-16 w-16 rounded object-cover"
+              loading="lazy"
+              decoding="async"
             />
           ) : (
             <div className="flex h-16 w-16 items-center justify-center rounded bg-muted">

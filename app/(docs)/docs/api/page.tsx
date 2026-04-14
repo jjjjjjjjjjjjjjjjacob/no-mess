@@ -8,8 +8,8 @@ export default function ApiPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">API Reference</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Read published content, exchange preview sessions, and report delivery
-          routes for route-aware Live Edit.
+          Read published content, exchange working-draft preview sessions, and
+          report page URLs for route-aware Live Edit.
         </p>
       </div>
 
@@ -74,11 +74,11 @@ Content-Type: application/json
         language="http"
       />
       <p className="text-muted-foreground">
-        This endpoint is uncached and returns draft content for the current
-        iframe session after HMAC verification.
+        This endpoint is uncached and returns the current working draft for the
+        active iframe session after HMAC verification.
       </p>
 
-      <DocsHeading>Route Report Endpoint</DocsHeading>
+      <DocsHeading>Page URL Report Endpoint</DocsHeading>
       <DocsStep number={1} title="Request">
         <CodeBlock
           code={`POST /api/live-edit/routes/report
@@ -100,8 +100,8 @@ Content-Type: application/json
             browser-side route reporting.
           </p>
           <p>
-            Normalizes the URL against the site preview base URL and strips
-            transient preview parameters such as{" "}
+            Normalizes the URL against the site preview and Live Edit base URL
+            and strips transient preview parameters such as{" "}
             <code className="rounded bg-muted px-1 font-mono text-xs">sid</code>
             ,{" "}
             <code className="rounded bg-muted px-1 font-mono text-xs">
@@ -120,6 +120,10 @@ Content-Type: application/json
               type
             </code>
             .
+          </p>
+          <p>
+            The site preview and Live Edit base URL determine which origins and
+            path prefixes are valid.
           </p>
           <p>
             Only writes again when a route is new or the last seen timestamp is
@@ -145,8 +149,8 @@ Cache-Control: no-store, no-cache, must-revalidate
       <DocsHeading>Validation Rules</DocsHeading>
       <div className="space-y-3 text-muted-foreground">
         <p>
-          Route URLs must match the preview URL origin and stay within its path
-          prefix.
+          Page URLs must match the preview and Live Edit base URL origin and
+          stay within its path prefix.
         </p>
         <p>
           The request origin or referer must also match the reported route

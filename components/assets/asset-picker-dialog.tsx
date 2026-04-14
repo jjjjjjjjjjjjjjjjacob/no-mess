@@ -110,6 +110,8 @@ export function AssetPickerDialog({
                       src={asset.url}
                       alt={asset.filename}
                       className="h-full w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
                     />
                   )}
                   <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-1">

@@ -1,19 +1,72 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { LiveEditLayout } from "../live-edit-layout";
 
 const {
   mockConvexQuery,
   mockUpdateEntry,
   mockPublishEntry,
+  mockCreateSavedDraft,
+  mockRenameSavedDraft,
+  mockRemoveSavedDraft,
+  mockLoadSavedDraft,
   mockToastError,
   mockToastSuccess,
+  createDefaultQueryState,
+  queryState,
 } = vi.hoisted(() => ({
   mockConvexQuery: vi.fn(),
   mockUpdateEntry: vi.fn(),
   mockPublishEntry: vi.fn(),
+  mockCreateSavedDraft: vi.fn(),
+  mockRenameSavedDraft: vi.fn(),
+  mockRemoveSavedDraft: vi.fn(),
+  mockLoadSavedDraft: vi.fn(),
   mockToastError: vi.fn(),
   mockToastSuccess: vi.fn(),
+  createDefaultQueryState: () => ({
+    contentType: {
+      _id: "ct_1",
+      name: "Blog Post",
+      slug: "blog-post",
+      kind: "template",
+      mode: "collection",
+      fields: [],
+    },
+    entries: [
+      {
+        _id: "entry_1",
+        slug: "my-post",
+        title: "My Post",
+        draft: { body: "Draft content" },
+        status: "draft",
+      },
+    ],
+    contentDefinitions: [],
+    savedDrafts: [],
+  }),
+  queryState: {
+    contentType: {
+      _id: "ct_1",
+      name: "Blog Post",
+      slug: "blog-post",
+      kind: "template",
+      mode: "collection",
+      fields: [],
+    },
+    entries: [
+      {
+        _id: "entry_1",
+        slug: "my-post",
+        title: "My Post",
+        draft: { body: "Draft content" },
+        status: "draft",
+      },
+    ],
+    contentDefinitions: [],
+    savedDrafts: [],
+  },
 }));
 
 vi.mock("convex/react", () => ({
@@ -21,32 +74,27 @@ vi.mock("convex/react", () => ({
   useMutation: (fnRef: string) => {
     if (fnRef === "contentEntries:update") return mockUpdateEntry;
     if (fnRef === "contentEntries:publish") return mockPublishEntry;
+    if (fnRef === "contentEntryDrafts:create") return mockCreateSavedDraft;
+    if (fnRef === "contentEntryDrafts:rename") return mockRenameSavedDraft;
+    if (fnRef === "contentEntryDrafts:remove") return mockRemoveSavedDraft;
+    if (fnRef === "contentEntryDrafts:load") return mockLoadSavedDraft;
     return vi.fn();
   },
-  useQuery: (fnRef: string) => {
+  useQuery: (fnRef: string, args?: unknown) => {
+    if (args === "skip") {
+      return undefined;
+    }
     if (fnRef === "contentTypes:getBySlug") {
-      return {
-        _id: "ct_1",
-        name: "Blog Post",
-        slug: "blog-post",
-        kind: "template",
-        mode: "collection",
-        fields: [],
-      };
+      return queryState.contentType;
     }
     if (fnRef === "contentEntries:listByType") {
-      return [
-        {
-          _id: "entry_1",
-          slug: "my-post",
-          title: "My Post",
-          draft: { body: "Draft content" },
-          status: "draft",
-        },
-      ];
+      return queryState.entries;
     }
     if (fnRef === "contentTypes:listBySite") {
-      return [];
+      return queryState.contentDefinitions;
+    }
+    if (fnRef === "contentEntryDrafts:listByEntry") {
+      return queryState.savedDrafts;
     }
     return undefined;
   },
@@ -63,6 +111,13 @@ vi.mock("@/convex/_generated/api", () => ({
       update: "contentEntries:update",
       publish: "contentEntries:publish",
       getPublishPlan: "contentEntries:getPublishPlan",
+    },
+    contentEntryDrafts: {
+      listByEntry: "contentEntryDrafts:listByEntry",
+      create: "contentEntryDrafts:create",
+      rename: "contentEntryDrafts:rename",
+      remove: "contentEntryDrafts:remove",
+      load: "contentEntryDrafts:load",
     },
   },
 }));
@@ -90,7 +145,7 @@ vi.mock("@/components/live-edit/live-edit-toolbar", () => ({
     onPublish: () => Promise<void> | void;
   }) => (
     <button type="button" onClick={() => void onPublish()}>
-      Save & Publish
+      Publish
     </button>
   ),
 }));
@@ -103,8 +158,66 @@ vi.mock("@/components/live-edit/live-edit-preview-panel", () => ({
   LiveEditPreviewPanel: () => <div data-testid="preview-panel" />,
 }));
 
+vi.mock("@/components/ui/resizable", () => ({
+  ResizablePanelGroup: ({ children }: { children: ReactNode }) => (
+    <div data-testid="resizable-group">{children}</div>
+  ),
+  ResizablePanel: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  ResizableHandle: () => <div data-testid="resizable-handle" />,
+}));
+
 vi.mock("@/components/ui/skeleton", () => ({
   Skeleton: () => <div />,
+}));
+
+vi.mock("@/components/ui/button", () => ({
+  Button: ({
+    children,
+    onClick,
+    type = "button",
+    disabled,
+  }: {
+    children: ReactNode;
+    onClick?: () => void;
+    type?: "button" | "submit";
+    disabled?: boolean;
+  }) => (
+    <button type={type} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  ),
+}));
+
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ children, open }: { children: ReactNode; open: boolean }) =>
+    open ? <div>{children}</div> : null,
+  DialogContent: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DialogDescription: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DialogFooter: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DialogHeader: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DialogTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock("@/components/ui/input", () => ({
+  Input: (props: Record<string, unknown>) => <input {...props} />,
+}));
+
+vi.mock("@/components/ui/label", () => ({
+  Label: ({ children }: { children: ReactNode }) => <label>{children}</label>,
+}));
+
+vi.mock("@/components/ui/scroll-area", () => ({
+  ScrollArea: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("@/components/publishing/publish-cascade-dialog", () => ({
@@ -132,6 +245,15 @@ vi.mock("sonner", () => ({
 describe("LiveEditLayout publish cascade", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(queryState, createDefaultQueryState());
+  });
+
+  it("renders the live edit workspace in a resizable split layout", () => {
+    render(<LiveEditLayout />);
+
+    expect(screen.getByTestId("resizable-group")).toBeInTheDocument();
+    expect(screen.getByTestId("field-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("preview-panel")).toBeInTheDocument();
   });
 
   it("passes expected cascade slugs after confirming from live edit", async () => {
@@ -145,7 +267,10 @@ describe("LiveEditLayout publish cascade", () => {
 
     render(<LiveEditLayout />);
 
-    await user.click(screen.getByRole("button", { name: "Save & Publish" }));
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+    await user.click(
+      screen.getByRole("button", { name: "Publish Selected Draft" }),
+    );
 
     expect(mockPublishEntry).not.toHaveBeenCalled();
 
@@ -178,7 +303,10 @@ describe("LiveEditLayout publish cascade", () => {
     try {
       render(<LiveEditLayout />);
 
-      await user.click(screen.getByRole("button", { name: "Save & Publish" }));
+      await user.click(screen.getByRole("button", { name: "Publish" }));
+      await user.click(
+        screen.getByRole("button", { name: "Publish Selected Draft" }),
+      );
 
       await waitFor(() => {
         expect(mockToastError).toHaveBeenCalledWith("Plan lookup failed");
@@ -187,7 +315,11 @@ describe("LiveEditLayout publish cascade", () => {
         "Failed to load entry publish plan",
         expect.any(Error),
       );
-      expect(mockUpdateEntry).not.toHaveBeenCalled();
+      expect(mockUpdateEntry).toHaveBeenCalledWith({
+        entryId: "entry_1",
+        title: "My Post",
+        draft: { body: "Draft content" },
+      });
       expect(mockPublishEntry).not.toHaveBeenCalled();
       expect(
         screen.queryByRole("button", { name: "Confirm cascade" }),
@@ -195,5 +327,13 @@ describe("LiveEditLayout publish cascade", () => {
     } finally {
       consoleErrorSpy.mockRestore();
     }
+  });
+
+  it("renders the entry-not-found state when the entry query resolves without a match", () => {
+    queryState.entries = [];
+
+    render(<LiveEditLayout />);
+
+    expect(screen.getByText("Entry not found")).toBeInTheDocument();
   });
 });

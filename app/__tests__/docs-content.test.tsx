@@ -40,6 +40,8 @@ describe("docs content", () => {
     expect(text).toContain("createServerNoMessClient");
     expect(text).toContain('cache: "no-store"');
     expect(text).toContain("useNoMessEditableEntry");
+    expect(text).toContain("working draft");
+    expect(text).toContain("Preview and Live Edit Base URL");
     expect(text).toContain("NO_MESS_API_KEY");
     expect(text).not.toContain("NO_MESS_SECRET_KEY");
   });
@@ -71,6 +73,8 @@ describe("docs content", () => {
 
     expect(text).toContain("frame-ancestors");
     expect(text).toContain('cache: "no-store"');
+    expect(text).toContain("Preview and Live Edit Base URL");
+    expect(text).toContain("current working draft");
     expect(text).toContain("static export");
   });
 
@@ -83,6 +87,9 @@ describe("docs content", () => {
     expect(text).toContain("frame-ancestors");
     expect(text).toContain("Content-Security-Policy");
     expect(text).toContain("append or merge");
+    expect(text).toContain("working draft");
+    expect(text).toContain("Saved drafts");
+    expect(text).toContain("Production");
   });
 
   it("documents fresh content reads as uncached runtime requests", () => {
@@ -91,5 +98,7 @@ describe("docs content", () => {
 
     expect(text).toContain("fresh=true");
     expect(text).toContain("no-store, no-cache, must-revalidate");
+    expect(text).toContain("current working draft");
+    expect(text).toContain("Page URL Report Endpoint");
   });
 });

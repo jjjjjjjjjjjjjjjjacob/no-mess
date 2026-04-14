@@ -142,4 +142,67 @@ describe("http router", () => {
     const unknown = http.lookup("/api/nonexistent", "GET");
     expect(unknown).toBeNull();
   });
+
+  it("rejects an explicitly empty images parameter", async () => {
+    const route = http.lookup("/api/content/blog-posts", "GET");
+    expect(route).not.toBeNull();
+
+    const handler = route?.[0] as unknown as (
+      ctx: { runQuery: ReturnType<typeof vi.fn> },
+      request: Request,
+    ) => Promise<Response>;
+    const ctx = {
+      runQuery: vi
+        .fn()
+        .mockResolvedValueOnce({ _id: "site_1", previewSecret: "preview" }),
+    };
+
+    const response = await handler(
+      ctx,
+      new Request("https://example.com/api/content/blog-posts?images=", {
+        headers: {
+          Authorization: "Bearer nm_secret_key",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Unsupported images value: ""',
+    });
+    expect(ctx.runQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects multiple images parameters", async () => {
+    const route = http.lookup("/api/content/blog-posts", "GET");
+    expect(route).not.toBeNull();
+
+    const handler = route?.[0] as unknown as (
+      ctx: { runQuery: ReturnType<typeof vi.fn> },
+      request: Request,
+    ) => Promise<Response>;
+    const ctx = {
+      runQuery: vi
+        .fn()
+        .mockResolvedValueOnce({ _id: "site_1", previewSecret: "preview" }),
+    };
+
+    const response = await handler(
+      ctx,
+      new Request(
+        "https://example.com/api/content/blog-posts?images=rich&images=rich",
+        {
+          headers: {
+            Authorization: "Bearer nm_secret_key",
+          },
+        },
+      ),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Unsupported images value: "rich", "rich"',
+    });
+    expect(ctx.runQuery).toHaveBeenCalledTimes(1);
+  });
 });

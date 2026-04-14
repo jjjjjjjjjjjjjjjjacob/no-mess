@@ -167,7 +167,9 @@ export default function SiteSettingsPage() {
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="settings-preview-url">Preview URL</Label>
+            <Label htmlFor="settings-preview-url">
+              Preview and Live Edit Base URL
+            </Label>
             <Input
               id="settings-preview-url"
               placeholder="https://mysite.com"
@@ -175,7 +177,8 @@ export default function SiteSettingsPage() {
               onChange={(e) => setPreviewUrl(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Used for preview links when editing content.
+              The base site URL used to open Live Edit, validate page URLs, and
+              build preview routes.
             </p>
           </div>
           <Button onClick={handleSave} disabled={isSaving}>

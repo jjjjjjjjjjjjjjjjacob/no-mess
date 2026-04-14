@@ -78,7 +78,8 @@ export function EntryContextMenu({
   const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
   const publishFlowInFlightRef = useRef(false);
 
-  const editPath = `/sites/${siteSlug}/content/${typeSlug}/${entry.slug}`;
+  const detailsPath = `/sites/${siteSlug}/content/${typeSlug}/${entry.slug}`;
+  const liveEditPath = `/sites/${siteSlug}/live-edit/${typeSlug}/${entry.slug}`;
   const hasDraftChanges =
     entry.hasDraftChanges ??
     hasPendingEntryDraft({
@@ -89,11 +90,11 @@ export function EntryContextMenu({
   const canPublishDraft = entry.status === "draft" || hasDraftChanges;
 
   const openEntry = () => {
-    router.push(editPath);
+    router.push(detailsPath);
   };
 
   const openLiveEdit = () => {
-    router.push(`/sites/${siteSlug}/live-edit/${typeSlug}/${entry.slug}`);
+    router.push(liveEditPath);
   };
 
   const publishEntryWithOptions = async (options?: {
@@ -178,7 +179,7 @@ export function EntryContextMenu({
   };
 
   const handleCopyUrl = async () => {
-    await copy(`${window.location.origin}${editPath}`);
+    await copy(`${window.location.origin}${detailsPath}`);
     toast.success("Entry URL copied");
   };
 

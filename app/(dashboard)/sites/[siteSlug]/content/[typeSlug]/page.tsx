@@ -106,6 +106,10 @@ export default function EntriesListPage() {
 
   if (!site) return null;
 
+  const entryHrefBase = site.previewUrl
+    ? `/sites/${siteSlug}/live-edit/${params.typeSlug}`
+    : `/sites/${siteSlug}/content/${params.typeSlug}`;
+
   if (contentType === undefined) {
     return (
       <div className="space-y-4">
@@ -250,7 +254,7 @@ export default function EntriesListPage() {
                   typeSlug={params.typeSlug}
                 >
                   <Link
-                    href={`/sites/${siteSlug}/content/${params.typeSlug}/${entry.slug}`}
+                    href={`${entryHrefBase}/${entry.slug}`}
                     className="flex items-center justify-between p-4 transition-colors hover:bg-muted/50"
                   >
                     <div>

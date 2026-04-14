@@ -264,6 +264,37 @@ function parseExpandTargets(url: URL) {
   };
 }
 
+function parseImagesMode(url: URL) {
+  if (!url.searchParams.has("images")) {
+    return {
+      ok: true as const,
+      images: undefined,
+    };
+  }
+
+  const values = url.searchParams.getAll("images");
+  const unsupportedImagesValue = (value: string) => ({
+    ok: false as const,
+    error: corsJsonError(`Unsupported images value: ${value}`, 400),
+  });
+
+  if (values.length !== 1) {
+    return unsupportedImagesValue(
+      values.map((value) => JSON.stringify(value)).join(", "),
+    );
+  }
+
+  const [images] = values;
+  if (images === "rich") {
+    return {
+      ok: true as const,
+      images: "rich" as const,
+    };
+  }
+
+  return unsupportedImagesValue(JSON.stringify(images));
+}
+
 function getRequestOrigin(request: Request): string | null {
   const origin = request.headers.get("Origin");
   if (origin) {
@@ -312,6 +343,11 @@ http.route({
     const entrySlug = pathParts[1]; // undefined if listing
     const previewRequested = url.searchParams.get("preview") === "true";
     const fresh = url.searchParams.get("fresh") === "true";
+    const imagesResult = parseImagesMode(url);
+    if (!imagesResult.ok) {
+      return imagesResult.error;
+    }
+    const images = imagesResult.images;
     const expandResult = parseExpandTargets(url);
     if (!expandResult.ok) {
       return expandResult.error;
@@ -344,6 +380,7 @@ http.route({
           slug: entrySlug,
           preview: isPreview,
           expand: expandResult.expand,
+          images,
         },
       );
 
@@ -363,6 +400,7 @@ http.route({
         // biome-ignore lint/suspicious/noExplicitAny: Convex ID type coercion
         siteId: site._id as any,
         expand: expandResult.expand,
+        images,
       },
     );
 

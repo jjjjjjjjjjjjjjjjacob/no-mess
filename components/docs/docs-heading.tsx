@@ -1,12 +1,6 @@
 import type { ReactNode } from "react";
+import { slugify } from "@/lib/slugify";
 import { cn } from "@/lib/utils";
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 interface DocsHeadingProps {
   as?: "h2" | "h3";

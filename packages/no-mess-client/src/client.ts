@@ -398,6 +398,10 @@ export class NoMessClient {
       params.expand = expand.join(",");
     }
 
+    if (options?.images === "rich") {
+      params.images = "rich";
+    }
+
     const entryOptions = options as GetEntryOptions | undefined;
     if (entryOptions?.preview) {
       params.preview = "true";

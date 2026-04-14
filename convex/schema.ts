@@ -85,6 +85,22 @@ export default defineSchema({
     .index("by_slug", ["siteId", "contentTypeId", "slug"])
     .index("by_status", ["siteId", "status"]),
 
+  contentEntryDrafts: defineTable({
+    siteId: v.id("sites"),
+    entryId: v.id("contentEntries"),
+    name: v.string(),
+    nameLower: v.string(),
+    title: v.string(),
+    draft: v.any(),
+    createdAt: v.number(),
+    createdBy: v.id("users"),
+    updatedAt: v.number(),
+    updatedBy: v.id("users"),
+  })
+    .index("by_site", ["siteId"])
+    .index("by_entry", ["entryId"])
+    .index("by_entry_name_lower", ["entryId", "nameLower"]),
+
   contentEntryRoutes: defineTable({
     siteId: v.id("sites"),
     entryId: v.id("contentEntries"),
@@ -112,9 +128,36 @@ export default defineSchema({
     url: v.string(),
     uploadedAt: v.number(),
     uploadedBy: v.id("users"),
+    // Image optimization fields
+    optimizedStorageId: v.optional(v.id("_storage")),
+    optimizedUrl: v.optional(v.string()),
+    optimizedSize: v.optional(v.number()),
+    optimizedMimeType: v.optional(v.string()),
+    optimizationStatus: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("processing"),
+        v.literal("completed"),
+        v.literal("failed"),
+        v.literal("skipped"),
+      ),
+    ),
+    optimizationError: v.optional(v.string()),
   })
     .index("by_site", ["siteId"])
-    .index("by_site_checksum", ["siteId", "checksum"]),
+    .index("by_site_checksum", ["siteId", "checksum"])
+    .index("by_optimization_status", ["optimizationStatus"]),
+
+  assetVariants: defineTable({
+    assetId: v.id("assets"),
+    storageId: v.id("_storage"),
+    url: v.string(),
+    width: v.number(),
+    height: v.number(),
+    mimeType: v.string(),
+    size: v.number(),
+    generatedAt: v.number(),
+  }).index("by_asset", ["assetId"]),
 
   shopifyProducts: defineTable({
     siteId: v.id("sites"),
