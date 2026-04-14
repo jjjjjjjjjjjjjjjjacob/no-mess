@@ -8,14 +8,14 @@
   ],
   "scripts": {
     "dev": "next dev --port 4567",
-    "build:client": "tsc -p packages/no-mess-client",
+    "build:client": "node ./node_modules/typescript/bin/tsc -p packages/no-mess-client",
     "build": "bun run build:client && next build",
     "start": "next start",
     "lint": "biome check",
     "format": "biome format --write",
-    "static-checks": "biome check && bun run build:client && tsc --noEmit && tsc --noEmit -p packages/no-mess-cli && tsc --noEmit -p packages/no-mess-mcp && bun run test",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "static-checks": "biome check && bun run build:client && node ./node_modules/typescript/bin/tsc --noEmit && node ./node_modules/typescript/bin/tsc --noEmit -p packages/no-mess-cli && node ./node_modules/typescript/bin/tsc --noEmit -p packages/no-mess-mcp && bun run test",
+    "test": "node ./node_modules/vitest/vitest.mjs run",
+    "test:watch": "node ./node_modules/vitest/vitest.mjs",
     "version": "changeset version",
     "release": "changeset publish",
     "prepare": "husky"
